@@ -1,0 +1,28 @@
+{
+  "name": "rallytree",
+  "version": "1.0.0",
+  "description": "Automation of Rally tree management",
+  "main": "index.html",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jrpool/rallytree.git"
+  },
+  "keywords": [
+    "API",
+    "REST"
+  ],
+  "author": "Jonathan Pool",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jrpool/rallytree/issues"
+  },
+  "homepage": "https://github.com/jrpool/rallytree#readme",
+  "dependencies": {
+    "axios": "*",
+    "dotenv": "*",
+    "rally": "*"
+  }
+}
