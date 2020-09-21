@@ -1,5 +1,52 @@
+// Import the module to access files.
+const fs = require('fs').promises;
 // Import the module to keep secrets local.
 require('dotenv').config();
+// Import the module to create a web server.
+const http = require('http');
+// Function to handle requests.
+const requestHandler = (request, response) => {
+    const {headers, method} = request;
+    const body = [];
+    request.on('error', err => {
+        console.error(err);
+    })
+    .on('data', chunk => {
+        body.push(chunk);
+    })
+    .on('end', () => {
+        const bodyString = Buffer.concat(body).toString();
+        request.setHeader('Content-Type', 'text/html');
+        if (method === 'get') {
+            fs.readFile('index.html', 'utf8')
+            .then(content => {
+                response.write(content);
+                response.end();
+            })
+        }
+        else {
+            response.write(
+                `<html lang="en-US">
+                <title>
+                Response
+                </title>
+                <body>
+                <p>Not a GET request.</p>
+                </body>
+                </html>`
+            );
+            response.end();
+        }
+    });
+};
+// Create the server.
+const server = http.createServer(requestHandler);
+// Configure the server.
+const port = process.env.PORT;
+// Start the server.
+server.listen(port, () => {
+    console.log(`Server listening at localhost:${port}.`);
+});
 const myName = process.env.RALLY_USERNAME;
 console.log(`The .env file says I am ${myName}`);
 // Import the Rally module.
@@ -138,10 +185,12 @@ const setOwnerOfTreeOf = (userRef, storyRef) => {
 // Make me the owner of the tree of the specified user story.
 // setOwnerOfTreeOf(myRef, mainRootRef);
 // getOwnerOf(mainRootShortRef);
+/*
 getMe()
 .then(me => {
     setOwnerOfTreeOf(me, mainRootRef)
 });
+*/
 /*
 
 // Function to get a reference to a named user.
