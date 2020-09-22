@@ -1,10 +1,178 @@
-// Import the module to access files.
+// ########## IMPORTS
+
+// Module to access files.
 const fs = require('fs').promises;
-// Import the module to keep secrets local.
+// Module to keep secrets local.
 require('dotenv').config();
-// Import the module to create a web server.
+// Module to create a web server.
 const http = require('http');
-// Function to handle requests.
+// Module to parse request bodies.
+const {parse} = require('querystring');
+// Rally module.
+const rally = require('rally');
+
+// ########## GLOBAL VARIABLES
+
+// User’s Rally user name and password.
+let userNameX = process.env.RALLY_USERNAME;
+let passwordX = process.env.RALLY_PASSWORD;
+// Counts.
+let itemCount = alreadyCount = changeCount = 0;
+let errorMessage = '';
+const queryUtils = rally.util.query;
+// REST API.
+const requestOptions = {
+    headers: {
+        'X-RallyIntegrationName': process.env.RALLYINTEGRATIONNAME || 'RallyTree',
+        'X-RallyIntegrationVendor': process.env.RALLYINTEGRATIONVENDOR || '',
+        'X-RallyIntegrationVersion': process.env.RALLYINTEGRATIONVERSION || '1.0'
+    }
+};
+
+// ########## FUNCTIONS
+
+// Gets a reference to a user.
+const getUser = (restAPI, userName) => {
+    return restAPI.query({
+        type: 'user',
+        query: queryUtils.where('UserName', '=', userName)
+    })
+    .then(
+        user => {
+            const userRef = user.Results[0]._ref;
+            return userRef;
+        },
+        error => {
+            errorMessage = `Error getting user: ${error.message}`;
+            return '';
+        }
+    );
+};
+// Gets a reference to the owner of a user story.
+const getOwnerOf = (restAPI, storyRef) => {
+    console.log(storyRef);
+    if (errorMessage) {
+        return Promise.resolve('');
+    }
+    else {
+        console.log(`storyRef is ${storyRef}`);
+        return restAPI.get({
+            ref: storyRef,
+            fetch: ['Owner']
+        })
+        .then(
+            result => {
+                const owner = result.Object.Owner;
+                return owner ? owner._ref : '';
+            },
+            error => {
+                errorMessage = `Error getting user story’s owner: ${
+                    error.message
+                }.`;
+                return '';
+            }
+        );
+    }
+};
+// Makes a user the owner of a user story.
+const setOwnerOf = (restAPI, userRef, storyRef) => {
+    if (! errorMessage) {
+        restAPI.update({
+            ref: storyRef,
+            data: {Owner: userRef}
+        });
+        // Increment the count of owner changes.
+        changeCount++;
+    }
+};
+// Gets references to the child user stories of a user story.
+const getChildrenOf = (restAPI, storyRef) => {
+    if (errorMessage) {
+        return Promise.resolve('');
+    }
+    else {
+        return restAPI.get({
+            ref: `${storyRef}/Children`,
+            fetch: ['_ref']
+        })
+        .then(
+            childrenRef => {
+                const childRefs = childrenRef.Object.Results.map(
+                    result => result._ref
+                );
+                // Increment the count of found items.
+                itemCount += childRefs.length;
+                return childRefs;
+            },
+            error => {
+                errorMessage = `Error getting children: ${error.message}.`;
+                return '';
+            }
+        );
+    }
+};
+// Makes a user the owner of the (sub)tree rooted at a user story.
+const setOwnerOfTreeOf = (restAPI, userRef, storyRef) => {
+    if (errorMessage) {
+        return Promise.resolve('');
+    }
+    else {
+        return getOwnerOf(restAPI, storyRef)
+        .then(
+            ownerRef => {
+                if (errorMessage) {
+                    return '';
+                }
+                else if (ownerRef !== userRef) {
+                    setOwnerOf(restAPI, userRef, storyRef);
+                }
+                else {
+                    alreadyCount++;
+                }
+                return getChildrenOf(restAPI, storyRef)
+                .then(
+                    children => {
+                        if (! errorMessage) {
+                            children.forEach(childRef => {
+                                setOwnerOfTreeOf(restAPI, userRef, childRef);
+                            });
+                        }
+                        return '';
+                    },
+                    error => {
+                        errorMessage = `Error setting owner of children: ${
+                            error.message
+                        }.`;
+                        return '';
+                    }
+                )
+            },
+            error => {
+                errorMessage = `Error getting root owner: ${error.message}.`;
+            }
+        )
+    }
+};
+// Serves the error page.
+const serveError = (response, errorMessage) => {
+    fs.readFile('error.html', 'utf8')
+    .then(
+        content => {
+            const newContent = content.replace(
+                '[[errorMessage]]', errorMessage
+            );
+            response.setHeader('Content-Type', 'text/html');
+            response.write(newContent);
+            response.end();
+        },
+        error => {
+            console.log(
+                `Error reading error page: ${error.message}`
+            );
+        }
+    );
+};
+// Handles requests.
 const requestHandler = (request, response) => {
     const {headers, method} = request;
     const body = [];
@@ -15,302 +183,113 @@ const requestHandler = (request, response) => {
         body.push(chunk);
     })
     .on('end', () => {
-        const bodyString = Buffer.concat(body).toString();
-        request.setHeader('Content-Type', 'text/html');
-        if (method === 'get') {
-            fs.readFile('index.html', 'utf8')
-            .then(content => {
-                response.write(content);
-                response.end();
-            })
+        if (method === 'GET') {
+            if (request.url === '/style.css') {
+                fs.readFile('style.css', 'utf8')
+                .then(
+                    content => {
+                        response.setHeader('Content-Type', 'text/css');
+                        response.write(content);
+                        response.end();
+                    },
+                    error => {
+                        console.log(`Error reading stylesheet: ${error.message}`);
+                    }
+                );
+            }
+            else {
+                fs.readFile('index.html', 'utf8')
+                .then(
+                    content => {
+                        response.setHeader('Content-Type', 'text/html');
+                        response.write(content);
+                        response.end();
+                    },
+                    error => {
+                        console.log(`Error reading home page: ${error.message}`);
+                    }
+                );
+            }
         }
-        else {
-            response.write(
-                `<html lang="en-US">
-                <title>
-                Response
-                </title>
-                <body>
-                <p>Not a GET request.</p>
-                </body>
-                </html>`
+        else if (method === 'POST') {
+            const bodyObject = parse(Buffer.concat(body).toString());
+            const userName = bodyObject.userName;
+            const restAPI = rally({
+                user: userName,
+                pass: bodyObject.password,
+                requestOptions
+            });
+            getUser(restAPI, userName)
+            .then(
+                userRef => {
+                    if (errorMessage) {
+                        serveError(response, errorMessage);
+                    }
+                    else {
+                        const rootRef = bodyObject.rootURL.replace(
+                            /^.+([/]|%2F)/, '/hierarchicalrequirement/'
+                        );
+                        setOwnerOfTreeOf(restAPI, userRef, rootRef)
+                        .then(
+                            () => {
+                                if (errorMessage) {
+                                    serveError(response, errorMessage);
+                                }
+                                else {
+                                    fs.readFile('result.html', 'utf8')
+                                    .then(
+                                        content => {
+                                            const newContent = content.replace(
+                                                '[[userName]]', bodyObject.userName
+                                            )
+                                            .replace(
+                                                '[[rootURL]]', bodyObject.rootURL
+                                            )
+                                            .replace(
+                                                '[[itemCount]]', itemCount
+                                            )
+                                            .replace(
+                                                '[[alreadyCount]]', alreadyCount
+                                            )
+                                            .replace(
+                                                '[[changeCount]]', changeCount
+                                            );
+                                            response.setHeader(
+                                                'Content-Type', 'text/html'
+                                            );
+                                            response.write(newContent);
+                                            response.end();
+                                        },
+                                        error => {
+                                            console.log(
+                                                `Error reading result page: ${
+                                                    error.message
+                                                }`
+                                            );
+                                        }
+                                    );
+                                }
+                            },
+                            error => {
+                                console.log(
+                                    `Error changing owner: ${error.message}`
+                                );
+                            }
+                        );
+                    }
+                },
+                error => {
+                    console.log(`Error getting user: ${error.message}`);
+                }
             );
-            response.end();
         }
     });
-};
-// Create the server.
+};      
+
+// ########## SERVER
+
 const server = http.createServer(requestHandler);
-// Configure the server.
-const port = process.env.PORT;
-// Start the server.
+const port = process.env.PORT || 3000;
 server.listen(port, () => {
     console.log(`Server listening at localhost:${port}.`);
 });
-const myName = process.env.RALLY_USERNAME;
-console.log(`The .env file says I am ${myName}`);
-// Import the Rally module.
-const rally = require('rally');
-const queryUtils = rally.util.query;
-// Temporary initialization of the root of the tree.
-const mainRootOID = '435404235956';
-const mainRootRef = `/HierarchicalRequirement/${mainRootOID}`;
-// Initialize the request options.
-const requestOptions = {
-    headers: {
-        'X-RallyIntegrationName': process.env.RALLYINTEGRATIONNAME,
-        'X-RallyIntegrationVendor': process.env.RALLYINTEGRATIONVENDOR,
-        'X-RallyIntegrationVersion': process.env.RALLYINTEGRATIONVERSION
-    }
-};
-/*
-    Create a Rally REST API instance, using the .env user and pw
-    (and not an API key).
-*/
-const restAPI = rally({
-    requestOptions
-});
-// Function to return my ref.
-const getMe = () => {
-    return restAPI.query({
-        type: 'user',
-        query: queryUtils.where('UserName', '=', myName)
-    })
-    .then(
-        me => {
-            const myRef = me.Results[0]._ref;
-            console.log(`My ref is ${myRef}.`);
-            return myRef;
-        },
-        error => {
-            console.log(error.message);
-        }
-    );
-};
-/*
-    Function to return a reference to the owner of the specified
-    user story.
-*/
-const getOwnerOf = storyRef => {
-    return restAPI.get({
-        ref: storyRef,
-        fetch: ['Owner']
-    })
-    .then(
-        result => {
-            const owner = result.Object.Owner;
-            if (owner) {
-                const ownerRef = owner._ref;
-                console.log(`The owner of\n${storyRef}\nis ${ownerRef}.`);
-                return ownerRef;
-            }
-            else {
-                console.log(`${storyRef} has no owner.`);
-                return '';
-            }
-        },
-        error => {
-            console.log(`Error getting user story’s owner: ${error.message}.`);
-        }
-    );
-};
-/*
-    Function to make the specified user the owner of the specified
-    user story.
-*/
-const setOwnerOf = (userRef, storyRef) => {
-    restAPI.update({
-        ref: storyRef,
-        data: {Owner: userRef}
-    });
-    console.log(`Changing owner of\n${storyRef}\nto\n${userRef}.`);
-};
-/*
-    Function to return references to the child user stories of
-    the specified user story.
-*/
-const getChildrenOf = storyRef => {
-    return restAPI.get({
-        ref: `${storyRef}/Children`,
-        fetch: ['_ref']
-    })
-    .then(
-        childrenRef => {
-            const childRefs = childrenRef.Object.Results.map(
-                result => result._ref
-            );
-            console.log(
-                `Children of\n${storyRef}\nare:\n${
-                    JSON.stringify(childRefs, null, 2)
-                }`
-            );
-            return childRefs;
-        },
-        error => {
-            console.log(`Error getting children: ${error.message}.`);
-        }
-    );
-};
-/*
-    Function to make the specified user the owner of the (sub)tree
-    rooted at the specified user story.
-*/
-const setOwnerOfTreeOf = (userRef, storyRef) => {
-    getOwnerOf(storyRef)
-    .then(
-        ownerRef => {
-            if (ownerRef !== userRef) {
-                setOwnerOf(userRef, storyRef);
-            }
-            else {
-                console.log(`I already own\n${storyRef}.`);
-            }
-            getChildrenOf(storyRef)
-            .then(
-                children => {
-                    children.forEach(childRef => {
-                        setOwnerOfTreeOf(userRef, childRef);
-                    })
-                },
-                error => {
-                    throw `Error setting owner of children: ${error.message}.`;
-                }
-            )
-        },
-        error => {
-            console.log(`Error getting root owner: ${error.message}.`);
-        }
-    )
-};
-// Make me the owner of the tree of the specified user story.
-// setOwnerOfTreeOf(myRef, mainRootRef);
-// getOwnerOf(mainRootShortRef);
-/*
-getMe()
-.then(me => {
-    setOwnerOfTreeOf(me, mainRootRef)
-});
-*/
-/*
-
-// Function to get a reference to a named user.
-const getUserRef = userName => {
-    return restAPI.query({
-        type: 'user',
-        query: queryUtils.where('UserName', '=', userName)
-    })
-    .then(
-        user => user.Results[0]._ref,
-        error => {
-            throw `Error getting user reference: ${error.message}.`;
-        }
-    );
-};
-
-/*
-    Function to make the specified user the owner of the (sub)tree rooted
-    at the specified user story.
-
-const ownTreeOf = (rootOID, userRef) => {
-    console.log(`(Sub)tree root is ${rootOID}.`);
-    const rootRef = `/hierarchicalrequirement/${rootOID}`;
-    /*
-        Function to make the specified user the owner of the members
-        of the specified collection of children.
-    
-    restAPI.get({
-        ref: rootRef,
-        fetch: ['Owner', 'Children']
-    })
-    .then(
-        root=> {
-            const rootObject = root.Object;
-            const oldOwner = rootObject.Owner;
-            const oldOwnerName = oldOwner._refObjectName;
-            const oldOwnerRef = oldOwner._ref;
-            console.log(`Old owner ref is ${oldOwnerRef}.`);
-            if (oldOwnerRef.endsWith(myRef)) {
-                console.log(`I already own ${rootOID}`);
-            }
-            else {
-                console.log(
-                    `Owner of ${rootOID} will change from ${oldOwnerName} to me.`
-                );
-                restAPI.update({
-                    ref: rootRef,
-                    data: {
-                        Owner: myRef
-                    }
-                })
-                .then(
-                    result => {
-                        console.log(`I have become owner of ${rootOID}.`);
-                        const childrenMeta = rootObject.Children;
-                        const childrenRef = childrenMeta._ref;
-                    },
-                    error => {
-                        console.log(`Error changing ${rootOID} owner: ${error.message}`);
-                    }
-                )
-            }
-        },
-        error => {
-            console.log(`Error getting ${rootOID} owner: ${error.message}`);
-        }
-    )
-};
-// Make me the owner of the whole tree rooted at the specified user story.
-restAPI.query({
-    type: 'user',
-    query: queryUtils.where('UserName', '=', process.env.RALLY_USERNAME)
-})
-.then(
-    me => {
-        const myOID = me.Results[0]._ref.replace(/^.+[/]/, '');
-        const myRef = `/user/${myOID}`;
-        console.log(`myRef is ${myRef}.`);
-        ownTreeOf(mainRootOID, myRef);
-    },
-    error => {
-        console.log(`Error getting me: ${error.message}`);
-    }
-);
-/*
-const myRef = '/user';
-const qs = {
-    query: `(UserName = ${process.env.RALLY_USERNAME})`
-};
-console.log(`My ref is ${myRef}`);
-// const refUtils = rally.util.ref;
-restAPI.get({
-    ref: myRef,
-    fetch: [],
-    requestOptions: {
-        qs
-    }
-})
-.then(
-    me => {console.log(JSON.stringify(me, null, 2))},
-    error => {console.log(error.message)}
-);
-const rootRef = '/HierarchicalRequirement/411765582904';
-const authorizedRef = `${rootRef}?key=${process.env.rallyKey}`;
-console.log(`Root user-story ref: ${rootRef}`);
-.then(me => {
-    console.log(`My Object ID is ${JSON.stringify(me.Object, null, 2)}`);
-    restAPI.get({
-        ref: rootRef,
-        fetch: ['DirectChildrenCount', 'Owner'],
-        requestOptions
-    })
-    .then(rootStory => {
-        const owner = rootStory.Object.Owner;
-        const ownerName = owner.DisplayName;
-        console.log(`Current owner: ${owner._refObjectName}`);
-        console.log(`Count of its children: ${rootStory.Object.DirectChildrenCount}`);
-    },
-    error => {
-        console.log(error.message);
-    })
-});
-*/
