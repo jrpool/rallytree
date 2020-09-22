@@ -23,5 +23,8 @@
   "dependencies": {
     "dotenv": "*",
     "rally": "*"
+  },
+  "devDependencies": {
+    "eslint": "^7.9.0"
   }
 }
