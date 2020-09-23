@@ -13,7 +13,6 @@ const rally = require('rally');
 
 // ########## GLOBAL VARIABLES
 
-// User’s Rally user name and password.
 // Counts.
 const counts = {
   item: 0,
