@@ -290,6 +290,8 @@ const requestHandler = (request, response) => {
                           .replace(
                             '[[changeCount]]', counts.change
                           );
+                          // Reset the counts.
+                          counts.item = counts.already = counts.change = 0;
                           response.setHeader(
                             'Content-Type', 'text/html'
                           );
