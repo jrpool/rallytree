@@ -41,16 +41,23 @@ const getDescendantsOf = (restAPI, storyRef, rootRef) => {
     .then(
       childrenRef => {
         const childRefs = childrenRef.Object.Results.map(
-          result => result._ref
+          result => result._ref.replace(/^.+v2\.0/, '')
         );
+        console.log(`storyRef is ${storyRef};`);
+        console.log(`rootRef is ${rootRef};`);
+        console.log(`childRefs length is ${childRefs.length}`);
         if (childRefs.length) {
           itemRefs.push(...childRefs);
           childRefs.forEach(childRef => {
-            getDescendantsOf(restAPI, childRef, rootRef);
+            return getDescendantsOf(restAPI, childRef, rootRef);
           });
         }
         else if (storyRef === rootRef) {
+          console.log(`getDescendantsOf will return ${itemRefs.length}`);
           return itemRefs.length;
+        }
+        else {
+          return '';
         }
       },
       error => {
@@ -95,7 +102,7 @@ const setOwnerOf = (restAPI, storyRef, userRef) => {
   );
 };
 // Makes a user the owner of a user story and its descendants.
-const setItemsOwner = (restAPI, userRef, itemCount) => {
+const setItemsOwner = (restAPI, userRef, itemCount, next) => {
   if (errorMessage) {
     return '';
   }
@@ -110,8 +117,8 @@ const setItemsOwner = (restAPI, userRef, itemCount) => {
         return getOwnerOf(restAPI, itemRef)
         .then(
           ownerRef => {
-            console.log('mark 2');
             if (ownerRef === userRef) {
+              console.log('mark 2');
               itemResults.push(Promise.resolve(false));
             }
             else {
@@ -119,12 +126,16 @@ const setItemsOwner = (restAPI, userRef, itemCount) => {
               setOwnerOf(restAPI, itemRef, userRef);
               itemResults.push(Promise.resolve(true));
             }
+            console.log(
+              `${itemCount} items, ${itemResults.length} results`
+            );
             if (itemResults.length === itemCount) {
-              return itemCount;
+              console.log('mark 4');
+              next();
             }
           },
           error => {
-            console.log('mark 4');
+            console.log('mark 5');
             errorMessage = `Error getting owner: ${error.message}`;
             return '';
           }
@@ -229,70 +240,63 @@ const requestHandler = (request, response) => {
             getDescendantsOf(restAPI, rootRef, rootRef)
             .then(
               itemCount => {
+                console.log(`itemCount type is ${typeof itemCount}`);
                 if (errorMessage) {
                   serveError(response, errorMessage);
                 }
                 else {
-                  setItemsOwner(restAPI, userRef, itemCount)
-                  .then(
-                    itemCount => {
-                      if (errorMessage) {
+                  setItemsOwner(restAPI, userRef, itemCount, () => {
+                    if (errorMessage) {
+                      serveError(response, errorMessage);
+                    }
+                    else {
+                      const changeCount = itemResults.filter(
+                        result => result
+                      ).length;
+                      const alreadyCount = itemCount - changeCount;
+                      if (itemResults.length !== itemCount) {
+                        if (! errorMessage) {
+                          errorMessage
+                            = 'Error: Not all tree items processed.';
+                        }
                         serveError(response, errorMessage);
                       }
                       else {
-                        const changeCount = itemResults.filter(
-                          result => result
-                        ).length;
-                        const alreadyCount = itemCount - changeCount;
-                        if (itemResults.length !== itemCount) {
-                          if (! errorMessage) {
-                            errorMessage
-                              = 'Error: Not all tree items processed.';
+                        fs.readFile('result.html', 'utf8')
+                        .then(
+                          content => {
+                            const newContent = content.replace(
+                              '[[userName]]', bodyObject.userName
+                            )
+                            .replace('[[rootRef]]', rootRef)
+                            .replace('[[itemCount]]', itemCount)
+                            .replace('[[alreadyCount]]', alreadyCount)
+                            .replace('[[changeCount]]', changeCount);
+                            // Reset the items and results.
+                            itemRefs.length = itemResults.length = 0;
+                            response.setHeader(
+                              'Content-Type', 'text/html'
+                            );
+                            response.write(newContent);
+                            response.end();
+                          },
+                          error => {
+                            console.log(
+                              `Error reading result page: ${
+                                error.message
+                              }`
+                            );
                           }
-                          serveError(response, errorMessage);
-                        }
-                        else {
-                          fs.readFile('result.html', 'utf8')
-                          .then(
-                            content => {
-                              const newContent = content.replace(
-                                '[[userName]]', bodyObject.userName
-                              )
-                              .replace('[[rootRef]]', rootRef)
-                              .replace('[[itemCount]]', itemCount)
-                              .replace('[[alreadyCount]]', alreadyCount)
-                              .replace('[[changeCount]]', changeCount);
-                              // Reset the items and results.
-                              itemRefs.length = itemResults.length = 0;
-                              response.setHeader(
-                                'Content-Type', 'text/html'
-                              );
-                              response.write(newContent);
-                              response.end();
-                            },
-                            error => {
-                              console.log(
-                                `Error reading result page: ${
-                                  error.message
-                                }`
-                              );
-                            }
-                          );
-                        }
+                        );
                       }
-                    },
-                    error => {
-                      console.log(
-                        `Error setting owner of items: ${error.message}`
-                      );
                     }
-                  );
+                  })
                 }
               },
               error => {
                 console.log(`Error getting descendants: ${error.message}`);
               }
-            )
+            );
           }
         },
         error => {
