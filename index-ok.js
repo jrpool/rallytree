@@ -1,11 +1,3 @@
-/*
-  index.js
-  RallyTree script.
-  This script serves a web page with a form for submission of a RallyTree
-  request. When a request is submitted, the script processes it and
-  reports the results on another web page.
-*/
-
 // ########## IMPORTS
 
 // Module to access files.
@@ -21,6 +13,7 @@ const rally = require('rally');
 
 // ########## GLOBAL VARIABLES
 
+// User’s Rally user name and password.
 // Counts.
 const counts = {
   item: 0,
@@ -37,102 +30,145 @@ const requestOptions = {
     'X-RallyIntegrationVersion': process.env.RALLYINTEGRATIONVERSION || '1.0'
   }
 };
-// Records of completion.
-const done = [];
+// Subtree results.
+const subtreeResults = [];
 
 // ########## FUNCTIONS
 
-// Creates an error message and returns an empty string.
-const err = (error, context) => {
-  errorMessage = `Error ${context}: ${error.message}`;
-  return '';
-};
-
 // Gets a reference to a user.
-const getUserRef = (restAPI, userName) => {
+const getUser = (restAPI, userName) => {
   return restAPI.query({
     type: 'user',
     query: queryUtils.where('UserName', '=', userName)
   })
   .then(
-    user => user.Results[0]._ref,
-    error => err(error, 'getting user')
+    user => {
+      const userRef = user.Results[0]._ref;
+      return userRef;
+    },
+    error => {
+      errorMessage = `Error getting user: ${error.message}`;
+      return '';
+    }
   );
 };
-// Gets data about the owner, children, and tasks of a user story.
-const getDataOf = (restAPI, storyRef) => {
+// Gets a reference to the owner of a user story.
+const getOwnerOf = (restAPI, storyRef) => {
   if (errorMessage) {
-    return Promise.reject('');
+    return Promise.resolve('');
   }
   else {
     return restAPI.get({
       ref: storyRef,
-      fetch: ['Owner', 'Children', 'Tasks']
+      fetch: ['Owner']
     })
     .then(
       result => {
-        const resultObject = result.Object;
-        const childData = resultObject.Children.map(object => ({
-          ref: object._ref,
-          owner: object.Owner
-        }));
-        const taskData = resultObject.Tasks.map(object => ({
-          ref: object._ref,
-          owner: object.Owner
-        }));
-        return resultObject ? {
-          ownerRef: resultObject.Owner._ref,
-          childData,
-          taskData
-        } : '';
+        const owner = result.Object.Owner;
+        return owner ? owner._ref : '';
       },
-      error => err(
-        error, 'getting work item’s owner, children, and tasks'
-      )
+      error => {
+        errorMessage = `Error getting user story’s owner: ${
+          error.message
+        }.`;
+        return '';
+      }
     );
   }
 };
-// Makes a user the owner of a work item.
-const setOwnerOf = (restAPI, itemRef, ownerRef, userRef) => {
-  if (! errorMessage) {
-    if (ownerRef === userRef) {
-      counts.already++;
-    }
-    else {
-      restAPI.update({
-        ref: itemRef,
-        data: {Owner: userRef}
-      })
-      .then(
-        () => ++counts.change,
-        error => err(error, 'setting owner')
-      );
-    }
+// Makes a user the owner of a user story.
+const setOwnerOf = (restAPI, storyRef, ownerRef, userRef) => {
+  if (ownerRef === userRef) {
+    // Increment the count of items already owned.
+    counts.already++;
+    console.log(`Already count has become ${counts.already}`);
+    return Promise.resolve(counts.already);
+  }
+  else {
+    return restAPI.update({
+      ref: storyRef,
+      data: {Owner: userRef}
+    })
+    .then(
+      () => {
+        // Increment the count of ownership changes.
+        counts.change++;
+        console.log(`Change count has become ${counts.change}`);
+        return counts.change;
+      },
+      error => {
+        errorMessage = `Error setting owner: ${error.message}`;
+        return '';
+      }
+    );
+  }
+};
+// Gets references to the child user stories of a user story.
+const getChildrenOf = (restAPI, storyRef) => {
+  if (errorMessage) {
+    return Promise.resolve('');
+  }
+  else {
+    return restAPI.get({
+      ref: `${storyRef}/Children`,
+      fetch: ['_ref']
+    })
+    .then(
+      childrenRef => {
+        const childRefs = childrenRef.Object.Results.map(
+          result => result._ref
+        );
+        return childRefs;
+      },
+      error => {
+        errorMessage = `Error getting children: ${error.message}.`;
+        return '';
+      }
+    );
   }
 };
 // Makes a user the owner of the (sub)tree rooted at a user story.
-const setOwnerOfTreeOf = (restAPI, storyRef, userRef) => {
-  if (! errorMessage) {
-    getDataOf(restAPI, storyRef)
+const setOwnerOfTreeOf = (restAPI, userRef, storyRef) => {
+  if (errorMessage) {
+    return Promise.resolve('');
+  }
+  else {
+    return getOwnerOf(restAPI, storyRef)
     .then(
-      resultObj => {
-        if (! errorMessage) {
-          setOwnerOf(restAPI, storyRef, resultObj.ownerRef, userRef);
-          const taskData = resultObj.taskData;
-          counts.item += taskData.length;
-          taskData.forEach(taskObj => {
-            setOwnerOf(restAPI, taskObj.ref, taskObj.owner, userRef);
-          });
-          const childData = resultObj.childData;
-          counts.item += childData.length;
-          childData.forEach(childObj => {
-            setOwnerOfTreeOf(restAPI, childObj.ref, userRef);
-          });
-          // Return whether there are any unprocessed items.
-          done.push('');
+      ownerRef => {
+        if (errorMessage) {
+          return '';
         }
-      },
-      error => err(error, `getting data of ${storyRef}`)
+        else {
+          return setOwnerOf(restAPI, storyRef, ownerRef, userRef)
+          .then(count => {
+            if (errorMessage) {
+              return Promise.resolve('');
+            }
+            else {
+              return getChildrenOf(restAPI, storyRef)
+              .then(childRefs => {
+                if (errorMessage) {
+                  return Promise.resolve('');
+                }
+                else {
+                  // Increment the count of found items.
+                  counts.item += childRefs.length;
+                  console.log(
+                    `Item count has jumped to ${counts.item}`
+                  );
+                  childRefs.forEach(childRef => {
+                    subtreeResults.push(
+                      setOwnerOfTreeOf(restAPI, userRef, childRef)
+                    );
+                  });
+                  return count;
+                }
+              });
+            }
+          });
+        }
+      }
     );
   }
 };
@@ -202,7 +238,7 @@ const requestHandler = (request, response) => {
         pass: bodyObject.password,
         requestOptions
       });
-      getUserRef(restAPI, userName)
+      getUser(restAPI, userName)
       .then(
         userRef => {
           if (errorMessage) {
@@ -212,7 +248,6 @@ const requestHandler = (request, response) => {
             const rootRef = bodyObject.rootURL.replace(
               /^.+([/]|%2F)/, '/hierarchicalrequirement/'
             );
-            counts.item++;
             setOwnerOfTreeOf(restAPI, userRef, rootRef)
             .then(
               () => {
@@ -220,8 +255,10 @@ const requestHandler = (request, response) => {
                   serveError(response, errorMessage);
                 }
                 else {
+                  // Increment item count by 1 for root.
+                  counts.item++;
                   // Await completion of all executions of setOwnerOfTreeOf.
-                  Promise.all(done)
+                  Promise.all(subtreeResults)
                   .then(
                     () => {
                       fs.readFile('result.html', 'utf8')
