@@ -37,6 +37,7 @@ const requestOptions = {
     'X-RallyIntegrationVersion': process.env.RALLYINTEGRATIONVERSION || '1.0'
   }
 };
+let rootRef = '';
 // Records of completion.
 const done = [];
 
@@ -47,6 +48,11 @@ const err = (error, context) => {
   errorMessage = `Error ${context}: ${error.message}`;
   return '';
 };
+
+// Shortens a long reference.
+const shorten = (type, longRef) => longRef.replace(
+  /^http.+([/]|%2F)/, `/${type}/`
+);
 
 // Gets a reference to a user.
 const getUserRef = (restAPI, userName) => {
@@ -69,33 +75,13 @@ const getDataOf = (restAPI, storyRef) => {
       ref: storyRef,
       fetch: ['Owner', 'Children', 'Tasks']
     })
-    .then(
-      result => {
-        const resultObject = result.Object;
-        const childData = resultObject.Children.map(object => ({
-          ref: object._ref,
-          owner: object.Owner
-        }));
-        const taskData = resultObject.Tasks.map(object => ({
-          ref: object._ref,
-          owner: object.Owner
-        }));
-        return resultObject ? {
-          ownerRef: resultObject.Owner._ref,
-          childData,
-          taskData
-        } : '';
-      },
-      error => err(
-        error, 'getting work item’s owner, children, and tasks'
-      )
-    );
+    .catch(error => err(error, 'getting user story’s data'));
   }
 };
 // Makes a user the owner of a work item.
-const setOwnerOf = (restAPI, itemRef, ownerRef, userRef) => {
+const setOwnerOf = (restAPI, type, itemRef, ownerRef, userRef) => {
   if (! errorMessage) {
-    if (ownerRef === userRef) {
+    if (shorten(type, ownerRef) === userRef) {
       counts.already++;
     }
     else {
@@ -117,19 +103,64 @@ const setOwnerOfTreeOf = (restAPI, storyRef, userRef) => {
   .then(
     resultObj => {
       if (! errorMessage) {
-        setOwnerOf(restAPI, storyRef, resultObj.ownerRef, userRef);
-        const taskData = resultObj.taskData;
-        counts.item += taskData.length;
-        taskData.forEach(taskObj => {
-          setOwnerOf(restAPI, taskObj.ref, taskObj.owner, userRef);
-        });
-        const childData = resultObj.childData;
-        counts.item += childData.length;
-        childData.forEach(childObj => {
-          setOwnerOfTreeOf(restAPI, childObj.ref, userRef);
-        });
-        // Return whether there are any unprocessed items.
-        return done.push('');
+        setOwnerOf(
+          restAPI,
+          'hierarchicalrequirement',
+          storyRef,
+          resultObj.ownerRef,
+          userRef
+        );
+        const storyObj = resultObj.Object;
+        const taskCount = storyObj.Tasks.Count;
+        if (taskCount) {
+          counts.item += taskCount;
+          restAPI.get({
+            ref: storyObj.Tasks._ref,
+            fetch: ['_ref', 'Owner']
+          })
+          .then(
+            tasksObj => {
+              const tasks = tasksObj.Object.Results;
+              tasks.forEach(task => {
+                setOwnerOf(
+                  restAPI, 'task', task._ref, task.Owner._ref, userRef
+                );
+                done.push('');
+              });
+            },
+            error => err(error, 'getting data of tasks')
+          );
+        }
+        const childCount = storyObj.Children.count;
+        if (childCount) {
+          counts.item += childCount;
+          restAPI.get({
+            ref: storyObj.Children._ref,
+            fetch: ['_ref', 'Owner']
+          })
+          .then(
+            children => {
+              children.forEach(child => {
+                const childObj = child.Object;
+                const childRef = childObj._ref;
+                const childOwnerRef = childObj.Owner._ref;
+                setOwnerOf(
+                  restAPI,
+                  'hierarchicalrequirement',
+                  childRef,
+                  childOwnerRef,
+                  userRef
+                );
+                setOwnerOfTreeOf(restAPI, childRef, childOwnerRef, userRef);
+              });
+            },
+            error => err(error, 'getting children of user story')
+          );
+        }
+        done.push('');
+        if (storyRef === rootRef) {
+          return '';
+        }
       }
     },
     error => err(error, `getting data of ${storyRef}`)
@@ -208,11 +239,11 @@ const requestHandler = (request, response) => {
             serveError(response, errorMessage);
           }
           else {
-            const rootRef = bodyObject.rootURL.replace(
+            rootRef = bodyObject.rootURL.replace(
               /^.+([/]|%2F)/, '/hierarchicalrequirement/'
             );
             counts.item++;
-            setOwnerOfTreeOf(restAPI, userRef, rootRef)
+            setOwnerOfTreeOf(restAPI, rootRef, userRef)
             .then(
               () => {
                 if (errorMessage) {
