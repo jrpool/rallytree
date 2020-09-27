@@ -112,29 +112,28 @@ const setOwnerOf = (restAPI, itemRef, ownerRef, userRef) => {
 };
 // Makes a user the owner of the (sub)tree rooted at a user story.
 const setOwnerOfTreeOf = (restAPI, storyRef, userRef) => {
-  if (! errorMessage) {
-    getDataOf(restAPI, storyRef)
-    .then(
-      resultObj => {
-        if (! errorMessage) {
-          setOwnerOf(restAPI, storyRef, resultObj.ownerRef, userRef);
-          const taskData = resultObj.taskData;
-          counts.item += taskData.length;
-          taskData.forEach(taskObj => {
-            setOwnerOf(restAPI, taskObj.ref, taskObj.owner, userRef);
-          });
-          const childData = resultObj.childData;
-          counts.item += childData.length;
-          childData.forEach(childObj => {
-            setOwnerOfTreeOf(restAPI, childObj.ref, userRef);
-          });
-          // Return whether there are any unprocessed items.
-          done.push('');
-        }
-      },
-      error => err(error, `getting data of ${storyRef}`)
-    );
-  }
+  return errorMessage ||
+  getDataOf(restAPI, storyRef)
+  .then(
+    resultObj => {
+      if (! errorMessage) {
+        setOwnerOf(restAPI, storyRef, resultObj.ownerRef, userRef);
+        const taskData = resultObj.taskData;
+        counts.item += taskData.length;
+        taskData.forEach(taskObj => {
+          setOwnerOf(restAPI, taskObj.ref, taskObj.owner, userRef);
+        });
+        const childData = resultObj.childData;
+        counts.item += childData.length;
+        childData.forEach(childObj => {
+          setOwnerOfTreeOf(restAPI, childObj.ref, userRef);
+        });
+        // Return whether there are any unprocessed items.
+        return done.push('');
+      }
+    },
+    error => err(error, `getting data of ${storyRef}`)
+  );
 };
 // Serves the error page.
 const serveError = (response, errorMessage) => {
