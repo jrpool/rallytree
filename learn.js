@@ -14,6 +14,7 @@ const processed = [];
     status: 'fulfilled', value: specified by the 'resolve' function
     status: 'rejected', reason: specified by the 'reject' function
 */
+
 const banLength = item => {
   processed.push(item);
   console.log(`processed has become ${processed}`);
@@ -33,18 +34,19 @@ const banLength = item => {
   Executes 'banLength' for all the items.
   Adds the Promise object that it returns to the 'results' array.
 */
+
 items.forEach(item => {
-  console.log(`Running banlength on ${item}`);
+  console.log(`Running banLength on ${item}`);
   results.push(banLength(item));
 });
 
-// Describes the Promise objects immediately after creation.
+// Describes the results immediately after creation.
 results.forEach(result => {
   console.log(`\nResult type: ${result}`);
+  console.log(JSON.stringify(result, null, 2));
   for (const prop in result) {
     console.log(`Result property ${prop} is ${result[prop]}`);
   }
-  console.log(`State: ${result.[[PromiseState]]}`);
 });
 
 /*
@@ -54,13 +56,14 @@ results.forEach(result => {
     'rejected' value of any 1 'status' property
   Then reports outcome.
 */
+
 Promise.all(results)
 .then(
   values => {
-    console.log(`\nfulfilled with ${JSON.stringify(values)}`);
+    console.log(`\nPromise.all: fulfilled with ${JSON.stringify(values)}`);
   },
   reasons => {
-    console.log(`\nrejected with ${JSON.stringify(reasons)}`);
+    console.log(`\nPromise.all: rejected with ${JSON.stringify(reasons)}`);
   }
 );
 
@@ -69,9 +72,14 @@ Promise.all(results)
   and reports all their 'status' and either 'value' or 'reason'
   property values.
 */
+
 Promise.allSettled(results)
 .then(
   settlements => {
-    console.log(`\nsettled with ${JSON.stringify(settlements, null, 2)}`);
+    console.log(
+      `\nPromise.allSettled: settled with ${
+        JSON.stringify(settlements, null, 2)
+      }`
+    );
   }
 );
