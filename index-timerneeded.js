@@ -44,6 +44,12 @@ const requestOptions = {
     'X-RallyIntegrationVersion': process.env.RALLYINTEGRATIONVERSION || '1.0'
   }
 };
+/*
+  Array to be populated with one Promise object per work item in the tree.
+  They will acquire status resolved if the owner of the work item is OK,
+  or rejected if it needs to be changed.
+*/
+const agenda = [];
 
 // ########## FUNCTIONS
 
@@ -57,7 +63,7 @@ const shorten = (type, longRef) => longRef.replace(
   /^http.+([/]|%2F)/, `/${type}/`
 );
 // Populates the agenda.
-const getAgenda = (restAPI, storyRef, userRef, agenda) => {
+const getAgenda = (restAPI, storyRef, userRef) => {
   restAPI.get({
     ref: shorten('hierarchicalrequirement', storyRef),
     fetch: ['Owner', 'Children', 'Tasks']
