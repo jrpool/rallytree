@@ -2,7 +2,13 @@
   index.js
   RallyTree script.
 
-  This script serves a web page with a form for submission of a RallyTree request to make the user the owner of all work items in a tree. When a request is submitted, the script fulfills and acknowledges it.
+  This script serves a web page with a form for submission of a RallyTree request to make the user the owner of all work items in a tree. When a request is submitted, the script processes it and reports the results on another web page.
+
+  Strategy:
+
+    1. Compile an “agenda” of Promises, one per work item in the tree, that will each acquire a status. If the work item already has the intended owner, the status of its Promise will become “resolved”. If not, its status will become “rejected”.
+
+    2. When the Promises are all settled, i.e. they all have statuses, change the item owners to the current user for work items whose Promises have the “rejected” status.
 */
 
 // ########## IMPORTS
@@ -22,6 +28,12 @@ const rally = require('rally');
 
 // ########## GLOBAL VARIABLES
 
+// Counts.
+const counts = {
+  item: 0,
+  already: 0,
+  change: 0
+};
 let errorMessage = '';
 const queryUtils = rally.util.query;
 // REST API.
@@ -35,80 +47,109 @@ const requestOptions = {
 
 // ########## FUNCTIONS
 
-// Creates and logs an error message.
+// Creates an error message and returns an empty string.
 const err = (error, context) => {
   errorMessage = `Error ${context}: ${error.message}`;
-  console.log(errorMessage);
+  return '';
 };
 // Shortens a long reference.
 const shorten = (type, longRef) => longRef.replace(
   /^http.+([/]|%2F)/, `/${type}/`
 );
-// Recursively processes a user story and its child user stories.
-const doStory = (restAPI, storyRef, userRef) => {
-  // Get data on the user story.
-  return restAPI.get({
-    ref: storyRef,
+// Populates the agenda.
+const getAgenda = (restAPI, storyRef, userRef, agenda) => {
+  restAPI.get({
+    ref: shorten('hierarchicalrequirement', storyRef),
     fetch: ['Owner', 'Children', 'Tasks']
   })
   .then(
     storyResult => {
       const storyObj = storyResult.Object;
-      const ownerRef = shorten('user', storyObj.Owner._ref);
+      const storyRef = storyObj._ref;
+      const ownerRef = storyObj.Owner._ref;
       const tasksSummary = storyObj.Tasks;
       const childrenSummary = storyObj.Children;
-      // Make the user the owner of the user story, if not already.
-      if (ownerRef !== userRef) {
-        restAPI.update({
-          ref: storyRef,
-          data: {Owner: userRef}
-        });
-      }
-      // If the user story has any tasks:
+      // Add a Promise object to agenda for the user story.
+      agenda.push(new Promise((resolve, reject) => {
+        if (shorten('user', ownerRef) === userRef) {
+          resolve(storyRef)
+          .then(
+            () => {
+              counts.already++;
+            },
+            () => {
+              counts.change++;
+            }
+          );
+        }
+        else {
+          reject(storyRef)
+          .then(
+            () => {
+              counts.already++;
+            },
+            () => {
+              counts.change++;
+            }
+          );
+        }
+      }));
+      // Add Promise objects to agenda for the tasks of the user story.
       if (tasksSummary.Count) {
-        // Get their data.
         restAPI.get({
           ref: tasksSummary._ref,
           fetch: ['_ref', 'Owner']
         })
         .then(
-          // Make the user the owner of each, if not already.
           tasksObj => {
             const tasks = tasksObj.Object.Results;
             tasks.forEach(task => {
               const taskRef = shorten('task', task._ref);
               const taskOwnerRef = shorten('user', task.Owner._ref);
-              if (taskOwnerRef !== userRef) {
-                restAPI.update({
-                  ref: taskRef,
-                  data: {Owner: userRef}
-                });
-              }
+              agenda.push(new Promise((resolve, reject) => {
+                if (taskOwnerRef === userRef) {
+                  resolve(taskRef)
+                  .then(
+                    () => {
+                      counts.already++;
+                    },
+                    () => {
+                      counts.change++;
+                    }
+                  );
+                }
+                else {
+                  reject(taskRef)
+                  .then(
+                    () => {
+                      counts.already++;
+                    },
+                    () => {
+                      counts.change++;
+                    }
+                  );
+                }
+              }));
             });
           },
           error => err(error, 'getting data on tasks')
         );
       }
-      // If the user story has any child user stories:
       if (childrenSummary.Count) {
-        // Get their data.
         restAPI.get({
           ref: childrenSummary._ref,
           fetch: ['_ref']
         })
         .then(
-          // Process each.
           childrenObj => {
             const children = childrenObj.Object.Results;
             children.forEach(child => {
-              const childRef = shorten('hierarchicalrequirement', child._ref);
-              doStory(restAPI, childRef, userRef);
+              getAgenda(restAPI, child._ref, userRef);
             });
           },
           error => err(error, 'getting data on children')
         );
       }
-      return '';
     },
     error => err(error, 'getting data on user story')
   );
@@ -124,6 +165,23 @@ const getUserRef = (restAPI, userName) => {
     error => err(error, 'getting user')
   );
 };
+// Processes the agenda.
+const doAgenda = (restAPI, promises, userRef) => {
+  counts.item = promises.length;
+  agenda.forEach(item => {
+    const status = item.status;
+    if (status === 'resolved') {
+      counts.already++;
+    }
+    else if (status === 'rejected') {
+      counts.change++;
+      restAPI.update({
+        ref: item.reason,
+        data: {Owner: userRef}
+      });
+    }
+  });
+};
 // Serves the error page.
 const serveError = (response, errorMessage) => {
   fs.readFile('error.html', 'utf8')
@@ -137,17 +195,23 @@ const serveError = (response, errorMessage) => {
       response.end();
     },
     error => {
-      err(error, 'reading error page');
+      console.log(`Error reading error page: ${error.message}`);
     }
   );
 };
-// Serves the acknowledgement page.
-const serveAck =(userName, rootRef, response) => {
-  fs.readFile('ack.html', 'utf8')
+// Serves the report page.
+const serveReport =(userName, rootRef, response) => {
+  fs.readFile('report.html', 'utf8')
   .then(
     content => {
       const newContent = content.replace('[[userName]]', userName)
-      .replace('[[rootRef]]', rootRef);
+      .replace('[[rootRef]]', rootRef)
+      .replace('[[itemCount]]', counts.item)
+      .replace('[[alreadyCount]]', counts.already)
+      .replace('[[changeCount]]', counts.change);
+      // Reset the results.
+      counts.item = counts.already = counts.change = 0;
+      agenda.length = 0;
       response.setHeader('Content-Type', 'text/html');
       response.write(newContent);
       response.end();
@@ -155,7 +219,7 @@ const serveAck =(userName, rootRef, response) => {
     error => err(error, 'reading result page')
   );
 };
-// Handles requests, serving the home page and the acknowledgement page.
+// Handles requests, serving the home page and the report page.
 const requestHandler = (request, response) => {
   const {method} = request;
   const body = [];
@@ -167,7 +231,6 @@ const requestHandler = (request, response) => {
   })
   .on('end', () => {
     if (method === 'GET') {
-      // Serve the stylesheet when the home page requests it.
       if (request.url === '/style.css') {
         fs.readFile('style.css', 'utf8')
         .then(
@@ -182,7 +245,6 @@ const requestHandler = (request, response) => {
         );
       }
       else {
-        // Serve the home page.
         fs.readFile('index.html', 'utf8')
         .then(
           content => {
@@ -214,8 +276,12 @@ const requestHandler = (request, response) => {
             serveError(response, errorMessage);
           }
           else {
-            doStory(restAPI, rootRef, userRef);``
-            serveAck(userName, rootRef, response);
+            getAgenda(restAPI, rootRef, userRef);
+            Promise.allSettled(agenda)
+            .then(results => {
+              doAgenda(restAPI, results, userRef);
+              serveReport(userName, rootRef, response);
+            }, error => err(error, 'getting settlements'));
           }
         },
         error => err(error, 'getting reference to user')
