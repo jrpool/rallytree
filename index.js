@@ -39,6 +39,7 @@ const requestOptions = {
 const err = (error, context) => {
   errorMessage = `Error ${context}: ${error.message}`;
   console.log(errorMessage);
+  return '';
 };
 // Shortens a long reference.
 const shorten = (type, longRef) => longRef.replace(
