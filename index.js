@@ -84,76 +84,69 @@ const doStory = (restAPI, storyRef, response) => {
         response.write(`${totalMsg}${changeMsg}`);
       };
       // Make the specified user the owner of the user story, if not already.
-      if (ownerRef !== takerRef) {
-        restAPI.update({
-          ref: storyRef,
-          data: {Owner: takerRef}
-        })
-        .then(
-          () => {
-            upTotal(true);
-          },
-          error => err(error, 'changing user-story owner')
-        );
-      }
-      else {
-        upTotal(false);
-      }
-      // If the user story has any tasks:
-      if (tasksSummary.Count) {
-        // Get their data.
-        restAPI.get({
-          ref: tasksSummary._ref,
-          fetch: ['_ref', 'Owner']
-        })
-        .then(
-          // Make the specified user the owner of each, if not already.
-          tasksObj => {
-            const tasks = tasksObj.Object.Results;
-            tasks.forEach(taskObj => {
-              const taskRef = shorten('task', taskObj._ref);
-              const taskOwner = taskObj.Owner;
-              const ownerRef = taskOwner ? shorten('user', taskOwner._ref) : '';
-              if (ownerRef !== takerRef) {
-                restAPI.update({
-                  ref: taskRef,
-                  data: {Owner: takerRef}
-                })
-                .then(
-                  () => {
-                    upTotal(true);
-                  },
-                  error => err(error, 'changing task owner')
-                );
-              }
-              else {
-                upTotal(false);
-              }
-            });
-          },
-          error => err(error, 'getting data on tasks')
-        );
-      }
-      // If the user story has any child user stories:
-      if (childrenSummary.Count) {
-        // Get their data.
-        restAPI.get({
-          ref: childrenSummary._ref,
-          fetch: ['_ref']
-        })
-        .then(
-          // Process each.
-          childrenObj => {
-            const children = childrenObj.Object.Results;
-            children.forEach(child => {
-              const childRef = shorten('hierarchicalrequirement', child._ref);
-              doStory(restAPI, childRef, response);
-            });
-          },
-          error => err(error, 'getting data on children')
-        );
-      }
-      return '';
+      const isChange = ownerRef !== takerRef;
+      upTotal(isChange);
+      restAPI.update({
+        ref: storyRef,
+        data: isChange ? {Owner: takerRef} : {}
+      })
+      .then(
+        () => {
+          if (tasksSummary.Count) {
+            // Get their data.
+            restAPI.get({
+              ref: tasksSummary._ref,
+              fetch: ['_ref', 'Owner']
+            })
+            .then(
+              // Make the specified user the owner of each, if not already.
+              tasksObj => {
+                const tasks = tasksObj.Object.Results;
+                // If the user story has any tasks:
+                tasks.forEach(taskObj => {
+                  const taskRef = shorten('task', taskObj._ref);
+                  const taskOwner = taskObj.Owner;
+                  const ownerRef = taskOwner
+                    ? shorten('user', taskOwner._ref)
+                    : '';
+                  const isChange = ownerRef !== takerRef;
+                  upTotal(isChange);
+                  if (isChange) {
+                    restAPI.update({
+                      ref: taskRef,
+                      data: {Owner: takerRef}
+                    });
+                  }
+                });
+              },
+              error => err(error, 'getting data on tasks')
+            );
+          }
+          // If the user story has any child user stories:
+          if (childrenSummary.Count) {
+            // Get their data.
+            restAPI.get({
+              ref: childrenSummary._ref,
+              fetch: ['_ref']
+            })
+            .then(
+              // Process each.
+              childrenObj => {
+                const children = childrenObj.Object.Results;
+                children.forEach(child => {
+                  const childRef = shorten(
+                    'hierarchicalrequirement', child._ref
+                  );
+                  doStory(restAPI, childRef, response);
+                });
+              },
+              error => err(error, 'getting data on children')
+            );
+          }
+          return '';
+        },
+        error => err(error, 'changing user-story owner')
+      );
     },
     error => err(error, 'getting data on user story')
   );
