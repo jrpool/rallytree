@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
   eventSource.addEventListener('changes', event => {
     messageHandler(event, 'changes');
   });
-  // Stop listening after 3 seconds idling, assuming the job will be complete.
+  // Stop listening after 3 idle seconds, assuming the job complete.
   const poller = setInterval(
     () => {
       if (lastEventTime && Date.now() - lastEventTime > 3000) {
