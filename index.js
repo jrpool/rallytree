@@ -43,9 +43,9 @@ let busy = false;
 // Creates and logs an error message.
 const err = (error, context) => {
   errorMessage = `Error ${context}: ${error.message}`;
-  userRef = takerRef = rootRef = '';
-  total = changes = 0;
-  busy = false;
+  // userRef = takerRef = rootRef = '';
+  // total = changes = 0;
+  // busy = false;
   console.log(errorMessage);
   return '';
 };
@@ -230,8 +230,13 @@ const requestHandler = (request, response) => {
         fs.readFile('index.html', 'utf8')
         .then(
           content => {
+            const {RALLY_USERNAME, RALLY_PASSWORD} = process.env;
+            const newContent = content.replace(
+              '__userName__', RALLY_USERNAME || ''
+            )
+            .replace('__password__', RALLY_PASSWORD || '');
             response.setHeader('Content-Type', 'text/html');
-            response.write(content);
+            response.write(newContent);
             response.end();
           },
           error => {
