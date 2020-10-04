@@ -4,9 +4,16 @@
 }
 
 body {
-  margin: 3rem;
-  max-width: 40rem;
+  margin: 2rem;
   line-height: 1.5;
+}
+
+body.ack {
+  max-width: 30rem;
+}
+
+body.home {
+  max-width: 40rem;
 }
 
 button {
@@ -28,7 +35,11 @@ button:hover {
 }
 
 h2 {
-  margin: 0.5rem 0;
+  margin: 0.25rem 0 0 0;
+}
+
+h2 + p {
+  margin-top: 0;
 }
 
 html {
@@ -43,8 +54,17 @@ label:hover .label {
   background-color: #eee;
 }
 
+main > section {
+  display: flex;
+  flex-wrap: wrap;
+}
+
 .major {
   font-weight: 700;
+}
+
+.more{
+  margin-top: 0.25rem;
 }
 
 p {
@@ -52,8 +72,26 @@ p {
 }
 
 pre {
-  margin-top: 0;
-  border: solid brown 2px;
+  margin: 0 auto;
+  text-align: center;
 }
 
-#total {}
+section.even, section.odd {
+  margin: 0.25rem;
+  padding: 0 0.5rem 0.5rem 0.5rem;
+}
+
+section.even {
+  background-color: aquamarine;
+}
+
+section.odd {
+  color: white;
+  background-color: teal;
+}
+
+span[role=status] {
+  padding: 0 0.25rem;
+  font-size: xx-large;
+  background-color: white;
+}
