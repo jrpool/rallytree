@@ -90,6 +90,11 @@ const doStory = (restAPI, storyRef, response) => {
         ref: storyRef,
         data: isChange ? {Owner: takerRef} : {}
       })
+      /*
+        Wait until the ownership change is complete. Otherwise, Rally will
+        reject changes to the descendants of the user story while it is
+        being modified, causing erratic failures.
+      */
       .then(
         () => {
           if (tasksSummary.Count) {
