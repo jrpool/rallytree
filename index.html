@@ -12,16 +12,17 @@
       <h1>RallyTree</h1>
       <section>
         <h2>Instructions</h2>
-        <p class="major">Do you need to make yourself the owner of a tree of
+        <p class="major">Do you need to change the owner of a tree of
           Rally work items?</p>
         <p>To do that manually, you must expand each work item in the Rally web
           interface, until the entire tree is expanded, and then perform a bulk
           edit. That can take you several minutes. It is also vulnerable to
           error.</p>
         <p>RallyTree automates that process. You specify the <span
-            class="major">root</span> user story of the tree. Then RallyTree
-          makes you the owner of that user story <span class="major">and all</span>
-          of its descendant user stories and tasks.</p>
+            class="major">root</span> user story of the tree and the new owner.
+            Then RallyTree makes you the owner of that user story
+            <span class="major">and all</span> of its descendant user stories
+            and tasks.</p>
         <p>Problems? Please send questions or comments about RallyTree to <a
             href="mailto:jonathan.pool@cvshealth.com">Jonathan Pool</a>.</p>
       </section>
@@ -31,9 +32,18 @@
           <p>
             <label>
               <span class="label">
-                Make me the owner of the tree of work items rooted at the URL:
+                Set the owner of the tree of work items rooted at the URL:
               </span><br>
               <input id="rootURL" name="rootURL" size="100">
+            </label>
+          </p>
+          <p>
+            <label>
+              <span class="label">
+                <strong>If</strong> I am not the new owner, the new
+                owner&rsquo;s user name (i.e. email address) is:
+              </span>
+              <input id="takerName" name="takerName" type="email" size="70">
             </label>
           </p>
           <p>
@@ -42,7 +52,7 @@
                 My Rally user name (i.e. my email address) is:
               </span>
               <br>
-              <input id="userName" name="userName" type="email" size="80">
+              <input id="userName" name="userName" type="email" size="70">
             </label>
           </p>
           <p>

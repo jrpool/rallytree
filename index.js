@@ -2,7 +2,7 @@
   index.js
   RallyTree script.
 
-  This script serves a web page with a form for submission of a RallyTree request to make the user the owner of all work items in a tree. When a request is submitted, the script fulfills and acknowledges it.
+  This script serves a web page with a form for submission of a RallyTree request to make a user the owner of all work items in a tree. When a request is submitted, the script fulfills and acknowledges it.
 */
 
 // ########## IMPORTS
@@ -35,6 +35,7 @@ const requestOptions = {
 };
 let restAPI;
 let userRef = '';
+let takerRef = '';
 let rootRef = '';
 let total = 0;
 let changes = 0;
@@ -63,7 +64,7 @@ const shorten = (type, longRef) => {
   }
 };
 // Recursively processes a user story and its child user stories.
-const doStory = (restAPI, storyRef, userRef, response) => {
+const doStory = (restAPI, storyRef, response) => {
   // Get data on the user story.
   return restAPI.get({
     ref: storyRef,
@@ -85,11 +86,11 @@ const doStory = (restAPI, storyRef, userRef, response) => {
         }
         response.write(`${totalMsg}${changeMsg}`);
       };
-      // Make the user the owner of the user story, if not already.
-      if (ownerRef !== userRef) {
+      // Make the specified user the owner of the user story, if not already.
+      if (ownerRef !== takerRef) {
         restAPI.update({
           ref: storyRef,
-          data: {Owner: userRef}
+          data: {Owner: takerRef}
         });
         upTotal(true);
       }
@@ -104,17 +105,17 @@ const doStory = (restAPI, storyRef, userRef, response) => {
           fetch: ['_ref', 'Owner']
         })
         .then(
-          // Make the user the owner of each, if not already.
+          // Make the specified user the owner of each, if not already.
           tasksObj => {
             const tasks = tasksObj.Object.Results;
             tasks.forEach(taskObj => {
               const taskRef = shorten('task', taskObj._ref);
               const taskOwner = taskObj.Owner;
               const ownerRef = taskOwner ? shorten('user', taskOwner._ref) : '';
-              if (ownerRef !== userRef) {
+              if (ownerRef !== takerRef) {
                 restAPI.update({
                   ref: taskRef,
-                  data: {Owner: userRef}
+                  data: {Owner: takerRef}
                 });
                 upTotal(true);
               }
@@ -139,7 +140,7 @@ const doStory = (restAPI, storyRef, userRef, response) => {
             const children = childrenObj.Object.Results;
             children.forEach(child => {
               const childRef = shorten('hierarchicalrequirement', child._ref);
-              doStory(restAPI, childRef, userRef, response);
+              doStory(restAPI, childRef, response);
             });
           },
           error => err(error, 'getting data on children')
@@ -180,7 +181,7 @@ const serveError = response => {
   );
 };
 // Serves the acknowledgement page.
-const serveAck = (userName, userRef, rootRef, response) => {
+const serveAck = (userName, takerName, response) => {
   fs.readFile('ack.html', 'utf8')
   .then(
     htmlContent => {
@@ -189,9 +190,11 @@ const serveAck = (userName, userRef, rootRef, response) => {
         jsContent => {
           const newContent = htmlContent
           .replace('__script__', jsContent)
+          .replace('__rootRef__', rootRef)
+          .replace('__takerName__', takerName)
+          .replace('__takerRef__', takerRef)
           .replace('__userName__', userName)
-          .replace('__userRef__', userRef)
-          .replace('__rootRef__', rootRef);
+          .replace('__userRef__', userRef);
           response.setHeader('Content-Type', 'text/html');
           response.write(newContent);
           response.end();
@@ -261,7 +264,7 @@ const requestHandler = (request, response) => {
         response.setHeader('Content-Type', 'text/event-stream');
         response.setHeader('Cache-Control', 'no-cache');
         response.setHeader('Connection', 'keep-alive');
-        doStory(restAPI, rootRef, userRef, response);
+        doStory(restAPI, rootRef, response);
         setTimeout(() => {
           busy = false;
           response.end();
@@ -272,7 +275,7 @@ const requestHandler = (request, response) => {
     else if (method === 'POST' && requestURL === '/') {
       busy = true;
       const bodyObject = parse(Buffer.concat(body).toString());
-      const userName = bodyObject.userName;
+      const {userName, takerName} = bodyObject;
       rootRef = shorten(
         'hierarchicalrequirement', bodyObject.rootURL
       );
@@ -282,19 +285,48 @@ const requestHandler = (request, response) => {
           pass: bodyObject.password,
           requestOptions
         });
-        getUserRef(restAPI, userName)
-        .then(
-          ref => {
-            if (errorMessage) {
-              serveError(response);
-            }
-            else {
-              userRef = ref;
-              serveAck(userName, userRef, rootRef, response);
-            }
-          },
-          error => err(error, 'getting reference to user')
-        );
+        if (takerName) {
+          getUserRef(restAPI, takerName)
+          .then(
+            ref => {
+              if (errorMessage) {
+                serveError(response);
+              }
+              else {
+                takerRef = ref;
+                getUserRef(restAPI, userName)
+                .then(
+                  ref => {
+                    if (errorMessage) {
+                      serveError(response);
+                    }
+                    else {
+                      userRef = ref;
+                      serveAck(userName, takerName, response);
+                    }
+                  },
+                  error => err(error, 'getting reference to user')
+                );
+              }
+            },
+            error => err(error, 'getting reference to new owner')
+          );
+        }
+        else {
+          getUserRef(restAPI, userName)
+          .then(
+            ref => {
+              if (errorMessage) {
+                serveError(response);
+              }
+              else {
+                takerRef = userRef = ref;
+                serveAck(userName, userName, response);
+              }
+            },
+            error => err(error, 'getting reference to user')
+          );
+        }
       }
       else {
         serveError(response);
