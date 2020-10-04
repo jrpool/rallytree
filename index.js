@@ -46,10 +46,10 @@ let busy = false;
 // Creates and logs an error message.
 const err = (error, context) => {
   errorMessage = `Error ${context}: ${error.message}`;
-  userRef = '';
-  rootRef = '';
-  total = 0;
+  userRef = takerRef = rootRef = '';
+  total = changes = 0;
   busy = false;
+  console.log(errorMessage);
   return '';
 };
 // Shortens a long reference.
@@ -91,8 +91,13 @@ const doStory = (restAPI, storyRef, response) => {
         restAPI.update({
           ref: storyRef,
           data: {Owner: takerRef}
-        });
-        upTotal(true);
+        })
+        .then(
+          () => {
+            upTotal(true);
+          },
+          error => err(error, 'changing user-story owner')
+        );
       }
       else {
         upTotal(false);
@@ -116,8 +121,13 @@ const doStory = (restAPI, storyRef, response) => {
                 restAPI.update({
                   ref: taskRef,
                   data: {Owner: takerRef}
-                });
-                upTotal(true);
+                })
+                .then(
+                  () => {
+                    upTotal(true);
+                  },
+                  error => err(error, 'changing task owner')
+                );
               }
               else {
                 upTotal(false);
@@ -264,11 +274,13 @@ const requestHandler = (request, response) => {
         response.setHeader('Content-Type', 'text/event-stream');
         response.setHeader('Cache-Control', 'no-cache');
         response.setHeader('Connection', 'keep-alive');
+        total = changes = 0;
         doStory(restAPI, rootRef, response);
         setTimeout(() => {
-          busy = false;
           response.end();
-          total = 0;
+          userRef = takerRef = rootRef = '';
+          total = changes = 0;
+          busy = false;
         }, 5000);
       }
     }
