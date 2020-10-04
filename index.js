@@ -11,11 +11,8 @@
 const fs = require('fs').promises;
 // Module to keep secrets local.
 require('dotenv').config();
-const { timeStamp } = require('console');
-// const { count } = require('console');
 // Module to create a web server.
 const http = require('http');
-// const { resolve } = require('path');
 // Module to parse request bodies.
 const {parse} = require('querystring');
 // Rally module.
