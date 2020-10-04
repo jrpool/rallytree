@@ -46,7 +46,7 @@ const shorten = (type, longRef) => longRef.replace(
   /^http.+([/]|%2F)/, `/${type}/`
 );
 // Recursively processes a user story and its child user stories.
-const doStory = (restAPI, storyRef, userRef, response) => {
+const doStory = (restAPI, storyRef, userRef) => {
   // Get data on the user story.
   return restAPI.get({
     ref: storyRef,
@@ -59,12 +59,6 @@ const doStory = (restAPI, storyRef, userRef, response) => {
       const ownerRef = storyOwner ? shorten('user', storyObj.Owner._ref) : '';
       const tasksSummary = storyObj.Tasks;
       const childrenSummary = storyObj.Children;
-      let total = 0;
-      const upTotal = subtotal => {
-        total += subtotal;
-        console.log(`About to add ${subtotal} to total`);
-        response.write(`id: total\n'data: ${total}\n\n`);
-      };
       // Make the user the owner of the user story, if not already.
       if (ownerRef !== userRef) {
         restAPI.update({
@@ -72,10 +66,8 @@ const doStory = (restAPI, storyRef, userRef, response) => {
           data: {Owner: userRef}
         });
       }
-      upTotal(1);
       // If the user story has any tasks:
       if (tasksSummary.Count) {
-        upTotal(tasksSummary.Count);
         // Get their data.
         restAPI.get({
           ref: tasksSummary._ref,
@@ -102,7 +94,6 @@ const doStory = (restAPI, storyRef, userRef, response) => {
       }
       // If the user story has any child user stories:
       if (childrenSummary.Count) {
-        upTotal(childrenSummary.Count);
         // Get their data.
         restAPI.get({
           ref: childrenSummary._ref,
@@ -155,7 +146,7 @@ const serveError = (response, errorMessage) => {
 };
 // Serves the acknowledgement page.
 const serveAck = (userName, rootRef, response) => {
-  fs.readFile('ack-sse.html', 'utf8')
+  fs.readFile('ack.html', 'utf8')
   .then(
     content => {
       const newContent = content.replace('[[userName]]', userName)
@@ -180,8 +171,7 @@ const requestHandler = (request, response) => {
   .on('end', () => {
     if (method === 'GET') {
       // Serve the stylesheet when the home page requests it.
-      const requestURL = request.url;
-      if (requestURL === '/style.css') {
+      if (request.url === '/style.css') {
         fs.readFile('style.css', 'utf8')
         .then(
           content => {
@@ -193,13 +183,6 @@ const requestHandler = (request, response) => {
             console.log(`Error reading stylesheet: ${error.message}`);
           }
         );
-      }
-      // Serve a stream of totals on the acknowledgement page.
-      else if (requestURL === '/totals') {
-        console.log('A request for /totals has been received.');
-        response.setHeader('Content-Type', 'text/event-stream');
-        response.setHeader('Cache-Control', 'no-cache');
-        response.setHeader('Connection', 'keep-alive');
       }
       else {
         // Serve the home page.
@@ -234,8 +217,8 @@ const requestHandler = (request, response) => {
             serveError(response, errorMessage);
           }
           else {
+            doStory(restAPI, rootRef, userRef);
             serveAck(userName, rootRef, response);
-            doStory(restAPI, rootRef, userRef, response);
           }
         },
         error => err(error, 'getting reference to user')

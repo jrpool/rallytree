@@ -11,11 +11,10 @@
 const fs = require('fs').promises;
 // Module to keep secrets local.
 require('dotenv').config();
-const { timeStamp } = require('console');
-// const { count } = require('console');
+const { count } = require('console');
 // Module to create a web server.
 const http = require('http');
-// const { resolve } = require('path');
+const { resolve } = require('path');
 // Module to parse request bodies.
 const {parse} = require('querystring');
 // Rally module.
@@ -33,35 +32,19 @@ const requestOptions = {
     'X-RallyIntegrationVersion': process.env.RALLYINTEGRATIONVERSION || '1.0'
   }
 };
-let restAPI;
-let userRef = '';
-let rootRef = '';
-let total = 0;
-let changes = 0;
-let busy = false;
 
 // ########## FUNCTIONS
 
 // Creates and logs an error message.
 const err = (error, context) => {
   errorMessage = `Error ${context}: ${error.message}`;
-  userRef = '';
-  rootRef = '';
-  total = 0;
-  busy = false;
+  console.log(errorMessage);
   return '';
 };
 // Shortens a long reference.
-const shorten = (type, longRef) => {
-  const num = longRef.replace(/^http.+([/]|%2F)/, '');
-  if (/^\d+$/.test(num)) {
-    return `/${type}/${num}`;
-  }
-  else {
-    errorMessage = 'Invalid Rally URL';
-    return '';
-  }
-};
+const shorten = (type, longRef) => longRef.replace(
+  /^http.+([/]|%2F)/, `/${type}/`
+);
 // Recursively processes a user story and its child user stories.
 const doStory = (restAPI, storyRef, userRef, response) => {
   // Get data on the user story.
@@ -76,14 +59,11 @@ const doStory = (restAPI, storyRef, userRef, response) => {
       const ownerRef = storyOwner ? shorten('user', storyObj.Owner._ref) : '';
       const tasksSummary = storyObj.Tasks;
       const childrenSummary = storyObj.Children;
-      // Increments the total(s) and sends the new total(s) as events.
-      const upTotal = isChange => {
-        const totalMsg = `event: total\ndata: ${++total}\n\n`;
-        let changeMsg = '';
-        if (isChange){
-          changeMsg = `event: changes\ndata: ${++changes}\n\n`;
-        }
-        response.write(`${totalMsg}${changeMsg}`);
+      let total = 0;
+      const upTotal = subtotal => {
+        total += subtotal;
+        console.log(`About to add ${subtotal} to total`);
+        response.write(`id: total\n'data: ${total}\n\n`);
       };
       // Make the user the owner of the user story, if not already.
       if (ownerRef !== userRef) {
@@ -91,13 +71,11 @@ const doStory = (restAPI, storyRef, userRef, response) => {
           ref: storyRef,
           data: {Owner: userRef}
         });
-        upTotal(true);
       }
-      else {
-        upTotal(false);
-      }
+      upTotal(1);
       // If the user story has any tasks:
       if (tasksSummary.Count) {
+        upTotal(tasksSummary.Count);
         // Get their data.
         restAPI.get({
           ref: tasksSummary._ref,
@@ -116,10 +94,6 @@ const doStory = (restAPI, storyRef, userRef, response) => {
                   ref: taskRef,
                   data: {Owner: userRef}
                 });
-                upTotal(true);
-              }
-              else {
-                upTotal(false);
               }
             });
           },
@@ -128,6 +102,7 @@ const doStory = (restAPI, storyRef, userRef, response) => {
       }
       // If the user story has any child user stories:
       if (childrenSummary.Count) {
+        upTotal(childrenSummary.Count);
         // Get their data.
         restAPI.get({
           ref: childrenSummary._ref,
@@ -139,7 +114,7 @@ const doStory = (restAPI, storyRef, userRef, response) => {
             const children = childrenObj.Object.Results;
             children.forEach(child => {
               const childRef = shorten('hierarchicalrequirement', child._ref);
-              doStory(restAPI, childRef, userRef, response);
+              doStory(restAPI, childRef, userRef);
             });
           },
           error => err(error, 'getting data on children')
@@ -162,17 +137,16 @@ const getUserRef = (restAPI, userName) => {
   );
 };
 // Serves the error page.
-const serveError = response => {
+const serveError = (response, errorMessage) => {
   fs.readFile('error.html', 'utf8')
   .then(
     content => {
       const newContent = content.replace(
-        '__errorMessage__', errorMessage
+        '[[errorMessage]]', errorMessage
       );
       response.setHeader('Content-Type', 'text/html');
       response.write(newContent);
       response.end();
-      errorMessage = '';
     },
     error => {
       err(error, 'reading error page');
@@ -180,26 +154,17 @@ const serveError = response => {
   );
 };
 // Serves the acknowledgement page.
-const serveAck = (userName, userRef, rootRef, response) => {
-  fs.readFile('ack.html', 'utf8')
+const serveAck = (userName, rootRef, response) => {
+  fs.readFile('ack-sse.html', 'utf8')
   .then(
-    htmlContent => {
-      fs.readFile('script.js', 'utf8')
-      .then(
-        jsContent => {
-          const newContent = htmlContent
-          .replace('__script__', jsContent)
-          .replace('__userName__', userName)
-          .replace('__userRef__', userRef)
-          .replace('__rootRef__', rootRef);
-          response.setHeader('Content-Type', 'text/html');
-          response.write(newContent);
-          response.end();
-        },
-        error => err(error, 'reading script')
-      );
+    content => {
+      const newContent = content.replace('[[userName]]', userName)
+      .replace('[[rootRef]]', rootRef);
+      response.setHeader('Content-Type', 'text/html');
+      response.write(newContent);
+      response.end();
     },
-    error => err(error, 'reading acknowledgement page')
+    error => err(error, 'reading result page')
   );
 };
 // Handles requests, serving the home page and the acknowledgement page.
@@ -214,8 +179,42 @@ const requestHandler = (request, response) => {
   })
   .on('end', () => {
     const requestURL = request.url;
-    if (method === 'GET') {
-      if (requestURL === '/') {
+    if (requestURL === '/script.js') {
+      fs.readFile('script.js', 'utf8')
+      .then(
+        content => {
+          response.setHeader('Content-Type', 'text/javascript');
+          response.write(content);
+          response.end();
+        },
+        error => {
+          console.log(`Error reading script: ${error.message}`);
+        }
+      );
+    }
+    // Serve a stream of totals on the acknowledgement page.
+    else if (requestURL === '/totals') {
+      console.log('A request for /totals has been received.');
+      response.setHeader('Content-Type', 'text/event-stream');
+      response.setHeader('Cache-Control', 'no-cache');
+      response.setHeader('Connection', 'keep-alive');
+    }
+    else if (method === 'GET') {
+      // Serve the stylesheet when the home page requests it.
+      if (requestURL === '/style.css') {
+        fs.readFile('style.css', 'utf8')
+        .then(
+          content => {
+            response.setHeader('Content-Type', 'text/css');
+            response.write(content);
+            response.end();
+          },
+          error => {
+            console.log(`Error reading stylesheet: ${error.message}`);
+          }
+        );
+      }
+      else {
         // Serve the home page.
         fs.readFile('index.html', 'utf8')
         .then(
@@ -229,76 +228,31 @@ const requestHandler = (request, response) => {
           }
         );
       }
-      else if (requestURL === '/style.css') {
-        // Serve the stylesheet when the home page requests it.
-        fs.readFile('style.css', 'utf8')
-        .then(
-          content => {
-            response.setHeader('Content-Type', 'text/css');
-            response.write(content);
-            response.end();
-          },
-          error => {
-            console.log(`Error reading stylesheet: ${error.message}`);
-          }
-        );
-      }
-      else if (requestURL === '/favicon.ico') {
-        // Serve the site icon when a page requests it.
-        fs.readFile('favicon.ico')
-        .then(
-          content => {
-            response.setHeader('Content-Type', 'image/x-icon');
-            response.write(content, 'binary');
-            response.end();
-          },
-          error => {
-            console.log(`Error reading site icon: ${error.message}`);
-          }
-        );
-      }
-      else if (requestURL === '/totals' && busy) {
-        response.setHeader('Content-Type', 'text/event-stream');
-        response.setHeader('Cache-Control', 'no-cache');
-        response.setHeader('Connection', 'keep-alive');
-        doStory(restAPI, rootRef, userRef, response);
-        setTimeout(() => {
-          busy = false;
-          response.end();
-          total = 0;
-        }, 5000);
-      }
     }
-    else if (method === 'POST' && requestURL === '/') {
-      busy = true;
+    else if (method === 'POST') {
       const bodyObject = parse(Buffer.concat(body).toString());
       const userName = bodyObject.userName;
-      rootRef = shorten(
+      const rootRef = shorten(
         'hierarchicalrequirement', bodyObject.rootURL
       );
-      if (rootRef) {
-        restAPI = rally({
-          user: userName,
-          pass: bodyObject.password,
-          requestOptions
-        });
-        getUserRef(restAPI, userName)
-        .then(
-          ref => {
-            if (errorMessage) {
-              serveError(response);
-            }
-            else {
-              userRef = ref;
-              serveAck(userName, userRef, rootRef, response);
-            }
-          },
-          error => err(error, 'getting reference to user')
-        );
-      }
-      else {
-        serveError(response);
-      }
+      const restAPI = rally({
+        user: userName,
+        pass: bodyObject.password,
+        requestOptions
+      });
+      getUserRef(restAPI, userName)
+      .then(
+        userRef => {
+          if (errorMessage) {
+            serveError(response, errorMessage);
+          }
+          else {
+            serveAck(userName, rootRef, response);
+            doStory(restAPI, rootRef, userRef, response);
+          }
+        },
+        error => err(error, 'getting reference to user')
+      );
     }
   });
 };

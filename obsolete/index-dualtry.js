@@ -76,14 +76,14 @@ const doStory = (restAPI, storyRef, userRef, response) => {
       const ownerRef = storyOwner ? shorten('user', storyObj.Owner._ref) : '';
       const tasksSummary = storyObj.Tasks;
       const childrenSummary = storyObj.Children;
-      // Increments the total(s) and sends the new total(s) as events.
       const upTotal = isChange => {
-        const totalMsg = `event: total\ndata: ${++total}\n\n`;
-        let changeMsg = '';
-        if (isChange){
-          changeMsg = `event: changes\ndata: ${++changes}\n\n`;
+        total++;
+        if (isChange) {
+          changes++;
         }
-        response.write(`${totalMsg}${changeMsg}`);
+        const msg = `total: ${total}\nchanges: ${changes}\n\n`;
+        console.log(`Sending message ${msg}`);
+        response.write(msg);
       };
       // Make the user the owner of the user story, if not already.
       if (ownerRef !== userRef) {
@@ -240,20 +240,6 @@ const requestHandler = (request, response) => {
           },
           error => {
             console.log(`Error reading stylesheet: ${error.message}`);
-          }
-        );
-      }
-      else if (requestURL === '/favicon.ico') {
-        // Serve the site icon when a page requests it.
-        fs.readFile('favicon.ico')
-        .then(
-          content => {
-            response.setHeader('Content-Type', 'image/x-icon');
-            response.write(content, 'binary');
-            response.end();
-          },
-          error => {
-            console.log(`Error reading site icon: ${error.message}`);
           }
         );
       }

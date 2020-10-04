@@ -1,49 +1,58 @@
 *:focus {
-    outline: solid 0.2rem #00f;
-    outline-offset: 0.2rem;
+  outline: solid 0.2rem #00f;
+  outline-offset: 0.2rem;
 }
+
 body {
-    margin: 3rem;
-    max-width: 40rem;
-    line-height: 1.5;
+  margin: 3rem;
+  max-width: 40rem;
+  line-height: 1.5;
 }
+
 button {
-    min-height: 44px;
-    min-width: 44px;
-    padding: 0.5rem;
-    border: solid 0.2rem #c00;
-    border-radius: 1rem;
-    font-size: inherit;
-    font-weight: 700;
-    color: #fff;
-    background-color: #c00;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.5rem;
+  border: solid 0.2rem #c00;
+  border-radius: 1rem;
+  font-size: inherit;
+  font-weight: 700;
+  color: #fff;
+  background-color: #c00;
 }
+
 button:hover {
-    color: #000;
-    border: solid 0.2rem #000;
-    background-color: #fff;
+  color: #000;
+  border: solid 0.2rem #000;
+  background-color: #fff;
 }
+
 h2 {
-    margin: 0.5rem 0;
+  margin: 0.5rem 0;
 }
+
 html {
-    font-size: 24px;
+  font-size: 24px;
 }
+
 input {
-    font-size: inherit;
+  font-size: inherit;
 }
+
 label:hover .label {
-    background-color: #eee;
+  background-color: #eee;
 }
+
 .major {
-    font-weight: 700;
+  font-weight: 700;
 }
+
 p {
-    margin: 1rem 0 0 0;
+  margin: 1rem 0 0 0;
 }
+
 pre {
-    border: solid brown 2px;
+  border: solid brown 2px;
 }
-#total {
-  
-}
+
+#total {}
