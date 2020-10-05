@@ -2,14 +2,14 @@
 <html lang="en-US">
   <head>
     <meta charset="utf-8">
-    <title>RallyTree</title>
+    <title>Request | RallyTree</title>
     <meta name="description" content="Automation of Rally tree management">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="style.css">
   </head>
   <body class="home">
     <main>
-      <h1>RallyTree</h1>
+      <h1>RallyTree request</h1>
       <section>
         <h2>Instructions</h2>
         <p class="major">Do you need to change the owner of a tree of
@@ -23,47 +23,57 @@
             Then RallyTree sets the owner of that user story
             <span class="major">and all</span> of its descendant user stories
             and tasks.</p>
-        <p>Problems? Please send questions or comments about RallyTree to <a
+        <p class="last">Problems? Please send questions or comments about RallyTree to <a
             href="mailto:jonathan.pool@cvshealth.com">Jonathan Pool</a>.</p>
       </section>
-      <section>
-        <h2>Your request</h2>
+      <section class="flex">
         <form id="request" action="http://localhost:3000" method="post">
+        <section class="odd">
+          <h2>Tree root</h2>
           <p>
             <label>
               <span class="label">
-                Set the owner of the tree of work items rooted at the URL:
-              </span><br>
+                <strong>URL</strong> of the user story at the root of the tree:
+              </span>
+              <br>
               <input id="rootURL" name="rootURL" size="100">
             </label>
           </p>
+        </section>
+        <section class="even">
+          <h2>New owner (if not you)</h2>
           <p>
             <label>
               <span class="label">
-                <strong>If</strong> I am not the new owner, the new
-                owner&rsquo;s Rally user name (i.e. email address) is:
+                <strong>If</strong> you are not the new owner, the new
+                owner&rsquo;s Rally user name (i.e. email address):
               </span>
-              <input id="takerName" name="takerName" type="email" size="70">
+              <br>
+              <input id="takerName" name="takerName" type="email" size="60">
             </label>
           </p>
+        </section>
+        <section class="odd">
+          <h2>Your credentials</h2>
           <p>
             <label>
               <span class="label">
-                My Rally user name (i.e. my email address) is:
+                Rally user name (i.e. email address):
               </span>
               <br>
               <input
                 id="userName"
                 name="userName"
                 type="email"
-                size="70"
+                size="60"
                 value="__userName__"
               >
             </label>
           </p>
           <p>
             <label>
-              <span class="label">My Rally password is:</span><br>
+              <span class="label">Rally password:</span>
+              <br>
               <input
                 id="password"
                 type="password"
@@ -73,7 +83,8 @@
               >
             </label>
           </p>
-          <p><button>Submit</button></p>
+        </section>
+        <p><button>Submit</button></p>
         </form>
       </section>
     </main>

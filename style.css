@@ -34,6 +34,15 @@ button:hover {
   background-color: #fff;
 }
 
+.flex {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+h1 {
+  margin-bottom: 0;
+}
+
 h2 {
   margin: 0.25rem 0 0 0;
 }
@@ -51,15 +60,15 @@ input {
 }
 
 label:hover .label {
-  background-color: #eee;
+  background-color: #fdd;
 }
 
-main > section {
-  display: flex;
-  flex-wrap: wrap;
+.last {
+  margin-bottom: 1rem;
 }
 
 .major {
+  margin-top: 0.5rem;
   font-weight: 700;
 }
 
@@ -82,12 +91,11 @@ section.even, section.odd {
 }
 
 section.even {
-  background-color: aquamarine;
+  background-color: #f0f8ff;
 }
 
 section.odd {
-  color: white;
-  background-color: teal;
+  background-color: #f0f0f8;
 }
 
 span[role=status] {
