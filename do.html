@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8">
+    <title>Request | RallyTree</title>
+    <meta name="description" content="Automation of Rally tree management">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body class="home">
+    <main>
+      <h1>RallyTree request</h1>
+      <section>
+        <form
+          id="request"
+          action="http://localhost:3000"
+          method="post"
+          class="flex"
+        >
+          <section class="odd">
+            <h2>Tree root</h2>
+            <p>
+              <label>
+                <span class="label">
+                  <strong>URL</strong> of the user story at the root of the tree:
+                </span>
+                <br>
+                <input id="rootURL" name="rootURL" size="100">
+              </label>
+            </p>
+          </section>
+          <section class="even">
+            <h2>New owner (if not you)</h2>
+            <p>
+              <label>
+                <span class="label">
+                  <strong>If</strong> you are not the new owner, the new
+                  owner&rsquo;s Rally user name (i.e. email address):
+                </span>
+                <br>
+                <input id="takerName" name="takerName" type="email" size="60">
+              </label>
+            </p>
+          </section>
+          <section class="odd">
+            <h2>Your credentials</h2>
+            <p>
+              <label>
+                <span class="label">
+                  Rally user name (i.e. email address):
+                </span>
+                <br>
+                <input
+                  id="userName"
+                  name="userName"
+                  type="email"
+                  size="60"
+                  value="__userName__"
+                >
+              </label>
+            </p>
+            <p>
+              <label>
+                <span class="label">Rally password:</span>
+                <br>
+                <input
+                  id="password"
+                  type="password"
+                  name="password"
+                  size="30"
+                  value="__password__"
+                >
+              </label>
+            </p>
+          </section>
+          <p><button>Submit</button></p>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>

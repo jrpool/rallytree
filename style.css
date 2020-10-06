@@ -34,6 +34,11 @@ button:hover {
   background-color: #fff;
 }
 
+#do {
+  font-size: x-large;
+  font-weight: bold;
+}
+
 .flex {
   display: flex;
   flex-direction: column;
@@ -62,10 +67,6 @@ input {
 
 label:hover .label {
   background-color: #fdd;
-}
-
-.last {
-  margin-bottom: 1rem;
 }
 
 .major {

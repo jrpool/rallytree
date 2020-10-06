@@ -224,12 +224,27 @@ const requestHandler = (request, response) => {
     const requestURL = request.url;
     if (method === 'GET') {
       if (requestURL === '/') {
-        // Serve the home page.
+        // Serve the introduction page.
+        fs.readFile('index.html', 'utf8')
+        .then(
+          content => {
+            response.setHeader('Content-Type', 'text/html');
+            response.write(content);
+            response.end();
+          },
+          error => {
+            console.log(`Error reading introduction page: ${error.message}`);
+          }
+        );
+      }
+      else if (requestURL === '/do.html') {
+        // Serve the request page.
         fs.readFile('index.html', 'utf8')
         .then(
           content => {
             const {RALLY_USERNAME, RALLY_PASSWORD} = process.env;
-            const newContent = content.replace(
+            const newContent = content
+            .replace(
               '__userName__', RALLY_USERNAME || ''
             )
             .replace('__password__', RALLY_PASSWORD || '');
