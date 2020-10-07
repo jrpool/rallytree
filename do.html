@@ -11,9 +11,12 @@
     <main>
       <h1>RallyTree request</h1>
       <section>
+        <p><a class="major" href="index.html">Introduction</a></p>
+      </section>
+      <section>
         <form
           id="request"
-          action="http://localhost:3000"
+          action="http://localhost:3000/do.html"
           method="post"
           class="flex"
         >
@@ -30,17 +33,30 @@
             </p>
           </section>
           <section class="even">
-            <h2>New owner (if not you)</h2>
-            <p>
-              <label>
+            <h2>What to do</h2>
+            <fieldset>
+              <legend>Choose an operation</legend>
+              <p><label>
+                <input type="radio" name="op" value="take" checked>
                 <span class="label">
-                  <strong>If</strong> you are not the new owner, the new
-                  owner&rsquo;s Rally user name (i.e. email address):
+                  Change the owner to you, or else to
+                </span><br>
+                <input
+                  id="takerName"
+                  name="takerName"
+                  type="email"
+                  size="60"
+                  class="indent"
+                ><br>
+                <span class="indent">
+                  Rally user name (i.e. email address)
                 </span>
-                <br>
-                <input id="takerName" name="takerName" type="email" size="60">
-              </label>
-            </p>
+              </label></p>
+              <p><label>
+                <input type="radio" name="op" value="testcase">
+                <span class="label">Add test cases</span>
+              </label></p>
+            </fieldset>
           </section>
           <section class="odd">
             <h2>Your credentials</h2>

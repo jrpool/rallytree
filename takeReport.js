@@ -17,6 +17,7 @@ const messageHandler = (event, type) => {
   }
 };
 document.addEventListener('DOMContentLoaded', () => {
+  // Request an event stream.
   eventSource = new EventSource('/totals');
   // Listen for message events.
   eventSource.addEventListener('total', event => {

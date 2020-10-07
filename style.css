@@ -34,15 +34,10 @@ button:hover {
   background-color: #fff;
 }
 
-#do {
-  font-size: x-large;
-  font-weight: bold;
-}
-
 .flex {
   display: flex;
   flex-direction: column;
-  flex-wrap: wrap;
+  align-items: start;
 }
 
 h1 {
@@ -53,12 +48,12 @@ h2 {
   margin: 0.25rem 0 0 0;
 }
 
-h2 + p {
-  margin-top: 0;
+html {
+  font-size: 21px;
 }
 
-html {
-  font-size: 24px;
+.indent {
+  margin-left: 1rem;
 }
 
 input {
@@ -71,6 +66,7 @@ label:hover .label {
 
 .major {
   margin-top: 0.5rem;
+  font-size: xx-large;
   font-weight: 700;
 }
 
@@ -79,12 +75,16 @@ label:hover .label {
 }
 
 p {
-  margin: 1rem 0 0 0;
+  margin: 0.5rem 0;
 }
 
 pre {
   margin: 0 auto;
   text-align: center;
+}
+
+.rfloat {
+  float: right;
 }
 
 section.even, section.odd {

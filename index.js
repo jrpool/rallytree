@@ -36,7 +36,7 @@ let takerRef = '';
 let rootRef = '';
 let total = 0;
 let changes = 0;
-let busy = false;
+let idle = false;
 
 // ########## FUNCTIONS
 
@@ -167,6 +167,73 @@ const getUserRef = (restAPI, userName) => {
     error => err(error, 'getting user')
   );
 };
+// Serves the introduction page.
+const serveIntro = response => {
+  fs.readFile('index.html', 'utf8')
+  .then(
+    content => {
+      response.setHeader('Content-Type', 'text/html');
+      response.write(content);
+      response.end();
+    },
+    error => err(error, 'reading intro page')
+  );
+};
+// Serves the request page.
+const serveDo = response => {
+  fs.readFile('do.html', 'utf8')
+  .then(
+    content => {
+      const {RALLY_USERNAME, RALLY_PASSWORD} = process.env;
+      const newContent = content
+      .replace('__userName__', RALLY_USERNAME || '')
+      .replace('__password__', RALLY_PASSWORD || '');
+      response.setHeader('Content-Type', 'text/html');
+      response.write(newContent);
+      response.end();
+    },
+    error => err(error, 'reading do page')
+  );
+};
+// Serves the acknowledgement page.
+const serveTakeReport = (userName, takerName, response) => {
+  fs.readFile('takeReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('takeReport.js', 'utf8')
+      .then(
+        jsContent => {
+          const newContent = htmlContent
+          .replace('__script__', jsContent)
+          .replace('__rootRef__', rootRef)
+          .replace('__takerName__', takerName)
+          .replace('__takerRef__', takerRef)
+          .replace('__userName__', userName)
+          .replace('__userRef__', userRef);
+          response.setHeader('Content-Type', 'text/html');
+          response.write(newContent);
+          response.end();
+        },
+        error => err(error, 'reading takeReport script')
+      );
+    },
+    error => err(error, 'reading takeReport page')
+  );
+};
+// Serves the stylesheet.
+const serveStyles = response => {
+  fs.readFile('style.css', 'utf8')
+  .then(
+    content => {
+      response.setHeader('Content-Type', 'text/css');
+      response.write(content);
+      response.end();
+    },
+    error => {
+      err(error, 'reading stylesheet');
+    }
+  );
+};
 // Serves the error page.
 const serveError = response => {
   fs.readFile('error.html', 'utf8')
@@ -185,30 +252,39 @@ const serveError = response => {
     }
   );
 };
-// Serves the acknowledgement page.
-const serveAck = (userName, takerName, response) => {
-  fs.readFile('ack.html', 'utf8')
+// Serves an image.
+const servePNG = (src, response) => {
+  fs.readFile(src.replace(/^\//, ''))
   .then(
-    htmlContent => {
-      fs.readFile('script.js', 'utf8')
-      .then(
-        jsContent => {
-          const newContent = htmlContent
-          .replace('__script__', jsContent)
-          .replace('__rootRef__', rootRef)
-          .replace('__takerName__', takerName)
-          .replace('__takerRef__', takerRef)
-          .replace('__userName__', userName)
-          .replace('__userRef__', userRef);
-          response.setHeader('Content-Type', 'text/html');
-          response.write(newContent);
-          response.end();
-        },
-        error => err(error, 'reading script')
-      );
+    content => {
+      response.setHeader('Content-Type', 'image/png');
+      response.write(content, 'binary');
+      response.end();
     },
-    error => err(error, 'reading acknowledgement page')
+    error => {
+      err(error, 'reading PNG image');
+    }
   );
+};
+// Serves the site icon.
+const serveIcon = response => {
+  fs.readFile('favicon.ico')
+  .then(
+    content => {
+      response.setHeader('Content-Type', 'image/x-icon');
+      response.write(content, 'binary');
+      response.end();
+    },
+    error => {
+      err(error, 'reading site icon');
+    }
+  );
+};
+// Prepares to serves the event stream.
+const serveEventStart = response => {
+  response.setHeader('Content-Type', 'text/event-stream');
+  response.setHeader('Cache-Control', 'no-cache');
+  response.setHeader('Connection', 'keep-alive');
 };
 // Handles requests, serving the home page and the acknowledgement page.
 const requestHandler = (request, response) => {
@@ -223,139 +299,103 @@ const requestHandler = (request, response) => {
   .on('end', () => {
     const requestURL = request.url;
     if (method === 'GET') {
-      if (requestURL === '/') {
-        // Serve the introduction page.
-        fs.readFile('index.html', 'utf8')
-        .then(
-          content => {
-            response.setHeader('Content-Type', 'text/html');
-            response.write(content);
-            response.end();
-          },
-          error => {
-            console.log(`Error reading introduction page: ${error.message}`);
-          }
-        );
+      if (requestURL === '/' || requestURL === '/index.html') {
+        // Serves the introduction page.
+        serveIntro(response);
       }
       else if (requestURL === '/do.html') {
-        // Serve the request page.
-        fs.readFile('index.html', 'utf8')
-        .then(
-          content => {
-            const {RALLY_USERNAME, RALLY_PASSWORD} = process.env;
-            const newContent = content
-            .replace(
-              '__userName__', RALLY_USERNAME || ''
-            )
-            .replace('__password__', RALLY_PASSWORD || '');
-            response.setHeader('Content-Type', 'text/html');
-            response.write(newContent);
-            response.end();
-          },
-          error => {
-            console.log(`Error reading home page: ${error.message}`);
-          }
-        );
+        // Serves the request page.
+        serveDo(response);
       }
       else if (requestURL === '/style.css') {
-        // Serve the stylesheet when the home page requests it.
-        fs.readFile('style.css', 'utf8')
-        .then(
-          content => {
-            response.setHeader('Content-Type', 'text/css');
-            response.write(content);
-            response.end();
-          },
-          error => {
-            console.log(`Error reading stylesheet: ${error.message}`);
-          }
-        );
+        // Serves the stylesheet when the home page requests it.
+        serveStyles(response);
+      }
+      else if (requestURL.endsWith('.png')) {
+        // Serves a PNG image when a page requests it.
+        servePNG(requestURL, response);
       }
       else if (requestURL === '/favicon.ico') {
-        // Serve the site icon when a page requests it.
-        fs.readFile('favicon.ico')
-        .then(
-          content => {
-            response.setHeader('Content-Type', 'image/x-icon');
-            response.write(content, 'binary');
-            response.end();
-          },
-          error => {
-            console.log(`Error reading site icon: ${error.message}`);
-          }
-        );
+        // Serves the site icon when a page requests it.
+        serveIcon(response);
       }
-      else if (requestURL === '/totals' && busy) {
-        response.setHeader('Content-Type', 'text/event-stream');
-        response.setHeader('Cache-Control', 'no-cache');
-        response.setHeader('Connection', 'keep-alive');
+      else if (requestURL === '/totals' && idle) {
+        /*
+          Serves the event stream, performs the operation, and reports
+          the events when a page first requests this. After the server
+          closes the connection, the client may periodically request
+          '/totals' again. Prevents response to those requests by
+          setting idle to false.
+        */
+        idle = false;
         total = changes = 0;
+        serveEventStart(response);
         doStory(restAPI, rootRef, response);
-        setTimeout(() => {
-          response.end();
-          userRef = takerRef = rootRef = '';
-          total = changes = 0;
-          busy = false;
-        }, 5000);
       }
     }
-    else if (method === 'POST' && requestURL === '/') {
-      busy = true;
+    else if (method === 'POST' && requestURL === '/do.html') {
+      // Enables a server response to the next /totals request.
+      idle = true;
       const bodyObject = parse(Buffer.concat(body).toString());
-      const {userName, takerName} = bodyObject;
-      rootRef = shorten(
-        'hierarchicalrequirement', bodyObject.rootURL
-      );
+      const {userName, password, rootURL, op, takerName} = bodyObject;
+      rootRef = shorten('hierarchicalrequirement', rootURL);
       if (rootRef) {
         restAPI = rally({
           user: userName,
-          pass: bodyObject.password,
+          pass: password,
           requestOptions
         });
-        if (takerName) {
-          getUserRef(restAPI, takerName)
-          .then(
-            ref => {
-              if (errorMessage) {
-                serveError(response);
-              }
-              else {
-                takerRef = ref;
-                getUserRef(restAPI, userName)
-                .then(
-                  ref => {
-                    if (errorMessage) {
-                      serveError(response);
-                    }
-                    else {
-                      userRef = ref;
-                      serveAck(userName, takerName, response);
-                    }
-                  },
-                  error => err(error, 'getting reference to user')
-                );
-              }
-            },
-            error => err(error, 'getting reference to new owner')
-          );
+        if (op === 'take') {
+          if (takerName) {
+            getUserRef(restAPI, takerName)
+            .then(
+              ref => {
+                if (errorMessage) {
+                  serveError(response);
+                }
+                else {
+                  takerRef = ref;
+                  getUserRef(restAPI, userName)
+                  .then(
+                    ref => {
+                      if (errorMessage) {
+                        serveError(response);
+                      }
+                      else {
+                        userRef = ref;
+                        serveTakeReport(userName, takerName, response);
+                      }
+                    },
+                    error => err(error, 'getting reference to user')
+                  );
+                }
+              },
+              error => err(error, 'getting reference to new owner')
+            );
+          }
+          else {
+            getUserRef(restAPI, userName)
+            .then(
+              ref => {
+                if (errorMessage) {
+                  serveError(response);
+                }
+                else {
+                  takerRef = userRef = ref;
+                  serveTakeReport(userName, userName, response);
+                }
+              },
+              error => err(error, 'getting reference to user')
+            );
+          }
         }
-        else {
-          getUserRef(restAPI, userName)
-          .then(
-            ref => {
-              if (errorMessage) {
-                serveError(response);
-              }
-              else {
-                takerRef = userRef = ref;
-                serveAck(userName, userName, response);
-              }
-            },
-            error => err(error, 'getting reference to user')
-          );
+        else if (op === 'testcase') {
+          errorMessage = 'Test-case creation not yet implemented.';
+          serveError(response);
         }
       }
       else {
+        errorMessage = 'Tree root not specified.';
         serveError(response);
       }
     }
