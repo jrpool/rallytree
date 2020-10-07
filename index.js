@@ -60,8 +60,11 @@ const shorten = (type, longRef) => {
     return '';
   }
 };
-// Recursively processes a user story and its child user stories.
-const doStory = (restAPI, storyRef, response) => {
+/*
+  Recursively processes ownership changes on a user story and its child
+  user stories.
+*/
+const takeTree = (restAPI, storyRef, response) => {
   // Get data on the user story.
   return restAPI.get({
     ref: storyRef,
@@ -142,7 +145,7 @@ const doStory = (restAPI, storyRef, response) => {
                   const childRef = shorten(
                     'hierarchicalrequirement', child._ref
                   );
-                  doStory(restAPI, childRef, response);
+                  takeTree(restAPI, childRef, response);
                 });
               },
               error => err(error, 'getting data on children')
@@ -152,6 +155,93 @@ const doStory = (restAPI, storyRef, response) => {
         },
         error => err(error, 'changing user-story owner')
       );
+    },
+    error => err(error, 'getting data on user story')
+  );
+};
+/*
+  Recursively checks a user story and its child user stories and,
+  where one is a test-level user story missing a test case, creates
+  it.
+*/
+const caseTree = (restAPI, storyRef, response) => {
+  // Get data on the user story.
+  return restAPI.get({
+    ref: storyRef,
+    fetch: ['Children', 'Tasks', 'TestCases']
+  })
+  .then(
+    storyResult => {
+      const storyObj = storyResult.Object;
+      const tasksSummary = storyObj.Tasks;
+      const casesSummary = storyObj.TestCases;
+      const childrenSummary = storyObj.Children;
+      // Increments the total(s) and sends the new total(s) as events.
+      const upTotal = isChange => {
+        const totalMsg = `event: total\ndata: ${++total}\n\n`;
+        let changeMsg = '';
+        if (isChange){
+          changeMsg = `event: changes\ndata: ${++changes}\n\n`;
+        }
+        response.write(`${totalMsg}${changeMsg}`);
+      };
+      // Processes the child user stories.
+      const doChildren = () => {
+        // If there are any child user stories:
+        if (childrenSummary.Count) {
+          // Get their data.
+          restAPI.get({
+            ref: childrenSummary._ref,
+            fetch: ['_ref']
+          })
+          .then(
+            // Process each.
+            childrenObj => {
+              const children = childrenObj.Object.Results;
+              children.forEach(child => {
+                const childRef = shorten(
+                  'hierarchicalrequirement', child._ref
+                );
+                caseTree(restAPI, childRef, response);
+              });
+            },
+            error => err(error, 'getting data on children')
+          );
+        }
+      };
+      // If the user story has tasks and no test cases:
+      if (tasksSummary.Count && ! casesSummary.Count) {
+        // Add a test case to it.
+        upTotal(true);
+        restAPI.create({
+          type: 'testcase',
+          fetch: ['_ref'],
+          data: {
+            Name: 'Test Case X'
+          }
+        })
+        .then(
+          newCase => {
+            const caseRef = newCase.Object._ref;
+            restAPI.add({
+              ref: casesSummary._ref,
+              collection: '',
+              data: [{_ref: caseRef}]
+            })
+            .then(
+              () => {
+                doChildren();
+              },
+              error => err(error, 'adding a test case')
+            );
+          },
+          error => err(error, 'getting data on tasks and test cases')
+        );
+      }
+      else {
+        upTotal(false);
+        doChildren();
+      }
     },
     error => err(error, 'getting data on user story')
   );
@@ -218,6 +308,29 @@ const serveTakeReport = (userName, takerName, response) => {
       );
     },
     error => err(error, 'reading takeReport page')
+  );
+};
+// Serves the acknowledgement page.
+const serveCaseReport = (userName, response) => {
+  fs.readFile('caseReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('caseReport.js', 'utf8')
+      .then(
+        jsContent => {
+          const newContent = htmlContent
+          .replace('__script__', jsContent)
+          .replace('__rootRef__', rootRef)
+          .replace('__userName__', userName)
+          .replace('__userRef__', userRef);
+          response.setHeader('Content-Type', 'text/html');
+          response.write(newContent);
+          response.end();
+        },
+        error => err(error, 'reading caseReport script')
+      );
+    },
+    error => err(error, 'reading caseReport page')
   );
 };
 // Serves the stylesheet.
@@ -319,22 +432,35 @@ const requestHandler = (request, response) => {
         // Serves the site icon when a page requests it.
         serveIcon(response);
       }
-      else if (requestURL === '/totals' && idle) {
+      else if (requestURL === '/taketotals' && idle) {
         /*
           Serves the event stream, performs the operation, and reports
           the events when a page first requests this. After the server
           closes the connection, the client may periodically request
-          '/totals' again. Prevents response to those requests by
+          '/taketotals' again. Prevents response to those requests by
           setting idle to false.
         */
         idle = false;
         total = changes = 0;
         serveEventStart(response);
-        doStory(restAPI, rootRef, response);
+        takeTree(restAPI, rootRef, response);
+      }
+      else if (requestURL === '/casetotals' && idle) {
+        /*
+          Serves the event stream, performs the operation, and reports
+          the events when a page first requests this. After the server
+          closes the connection, the client may periodically request
+          '/casetotals' again. Prevents response to those requests by
+          setting idle to false.
+        */
+        idle = false;
+        total = changes = 0;
+        serveEventStart(response);
+        caseTree(restAPI, rootRef, response);
       }
     }
     else if (method === 'POST' && requestURL === '/do.html') {
-      // Enables a server response to the next /totals request.
+      // Enables a server response to the next /taketotals request.
       idle = true;
       const bodyObject = parse(Buffer.concat(body).toString());
       const {userName, password, rootURL, op, takerName} = bodyObject;
@@ -389,9 +515,8 @@ const requestHandler = (request, response) => {
             );
           }
         }
-        else if (op === 'testcase') {
-          errorMessage = 'Test-case creation not yet implemented.';
-          serveError(response);
+        else if (op === 'case') {
+          serveCaseReport(userName, response);
         }
       }
       else {
