@@ -51,12 +51,12 @@ const err = (error, context) => {
 };
 // Shortens a long reference.
 const shorten = (type, longRef) => {
-  const num = longRef.replace(/^http.+([/]|%2F)/, '');
-  if (/^\d+$/.test(num)) {
+  const num = longRef.replace(/^http.+([/]|%2F)(?=\d+)/, '');
+  if (/^\d+/.test(num)) {
     return `/${type}/${num}`;
   }
   else {
-    errorMessage = 'Invalid Rally URL';
+    errorMessage = `Invalid Rally URL: ${longRef} shortened to /${type}/${num}`;
     return '';
   }
 };
@@ -112,18 +112,25 @@ const takeTree = (restAPI, storyRef, response) => {
                 const tasks = tasksObj.Object.Results;
                 // If the user story has any tasks:
                 tasks.forEach(taskObj => {
-                  const taskRef = shorten('task', taskObj._ref);
-                  const taskOwner = taskObj.Owner;
-                  const ownerRef = taskOwner
-                    ? shorten('user', taskOwner._ref)
-                    : '';
-                  const isChange = ownerRef !== takerRef;
-                  upTotal(isChange);
-                  if (isChange) {
-                    restAPI.update({
-                      ref: taskRef,
-                      data: {Owner: takerRef}
-                    });
+                  if (! errorMessage) {
+                    const taskRef = shorten('task', taskObj._ref);
+                    const taskOwner = taskObj.Owner;
+                    const ownerRef = taskOwner
+                      ? shorten('user', taskOwner._ref)
+                      : '';
+                    const isChange = ownerRef !== takerRef;
+                    upTotal(isChange);
+                    if (errorMessage) {
+                      serveError(response);
+                      return;
+                    }
+                    if (isChange) {
+                      restAPI.update({
+                        ref: taskRef,
+                        data: {Owner: takerRef}
+                      })
+                      .catch(error => err(error, 'changing the owner'));
+                    }
                   }
                 });
               },
@@ -142,10 +149,16 @@ const takeTree = (restAPI, storyRef, response) => {
               childrenObj => {
                 const children = childrenObj.Object.Results;
                 children.forEach(child => {
-                  const childRef = shorten(
-                    'hierarchicalrequirement', child._ref
-                  );
-                  takeTree(restAPI, childRef, response);
+                  if (! errorMessage) {
+                    const childRef = shorten(
+                      'hierarchicalrequirement', child._ref
+                    );
+                    if (errorMessage) {
+                      serveError(response);
+                      return;
+                    }
+                    takeTree(restAPI, childRef, response);
+                  }
                 });
               },
               error => err(error, 'getting data on children')
@@ -175,6 +188,7 @@ const caseTree = (restAPI, storyRef, response) => {
       const storyObj = storyResult.Object;
       const tasksSummary = storyObj.Tasks;
       const casesSummary = storyObj.TestCases;
+      console.log(`casesSummary is:\n${JSON.stringify(casesSummary)}`);
       const childrenSummary = storyObj.Children;
       // Increments the total(s) and sends the new total(s) as events.
       const upTotal = isChange => {
@@ -199,10 +213,12 @@ const caseTree = (restAPI, storyRef, response) => {
             childrenObj => {
               const children = childrenObj.Object.Results;
               children.forEach(child => {
-                const childRef = shorten(
-                  'hierarchicalrequirement', child._ref
-                );
-                caseTree(restAPI, childRef, response);
+                if (! errorMessage) {
+                  const childRef = shorten(
+                    'hierarchicalrequirement', child._ref
+                  );
+                  caseTree(restAPI, childRef, response);
+                }
               });
             },
             error => err(error, 'getting data on children')
@@ -211,7 +227,12 @@ const caseTree = (restAPI, storyRef, response) => {
       };
       // If the user story has tasks and no test cases:
       if (tasksSummary.Count && ! casesSummary.Count) {
-        // Add a test case to it.
+        const casesRef = shorten('hierarchicalrequirement', casesSummary._ref);
+        if (errorMessage) {
+          serveError(response);
+          return;
+        }
+        // Create a test case.
         upTotal(true);
         restAPI.create({
           type: 'testcase',
@@ -222,10 +243,16 @@ const caseTree = (restAPI, storyRef, response) => {
         })
         .then(
           newCase => {
-            const caseRef = newCase.Object._ref;
+            // After it is created, link it to the user story.
+            const caseRef = shorten('testcase', newCase.Object._ref);
+            if (errorMessage) {
+              serveError(response);
+            }
+            console.log(
+              `Linking case\n${caseRef}\nto collection\n${casesRef}`
+            );
             restAPI.add({
-              ref: casesSummary._ref,
-              collection: '',
+              ref: casesRef,
               data: [{_ref: caseRef}]
             })
             .then(
@@ -465,6 +492,10 @@ const requestHandler = (request, response) => {
       const bodyObject = parse(Buffer.concat(body).toString());
       const {userName, password, rootURL, op, takerName} = bodyObject;
       rootRef = shorten('hierarchicalrequirement', rootURL);
+      if (errorMessage) {
+        serveError(response);
+        return;
+      }
       if (rootRef) {
         restAPI = rally({
           user: userName,
