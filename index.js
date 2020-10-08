@@ -60,6 +60,15 @@ const shorten = (type, longRef) => {
     return '';
   }
 };
+// Increments the total(s) and sends the new total(s) as events.
+const upTotal = (isChange, response) => {
+  const totalMsg = `event: total\ndata: ${++total}\n\n`;
+  let changeMsg = '';
+  if (isChange){
+    changeMsg = `event: changes\ndata: ${++changes}\n\n`;
+  }
+  response.write(`${totalMsg}${changeMsg}`);
+};
 /*
   Recursively processes ownership changes on a user story and its child
   user stories.
@@ -77,18 +86,9 @@ const takeTree = (restAPI, storyRef, response) => {
       const ownerRef = storyOwner ? shorten('user', storyObj.Owner._ref) : '';
       const tasksSummary = storyObj.Tasks;
       const childrenSummary = storyObj.Children;
-      // Increments the total(s) and sends the new total(s) as events.
-      const upTotal = isChange => {
-        const totalMsg = `event: total\ndata: ${++total}\n\n`;
-        let changeMsg = '';
-        if (isChange){
-          changeMsg = `event: changes\ndata: ${++changes}\n\n`;
-        }
-        response.write(`${totalMsg}${changeMsg}`);
-      };
       // Make the specified user the owner of the user story, if not already.
       const isChange = ownerRef !== takerRef;
-      upTotal(isChange);
+      upTotal(isChange, response);
       restAPI.update({
         ref: storyRef,
         data: isChange ? {Owner: takerRef} : {}
@@ -119,7 +119,7 @@ const takeTree = (restAPI, storyRef, response) => {
                       ? shorten('user', taskOwner._ref)
                       : '';
                     const isChange = ownerRef !== takerRef;
-                    upTotal(isChange);
+                    upTotal(isChange, response);
                     if (errorMessage) {
                       serveError(response);
                       return;
@@ -178,6 +178,7 @@ const takeTree = (restAPI, storyRef, response) => {
   it.
 */
 const caseTree = (restAPI, storyRef, response) => {
+  console.log(`Running caseTree on ${storyRef}`);
   // Get data on the user story.
   return restAPI.get({
     ref: storyRef,
@@ -188,52 +189,52 @@ const caseTree = (restAPI, storyRef, response) => {
       const storyObj = storyResult.Object;
       const tasksSummary = storyObj.Tasks;
       const casesSummary = storyObj.TestCases;
-      console.log(`casesSummary is:\n${JSON.stringify(casesSummary)}`);
+      console.log(
+        `casesSummary is:\n${JSON.stringify(casesSummary, null, 2)}`
+      );
       const childrenSummary = storyObj.Children;
-      // Increments the total(s) and sends the new total(s) as events.
-      const upTotal = isChange => {
-        const totalMsg = `event: total\ndata: ${++total}\n\n`;
-        let changeMsg = '';
-        if (isChange){
-          changeMsg = `event: changes\ndata: ${++changes}\n\n`;
-        }
-        response.write(`${totalMsg}${changeMsg}`);
-      };
-      // Processes the child user stories.
-      const doChildren = () => {
-        // If there are any child user stories:
-        if (childrenSummary.Count) {
-          // Get their data.
-          restAPI.get({
-            ref: childrenSummary._ref,
-            fetch: ['_ref']
-          })
-          .then(
-            // Process each.
-            childrenObj => {
-              const children = childrenObj.Object.Results;
-              children.forEach(child => {
-                if (! errorMessage) {
-                  const childRef = shorten(
-                    'hierarchicalrequirement', child._ref
-                  );
-                  caseTree(restAPI, childRef, response);
-                }
-              });
-            },
-            error => err(error, 'getting data on children')
-          );
-        }
-      };
-      // If the user story has tasks and no test cases:
-      if (tasksSummary.Count && ! casesSummary.Count) {
-        const casesRef = shorten('hierarchicalrequirement', casesSummary._ref);
+      console.log(
+        `childrenSummary is:\n${JSON.stringify(childrenSummary, null, 2)}`
+      );
+      /*
+        If the user story has any child user stories, assume it
+        does not need a test case and:
+      */
+      if (childrenSummary.Count) {
+        // Get their data.
+        restAPI.get({
+          ref: childrenSummary._ref,
+          fetch: ['_ref']
+        })
+        .then(
+          // After the data have been fetched, process each child.
+          childrenObj => {
+            const children = childrenObj.Object.Results;
+            children.forEach(child => {
+              if (! errorMessage) {
+                const childRef = shorten(
+                  'hierarchicalrequirement', child._ref
+                );
+                console.log(`childRef is ${childRef}`);
+                caseTree(restAPI, childRef, response);
+              }
+            });
+          },
+          error => err(error, 'getting data on children')
+        );
+      }
+      // Otherwise, if the user story needs a test case:
+      else if (tasksSummary.Count && ! casesSummary.Count) {
+        const casesRef = shorten(
+          'hierarchicalrequirement', casesSummary._ref
+        );
+        console.log(`casesRef is ${casesRef}`);
         if (errorMessage) {
           serveError(response);
           return;
         }
         // Create a test case.
-        upTotal(true);
+        upTotal(true, response);
         restAPI.create({
           type: 'testcase',
           fetch: ['_ref'],
@@ -243,10 +244,12 @@ const caseTree = (restAPI, storyRef, response) => {
         })
         .then(
           newCase => {
+            console.log(`Created test case ${caseRef}`);
             // After it is created, link it to the user story.
             const caseRef = shorten('testcase', newCase.Object._ref);
             if (errorMessage) {
               serveError(response);
+              return;
             }
             console.log(
               `Linking case\n${caseRef}\nto collection\n${casesRef}`
@@ -257,7 +260,8 @@ const caseTree = (restAPI, storyRef, response) => {
             })
             .then(
               () => {
-                doChildren();
+                console.log('Addition to collection successful');
+                return;
               },
               error => err(error, 'adding a test case')
             );
@@ -265,9 +269,12 @@ const caseTree = (restAPI, storyRef, response) => {
           error => err(error, 'getting data on tasks and test cases')
         );
       }
+      /*
+        Otherwise, i.e. if the user story has no children but does
+        not need a test case:
+      */
       else {
-        upTotal(false);
-        doChildren();
+        upTotal(false, response);
       }
     },
     error => err(error, 'getting data on user story')
