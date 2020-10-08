@@ -178,7 +178,6 @@ const takeTree = (restAPI, storyRef, response) => {
   it.
 */
 const caseTree = (restAPI, storyRef, response) => {
-  console.log(`Running caseTree on ${storyRef}`);
   // Get data on the user story.
   return restAPI.get({
     ref: storyRef,
@@ -189,13 +188,7 @@ const caseTree = (restAPI, storyRef, response) => {
       const storyObj = storyResult.Object;
       const tasksSummary = storyObj.Tasks;
       const casesSummary = storyObj.TestCases;
-      console.log(
-        `casesSummary is:\n${JSON.stringify(casesSummary, null, 2)}`
-      );
       const childrenSummary = storyObj.Children;
-      console.log(
-        `childrenSummary is:\n${JSON.stringify(childrenSummary, null, 2)}`
-      );
       /*
         If the user story has any child user stories, assume it
         does not need a test case and:
@@ -215,7 +208,6 @@ const caseTree = (restAPI, storyRef, response) => {
                 const childRef = shorten(
                   'hierarchicalrequirement', child._ref
                 );
-                console.log(`childRef is ${childRef}`);
                 caseTree(restAPI, childRef, response);
               }
             });
@@ -227,8 +219,7 @@ const caseTree = (restAPI, storyRef, response) => {
       else if (tasksSummary.Count && ! casesSummary.Count) {
         const casesRef = shorten(
           'hierarchicalrequirement', casesSummary._ref
-        );
-        console.log(`casesRef is ${casesRef}`);
+        ).toLowerCase();
         if (errorMessage) {
           serveError(response);
           return;
@@ -244,9 +235,9 @@ const caseTree = (restAPI, storyRef, response) => {
         })
         .then(
           newCase => {
-            console.log(`Created test case ${caseRef}`);
             // After it is created, link it to the user story.
             const caseRef = shorten('testcase', newCase.Object._ref);
+            console.log(`Created ${caseRef}`);
             if (errorMessage) {
               serveError(response);
               return;
@@ -255,18 +246,20 @@ const caseTree = (restAPI, storyRef, response) => {
               `Linking case\n${caseRef}\nto collection\n${casesRef}`
             );
             restAPI.add({
-              ref: casesRef,
-              data: [{_ref: caseRef}]
+              ref: storyRef,
+              collection: 'TestCases',
+              data: [{_ref: caseRef}],
+              fetch: ['_ref']
             })
             .then(
-              () => {
-                console.log('Addition to collection successful');
+              ref => {
+                console.log(`Added ${ref} to ${storyRef}`);
                 return;
               },
-              error => err(error, 'adding a test case')
+              error => err(error, 'adding test case to user story')
             );
           },
-          error => err(error, 'getting data on tasks and test cases')
+          error => err(error, 'creating test case')
         );
       }
       /*
