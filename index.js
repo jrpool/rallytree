@@ -178,100 +178,104 @@ const takeTree = (restAPI, storyRef, response) => {
   it.
 */
 const caseTree = (restAPI, storyRef, response) => {
-  // Get data on the user story.
-  return restAPI.get({
-    ref: storyRef,
-    fetch: ['Children', 'Tasks', 'TestCases']
-  })
-  .then(
-    storyResult => {
-      const storyObj = storyResult.Object;
-      const tasksSummary = storyObj.Tasks;
-      const casesSummary = storyObj.TestCases;
-      const childrenSummary = storyObj.Children;
-      /*
-        If the user story has any child user stories, assume it
-        does not need a test case and:
-      */
-      if (childrenSummary.Count) {
-        // Get their data.
-        restAPI.get({
-          ref: childrenSummary._ref,
-          fetch: ['_ref']
-        })
-        .then(
-          // After the data have been fetched, process each child.
-          childrenObj => {
-            const children = childrenObj.Object.Results;
-            children.forEach(child => {
-              if (! errorMessage) {
-                const childRef = shorten(
-                  'hierarchicalrequirement', child._ref
-                );
-                caseTree(restAPI, childRef, response);
-              }
-            });
-          },
-          error => err(error, 'getting data on children')
-        );
-      }
-      // Otherwise, if the user story needs a test case:
-      else if (tasksSummary.Count && ! casesSummary.Count) {
-        const casesRef = shorten(
-          'hierarchicalrequirement', casesSummary._ref
-        ).toLowerCase();
-        if (errorMessage) {
-          serveError(response);
-          return;
+  if (errorMessage) {
+    serveError(response);
+    return;
+  }
+  else {
+    // Get data on the user story.
+    return restAPI.get({
+      ref: storyRef,
+      fetch: ['Children', 'Tasks', 'TestCases']
+    })
+    .then(
+      storyResult => {
+        const storyObj = storyResult.Object;
+        const tasksSummary = storyObj.Tasks;
+        const casesSummary = storyObj.TestCases;
+        const childrenSummary = storyObj.Children;
+        /*
+          If the user story has any child user stories, assume it
+          does not need a test case and:
+        */
+        if (childrenSummary.Count) {
+          // Get their data.
+          restAPI.get({
+            ref: childrenSummary._ref,
+            fetch: ['_ref']
+          })
+          .then(
+            // After the data have been fetched, process each child.
+            childrenObj => {
+              const children = childrenObj.Object.Results;
+              children.forEach(child => {
+                if (errorMessage) {
+                  serveError(response);
+                  return;
+                }
+                else {
+                  const childRef = shorten(
+                    'hierarchicalrequirement', child._ref
+                  );
+                  if (errorMessage) {
+                    serveError(response);
+                    return;
+                  }
+                  caseTree(restAPI, childRef, response);
+                }
+              });
+            },
+            error => err(error, 'getting data on children')
+          );
         }
-        // Create a test case.
-        upTotal(true, response);
-        restAPI.create({
-          type: 'testcase',
-          fetch: ['_ref'],
-          data: {
-            Name: 'Test Case X'
-          }
-        })
-        .then(
-          newCase => {
-            // After it is created, link it to the user story.
-            const caseRef = shorten('testcase', newCase.Object._ref);
-            console.log(`Created ${caseRef}`);
-            if (errorMessage) {
-              serveError(response);
-              return;
+        // Otherwise, if the user story needs a test case:
+        else if (tasksSummary.Count && ! casesSummary.Count) {
+          // Create a test case.
+          upTotal(true, response);
+          restAPI.create({
+            type: 'testcase',
+            fetch: ['_ref'],
+            data: {
+              Name: 'Test Case X'
             }
-            console.log(
-              `Linking case\n${caseRef}\nto collection\n${casesRef}`
-            );
-            restAPI.add({
-              ref: storyRef,
-              collection: 'TestCases',
-              data: [{_ref: caseRef}],
-              fetch: ['_ref']
-            })
-            .then(
-              ref => {
-                console.log(`Added ${ref} to ${storyRef}`);
+          })
+          .then(
+            newCase => {
+              // After it is created, link it to the user story.
+              const caseRef = shorten('testcase', newCase.Object._ref);
+              if (errorMessage) {
+                serveError(response);
                 return;
-              },
-              error => err(error, 'adding test case to user story')
-            );
-          },
-          error => err(error, 'creating test case')
-        );
-      }
-      /*
-        Otherwise, i.e. if the user story has no children but does
-        not need a test case:
-      */
-      else {
-        upTotal(false, response);
-      }
-    },
-    error => err(error, 'getting data on user story')
-  );
+              }
+              /*
+                Delay the linking after the test case is created. This
+                seems to decrease, but not eliminate, bogus “Invalid key”
+                errors.
+              */
+              setTimeout(() => {
+                restAPI.add({
+                  ref: storyRef,
+                  collection: 'TestCases',
+                  data: [{_ref: caseRef}],
+                  fetch: ['_ref']
+                })
+                .catch(error => err(error, 'adding test case to user story'));
+              }, 1000);
+            },
+            error => err(error, 'creating test case')
+          );
+        }
+        /*
+          Otherwise, i.e. if the user story has no children but does
+          not need a test case:
+        */
+        else {
+          upTotal(false, response);
+        }
+      },
+      error => err(error, 'getting data on user story')
+    );
+  }
 };
 // Gets a reference to a user.
 const getUserRef = (restAPI, userName) => {
@@ -312,7 +316,7 @@ const serveDo = response => {
     error => err(error, 'reading do page')
   );
 };
-// Serves the acknowledgement page.
+// Serves the report page.
 const serveTakeReport = (userName, takerName, response) => {
   fs.readFile('takeReport.html', 'utf8')
   .then(
@@ -337,7 +341,7 @@ const serveTakeReport = (userName, takerName, response) => {
     error => err(error, 'reading takeReport page')
   );
 };
-// Serves the acknowledgement page.
+// Serves the report page.
 const serveCaseReport = (userName, response) => {
   fs.readFile('caseReport.html', 'utf8')
   .then(
