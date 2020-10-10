@@ -284,7 +284,7 @@ const caseTree = (restAPI, storyRef, response) => {
                     },
                     error => err(error, 'adding test case to user story')
                   );
-                }, 2000 + 200 * casesMade);
+                }, 2000 + 300 * casesMade);
               }
             },
             error => err(error, 'creating test case')
