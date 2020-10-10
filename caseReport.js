@@ -26,14 +26,14 @@ document.addEventListener('DOMContentLoaded', () => {
   eventSource.addEventListener('changes', event => {
     messageHandler(event, 'changes');
   });
-  // Stop listening after 3 idle seconds, assuming the job complete.
+  // Stop listening after 10 idle seconds, assuming the job complete.
   const poller = setInterval(
     () => {
-      if (lastEventTime && Date.now() - lastEventTime > 3000) {
+      if (lastEventTime && Date.now() - lastEventTime > 10000) {
         eventSource.close();
         clearInterval(poller);
       }
     },
-    1000
+    2000
   );
 }, {once: true});

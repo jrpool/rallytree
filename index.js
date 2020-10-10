@@ -36,6 +36,7 @@ let takerRef = '';
 let rootRef = '';
 let total = 0;
 let changes = 0;
+let casesMade = 0;
 let idle = false;
 
 // ########## FUNCTIONS
@@ -88,7 +89,6 @@ const takeTree = (restAPI, storyRef, response) => {
       const childrenSummary = storyObj.Children;
       // Make the specified user the owner of the user story, if not already.
       const isChange = ownerRef !== takerRef;
-      upTotal(isChange, response);
       restAPI.update({
         ref: storyRef,
         data: isChange ? {Owner: takerRef} : {}
@@ -100,6 +100,8 @@ const takeTree = (restAPI, storyRef, response) => {
       */
       .then(
         () => {
+          upTotal(isChange, response);
+          // If the user story has any tasks:
           if (tasksSummary.Count) {
             // Get their data.
             restAPI.get({
@@ -119,7 +121,6 @@ const takeTree = (restAPI, storyRef, response) => {
                       ? shorten('user', taskOwner._ref)
                       : '';
                     const isChange = ownerRef !== takerRef;
-                    upTotal(isChange, response);
                     if (errorMessage) {
                       serveError(response);
                       return;
@@ -129,7 +130,15 @@ const takeTree = (restAPI, storyRef, response) => {
                         ref: taskRef,
                         data: {Owner: takerRef}
                       })
-                      .catch(error => err(error, 'changing the owner'));
+                      .then(
+                        () => {
+                          upTotal(true, response);
+                        },
+                        error => err(error, 'changing the owner')
+                      );
+                    }
+                    else {
+                      upTotal(false, response);
                     }
                   }
                 });
@@ -157,7 +166,9 @@ const takeTree = (restAPI, storyRef, response) => {
                       serveError(response);
                       return;
                     }
-                    takeTree(restAPI, childRef, response);
+                    else {
+                      takeTree(restAPI, childRef, response);
+                    }
                   }
                 });
               },
@@ -199,6 +210,7 @@ const caseTree = (restAPI, storyRef, response) => {
           does not need a test case and:
         */
         if (childrenSummary.Count) {
+          upTotal(false, response);
           // Get their data.
           restAPI.get({
             ref: childrenSummary._ref,
@@ -228,10 +240,13 @@ const caseTree = (restAPI, storyRef, response) => {
             error => err(error, 'getting data on children')
           );
         }
-        // Otherwise, if the user story needs a test case:
+        /*
+          Otherwise, if the user story has any tasks but has no
+          test cases, assume it needs a test case and:
+        */
         else if (tasksSummary.Count && ! casesSummary.Count) {
+          casesMade++;
           // Create a test case.
-          upTotal(true, response);
           restAPI.create({
             type: 'testcase',
             fetch: ['_ref'],
@@ -241,26 +256,33 @@ const caseTree = (restAPI, storyRef, response) => {
           })
           .then(
             newCase => {
-              // After it is created, link it to the user story.
+              /*
+                After it is created, wait long enough for all other
+                test cases to have been created, and then link it to
+                the user story. Linking test cases while other test
+                cases are being created makes Rally throw errors.
+              */
               const caseRef = shorten('testcase', newCase.Object._ref);
               if (errorMessage) {
                 serveError(response);
                 return;
               }
-              /*
-                Delay the linking after the test case is created. This
-                seems to decrease, but not eliminate, bogus “Invalid key”
-                errors.
-              */
-              setTimeout(() => {
-                restAPI.add({
-                  ref: storyRef,
-                  collection: 'TestCases',
-                  data: [{_ref: caseRef}],
-                  fetch: ['_ref']
-                })
-                .catch(error => err(error, 'adding test case to user story'));
-              }, 1000);
+              else {
+                setTimeout(() => {
+                  restAPI.add({
+                    ref: storyRef,
+                    collection: 'TestCases',
+                    data: [{_ref: caseRef}],
+                    fetch: ['_ref']
+                  })
+                  .then(
+                    () => {
+                      upTotal(true, response);
+                    },
+                    error => err(error, 'adding test case to user story')
+                  );
+                }, 1000 + 100 * casesMade);
+              }
             },
             error => err(error, 'creating test case')
           );
