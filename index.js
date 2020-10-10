@@ -197,7 +197,14 @@ const caseTree = (restAPI, storyRef, response) => {
     // Get data on the user story.
     return restAPI.get({
       ref: storyRef,
-      fetch: ['Name', 'Description', 'Owner', 'Children', 'Tasks', 'TestCases']
+      fetch: [
+        'Name',
+        'Description',
+        'Owner',
+        'Children',
+        'Tasks',
+        'TestCases'
+      ]
     })
     .then(
       storyResult => {
@@ -236,7 +243,9 @@ const caseTree = (restAPI, storyRef, response) => {
                     serveError(response);
                     return;
                   }
-                  caseTree(restAPI, childRef, response);
+                  else {
+                    caseTree(restAPI, childRef, response);
+                  }
                 }
               });
             },
@@ -304,6 +313,193 @@ const caseTree = (restAPI, storyRef, response) => {
     );
   }
 };
+/*
+  Recursively copies a user story and its child user stories
+  and tasks.
+*/
+const copyTree = (restAPI, storyRef, parentRef, response) => {
+  if (errorMessage) {
+    serveError(response);
+    return;
+  }
+  else {
+    // Get data on the user story.
+    return restAPI.get({
+      ref: storyRef,
+      fetch: [
+        'Children',
+        'Tasks',
+        'TestCases'
+      ]
+    })
+    .then(
+      storyResult => {
+        const storyObj = storyResult.Object;
+        const tasksSummary = storyObj.Tasks;
+        const casesSummary = storyObj.TestCases;
+        const childrenSummary = storyObj.Children;
+        /*
+          When the data arrive, copy it and make the specified
+          user story its parent.
+        */
+        restAPI.copy({
+          ref: storyRef,
+          fetch: ['_ref'],
+          data: {
+            parent: parentRef
+          }
+        })
+        .then(
+          // When the copy is complete:
+          copyResult => {
+            const copyObj = copyResult.Object;
+            const copyRef = shorten(
+              'hierarchicalrequirement', copy._ref
+            );
+            if (errorMessage) {
+              serveError(response);
+              return;
+            }
+            // If the user story has any children:
+            else if (childrenSummary.Count) {
+              // Request their data.
+              restAPI.get({
+                ref: childrenSummary._ref,
+                fetch: ['_ref']
+              })
+              .then(
+                /*
+                  When the data arrive, process each child, making
+                  the copy of the user story its parent.
+                */
+                childrenResult => {
+                  const children = childrenResult.Object.Results;
+                  children.forEach(child => {
+                    if (errorMessage) {
+                      serveError(response);
+                      return;
+                    }
+                    else {
+                      const childRef = shorten(
+                        'hierarchicalrequirement', child._ref
+                      );
+                      if (errorMessage) {
+                        serveError(response);
+                        return;
+                      }
+                      else {
+                        copyTree(restAPI, childRef, copyRef, response);
+                      }
+                    }
+                  });
+                },
+                error => err(error, 'getting data on children')
+              );
+            }
+            // Otherwise, if the user story has any tasks:
+            else if (tasksSummary.Count) {
+              // Request their data.
+              restAPI.get({
+                ref: tasksSummary._ref,
+                fetch: ['_ref']
+              })
+              .then(
+                /*
+                  When the data arrive, copy each task, making
+                  the copy of the user story its parent.
+                */
+                tasksResult => {
+                  const tasks = tasksResult.Object.Results;
+                  tasks.forEach(task => {
+                    if (errorMessage) {
+                      serveError(response);
+                      return;
+                    }
+                    else {
+                      const taskRef = shorten(
+                        'task', task._ref
+                      );
+                      if (errorMessage) {
+                        serveError(response);
+                        return;
+                      }
+                      else {
+                        restAPI.copy({
+                          ref: taskRef,
+                          fetch: ['_ref'],
+                          data: {
+                            parent: copyRef
+                          }
+                        })
+                        .then(
+                          () => {
+                            upTotal(true, response);
+                          },
+                          error => err(error, 'copying task')
+                        );
+                      }
+                    }
+                  });
+                },
+                error => err(error, 'getting data on tasks')
+              );
+            }
+            // Otherwise, if the user story has any test cases:
+            else if (casesSummary.Count) {
+              // Request their data.
+              restAPI.get({
+                ref: casesSummary._ref,
+                fetch: ['_ref']
+              })
+              .then(
+                /*
+                  When the data arrive, copy each test case, making
+                  the copy of the user story its parent.
+                */
+                casesResult => {
+                  const cases = casesResult.Object.Results;
+                  cases.forEach(testCase => {
+                    if (errorMessage) {
+                      serveError(response);
+                      return;
+                    }
+                    else {
+                      const caseRef = shorten(
+                        'testcase', testCase._ref
+                      );
+                      if (errorMessage) {
+                        serveError(response);
+                        return;
+                      }
+                      else {
+                        restAPI.copy({
+                          ref: caseRef,
+                          fetch: ['_ref'],
+                          data: {
+                            parent: copyRef
+                          }
+                        })
+                        .then(
+                          () => {
+                            upTotal(true, response);
+                          },
+                          error => err(error, 'copying task')
+                        );
+                      }
+                    }
+                  });
+                },
+                error => err(error, 'getting data on test cases')
+              );
+            }
+          },
+          error => err(error, 'copying user story')
+        );
+      },
+      error => err(error, 'getting data on user story')
+    );
+  }
+};
 // Gets a reference to a user.
 const getUserRef = (restAPI, userName) => {
   return restAPI.query({
@@ -343,7 +539,7 @@ const serveDo = response => {
     error => err(error, 'reading do page')
   );
 };
-// Serves the report page.
+// Serves the change-owner report page.
 const serveTakeReport = (userName, takerName, response) => {
   fs.readFile('takeReport.html', 'utf8')
   .then(
@@ -368,7 +564,7 @@ const serveTakeReport = (userName, takerName, response) => {
     error => err(error, 'reading takeReport page')
   );
 };
-// Serves the report page.
+// Serves the add-test-cases report page.
 const serveCaseReport = (userName, response) => {
   fs.readFile('caseReport.html', 'utf8')
   .then(
@@ -379,6 +575,30 @@ const serveCaseReport = (userName, response) => {
           const newContent = htmlContent
           .replace('__script__', jsContent)
           .replace('__rootRef__', rootRef)
+          .replace('__userName__', userName)
+          .replace('__userRef__', userRef);
+          response.setHeader('Content-Type', 'text/html');
+          response.write(newContent);
+          response.end();
+        },
+        error => err(error, 'reading caseReport script')
+      );
+    },
+    error => err(error, 'reading caseReport page')
+  );
+};
+// Serves the copy report page.
+const serveCopyReport = (userName, parentRef, response) => {
+  fs.readFile('copyReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('copyReport.js', 'utf8')
+      .then(
+        jsContent => {
+          const newContent = htmlContent
+          .replace('__script__', jsContent)
+          .replace('__rootRef__', rootRef)
+          .replace('__parentRef__', parentRef)
           .replace('__userName__', userName)
           .replace('__userRef__', userRef);
           response.setHeader('Content-Type', 'text/html');
@@ -518,16 +738,19 @@ const requestHandler = (request, response) => {
       }
     }
     else if (method === 'POST' && requestURL === '/do.html') {
-      // Enables a server response to the next /taketotals request.
+      // Enables a server response to the next /totals request.
       idle = true;
       const bodyObject = parse(Buffer.concat(body).toString());
-      const {userName, password, rootURL, op, takerName} = bodyObject;
+      const {
+        userName, password, rootURL, op, takerName, parentURL
+      } = bodyObject;
       rootRef = shorten('hierarchicalrequirement', rootURL);
+      const parentRef = shorten('hierarchicalrequirement', parentURL);
       if (errorMessage) {
         serveError(response);
         return;
       }
-      if (rootRef) {
+      else if (rootRef) {
         restAPI = rally({
           user: userName,
           pass: password,
@@ -579,6 +802,9 @@ const requestHandler = (request, response) => {
         }
         else if (op === 'case') {
           serveCaseReport(userName, response);
+        }
+        else if (op === 'copy') {
+          serveCopyReport(userName, parentRef, response);
         }
       }
       else {
