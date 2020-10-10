@@ -197,7 +197,7 @@ const caseTree = (restAPI, storyRef, response) => {
     // Get data on the user story.
     return restAPI.get({
       ref: storyRef,
-      fetch: ['Name', 'Description', 'Children', 'Tasks', 'TestCases']
+      fetch: ['Name', 'Description', 'Owner', 'Children', 'Tasks', 'TestCases']
     })
     .then(
       storyResult => {
@@ -207,6 +207,7 @@ const caseTree = (restAPI, storyRef, response) => {
         const childrenSummary = storyObj.Children;
         const name = storyObj.Name;
         const description = storyObj.Description;
+        const owner = storyObj.Owner;
         /*
           If the user story has any child user stories, assume it
           does not need a test case and:
@@ -254,7 +255,8 @@ const caseTree = (restAPI, storyRef, response) => {
             fetch: ['_ref'],
             data: {
               Name: name,
-              Description: description
+              Description: description,
+              Owner: owner
             }
           })
           .then(
@@ -284,7 +286,7 @@ const caseTree = (restAPI, storyRef, response) => {
                     },
                     error => err(error, 'adding test case to user story')
                   );
-                }, 2000 + 300 * casesMade);
+                }, 2000 + 400 * casesMade);
               }
             },
             error => err(error, 'creating test case')
