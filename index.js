@@ -67,8 +67,13 @@ const shorten = (type, longRef) => {
     return '';
   }
 };
-// Increments the total(s) and sends the new total(s) as events.
-const upTotal = (isChange, response) => {
+// Increments the totals and sends the new totals as events.
+const upTotal = response => {
+  const totalMsg = `event: total\ndata: ${++total}\n\n`;
+  response.write(`${totalMsg}`);
+};
+// Increments the totals and sends the new totals as events.
+const upTotals = (isChange, response) => {
   const totalMsg = `event: total\ndata: ${++total}\n\n`;
   let changeMsg = '';
   if (isChange){
@@ -106,7 +111,7 @@ const takeTree = (restAPI, storyRef, response) => {
       */
       .then(
         () => {
-          upTotal(isChange, response);
+          upTotals(isChange, response);
           // If the user story has any tasks:
           if (tasksSummary.Count) {
             // Get their data.
@@ -138,7 +143,7 @@ const takeTree = (restAPI, storyRef, response) => {
                       })
                       .then(
                         () => {
-                          upTotal(true, response);
+                          upTotals(true, response);
                         },
                         error => err(error, 'changing the owner')
                       );
@@ -226,7 +231,7 @@ const caseTree = (restAPI, storyRef, response) => {
           does not need a test case and:
         */
         if (childrenSummary.Count) {
-          upTotal(false, response);
+          upTotals(false, response);
           // Get their data.
           restAPI.get({
             ref: childrenSummary._ref,
@@ -297,7 +302,7 @@ const caseTree = (restAPI, storyRef, response) => {
                   })
                   .then(
                     () => {
-                      upTotal(true, response);
+                      upTotals(true, response);
                     },
                     error => err(error, 'adding test case to user story')
                   );
@@ -312,18 +317,44 @@ const caseTree = (restAPI, storyRef, response) => {
           not need a test case:
         */
         else {
-          upTotal(false, response);
+          upTotals(false, response);
         }
       },
       error => err(error, 'getting data on user story')
     );
   }
 };
+// Sequentially copies an array of user stories.
+const copySequentially = (restAPI, stories, parentRef, response) => {
+  if (errorMessage) {
+    serveError(response);
+    return '';
+  }
+  else if (! stories.length) {
+    return '';
+  }
+  else {
+    const firstRef = shorten(
+      'hierarchicalrequirement', stories[0]._ref
+    );
+    if (errorMessage) {
+      serveError(response);
+      return '';
+    }
+    else {
+      return copyTree(restAPI, firstRef, parentRef, response)
+      .then(
+        () => copySequentially(restAPI, stories.slice(1), parentRef, response),
+        error => err(error, 'copying user story')
+      );
+    }
+  }
+};
 // Recursively copies a user story and its child user stories.
 const copyTree = (restAPI, storyRef, parentRef, response) => {
   if (errorMessage) {
     serveError(response);
-    return;
+    return '';
   }
   else {
     // Get data on the user story.
@@ -339,7 +370,7 @@ const copyTree = (restAPI, storyRef, parentRef, response) => {
           When the data arrive, copy the user story and give it the specified
           parent.
         */
-        restAPI.create({
+        return restAPI.create({
           type: 'hierarchicalrequirement',
           fetch: ['_ref'],
           data: {
@@ -351,34 +382,21 @@ const copyTree = (restAPI, storyRef, parentRef, response) => {
         })
         .then(
           copyResult => {
+            upTotal(response);
             // When the user story has been copied, get data on its children.
             const ref = copyResult.Object._ref;
-            restAPI.get({
+            return restAPI.get({
               ref: childrenRef,
               fetch: ['_ref']
             })
             .then(
-              // When the data arrive, process each child.
+              /*
+                When the data arrive, process the children consecutively.
+                Parellel processing causes concurrency conflicts in Rally.
+              */
               childrenResult => {
                 const children = childrenResult.Object.Results;
-                children.forEach(child => {
-                  if (errorMessage) {
-                    serveError(response);
-                    return;
-                  }
-                  else {
-                    const childRef = shorten(
-                      'hierarchicalrequirement', child._ref
-                    );
-                    if (errorMessage) {
-                      serveError(response);
-                      return;
-                    }
-                    else {
-                      copyTree(restAPI, childRef, ref, response);
-                    }
-                  }
-                });
+                return copySequentially(restAPI, children, ref, response);
               },
               error => err(error, 'getting data on children')
             );
