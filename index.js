@@ -34,6 +34,7 @@ let restAPI;
 let userRef = '';
 let takerRef = '';
 let rootRef = '';
+let parentRef = '';
 let total = 0;
 let changes = 0;
 let casesMade = 0;
@@ -736,6 +737,19 @@ const requestHandler = (request, response) => {
         serveEventStart(response);
         caseTree(restAPI, rootRef, response);
       }
+      else if (requestURL === '/copytotals' && idle) {
+        /*
+          Serves the event stream, performs the operation, and reports
+          the events when a page first requests this. After the server
+          closes the connection, the client may periodically request
+          '/copytotals' again. Prevents response to those requests by
+          setting idle to false.
+        */
+        idle = false;
+        total = changes = 0;
+        serveEventStart(response);
+        copyTree(restAPI, rootRef, response);
+      }
     }
     else if (method === 'POST' && requestURL === '/do.html') {
       // Enables a server response to the next /totals request.
@@ -745,7 +759,7 @@ const requestHandler = (request, response) => {
         userName, password, rootURL, op, takerName, parentURL
       } = bodyObject;
       rootRef = shorten('hierarchicalrequirement', rootURL);
-      const parentRef = shorten('hierarchicalrequirement', parentURL);
+      parentRef = shorten('hierarchicalrequirement', parentURL);
       if (errorMessage) {
         serveError(response);
         return;

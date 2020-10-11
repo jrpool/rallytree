@@ -18,12 +18,12 @@ const messageHandler = (event, type) => {
 };
 document.addEventListener('DOMContentLoaded', () => {
   // Request an event stream.
-  eventSource = new EventSource('/casetotals');
+  eventSource = new EventSource('/copytotals');
   // Listen for message events.
   eventSource.addEventListener('total', event => {
     messageHandler(event, 'total');
   });
-  eventSource.addEventListener('changes', event => {
+  eventSource.addEventListener('copies', event => {
     messageHandler(event, 'changes');
   });
   // Stop listening after 10 idle seconds, assuming the job complete.
