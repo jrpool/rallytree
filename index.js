@@ -748,7 +748,7 @@ const requestHandler = (request, response) => {
         idle = false;
         total = changes = 0;
         serveEventStart(response);
-        copyTree(restAPI, rootRef, response);
+        copyTree(restAPI, rootRef, parentRef, response);
       }
     }
     else if (method === 'POST' && requestURL === '/do.html') {
