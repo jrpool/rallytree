@@ -13,6 +13,8 @@ const fs = require('fs').promises;
 require('dotenv').config();
 // Module to create a web server.
 const http = require('http');
+// Module to make encrypted requests.
+const https = require('https');
 // Module to parse request bodies.
 const {parse} = require('querystring');
 // Rally module.
@@ -39,6 +41,9 @@ let total = 0;
 let changes = 0;
 let casesMade = 0;
 let idle = false;
+let {RALLY_USERNAME, RALLY_PASSWORD} = process.env;
+RALLY_USERNAME = RALLY_USERNAME || '';
+RALLY_PASSWORD = RALLY_PASSWORD || '';
 
 // ########## FUNCTIONS
 
@@ -314,10 +319,7 @@ const caseTree = (restAPI, storyRef, response) => {
     );
   }
 };
-/*
-  Recursively copies a user story and its child user stories
-  and tasks.
-*/
+// Recursively copies a user story and its child user stories.
 const copyTree = (restAPI, storyRef, parentRef, response) => {
   if (errorMessage) {
     serveError(response);
@@ -327,172 +329,59 @@ const copyTree = (restAPI, storyRef, parentRef, response) => {
     // Get data on the user story.
     return restAPI.get({
       ref: storyRef,
-      fetch: [
-        'Children',
-        'Tasks',
-        'TestCases'
-      ]
+      fetch: ['Name', 'Description', 'Owner', 'Children']
     })
     .then(
       storyResult => {
         const storyObj = storyResult.Object;
-        const tasksSummary = storyObj.Tasks;
-        const casesSummary = storyObj.TestCases;
-        const childrenSummary = storyObj.Children;
+        const childrenRef = storyObj.Children._ref;
         /*
-          When the data arrive, copy it and make the specified
-          user story its parent.
+          When the data arrive, copy the user story and give it the specified
+          parent.
         */
-        restAPI.copy({
-          ref: storyRef,
+        restAPI.create({
+          type: 'hierarchicalrequirement',
           fetch: ['_ref'],
           data: {
-            parent: parentRef
+            Name: storyObj.Name,
+            Description: storyObj.Description,
+            Owner: storyObj.Owner,
+            Parent: parentRef
           }
         })
         .then(
-          // When the copy is complete:
           copyResult => {
-            const copyObj = copyResult.Object;
-            const copyRef = shorten(
-              'hierarchicalrequirement', copy._ref
+            // When the user story has been copied, get data on its children.
+            const ref = copyResult.Object._ref;
+            restAPI.get({
+              ref: childrenRef,
+              fetch: ['_ref']
+            })
+            .then(
+              // When the data arrive, process each child.
+              childrenResult => {
+                const children = childrenResult.Object.Results;
+                children.forEach(child => {
+                  if (errorMessage) {
+                    serveError(response);
+                    return;
+                  }
+                  else {
+                    const childRef = shorten(
+                      'hierarchicalrequirement', child._ref
+                    );
+                    if (errorMessage) {
+                      serveError(response);
+                      return;
+                    }
+                    else {
+                      copyTree(restAPI, childRef, ref, response);
+                    }
+                  }
+                });
+              },
+              error => err(error, 'getting data on children')
             );
-            if (errorMessage) {
-              serveError(response);
-              return;
-            }
-            // If the user story has any children:
-            else if (childrenSummary.Count) {
-              // Request their data.
-              restAPI.get({
-                ref: childrenSummary._ref,
-                fetch: ['_ref']
-              })
-              .then(
-                /*
-                  When the data arrive, process each child, making
-                  the copy of the user story its parent.
-                */
-                childrenResult => {
-                  const children = childrenResult.Object.Results;
-                  children.forEach(child => {
-                    if (errorMessage) {
-                      serveError(response);
-                      return;
-                    }
-                    else {
-                      const childRef = shorten(
-                        'hierarchicalrequirement', child._ref
-                      );
-                      if (errorMessage) {
-                        serveError(response);
-                        return;
-                      }
-                      else {
-                        copyTree(restAPI, childRef, copyRef, response);
-                      }
-                    }
-                  });
-                },
-                error => err(error, 'getting data on children')
-              );
-            }
-            // Otherwise, if the user story has any tasks:
-            else if (tasksSummary.Count) {
-              // Request their data.
-              restAPI.get({
-                ref: tasksSummary._ref,
-                fetch: ['_ref']
-              })
-              .then(
-                /*
-                  When the data arrive, copy each task, making
-                  the copy of the user story its parent.
-                */
-                tasksResult => {
-                  const tasks = tasksResult.Object.Results;
-                  tasks.forEach(task => {
-                    if (errorMessage) {
-                      serveError(response);
-                      return;
-                    }
-                    else {
-                      const taskRef = shorten(
-                        'task', task._ref
-                      );
-                      if (errorMessage) {
-                        serveError(response);
-                        return;
-                      }
-                      else {
-                        restAPI.copy({
-                          ref: taskRef,
-                          fetch: ['_ref'],
-                          data: {
-                            parent: copyRef
-                          }
-                        })
-                        .then(
-                          () => {
-                            upTotal(true, response);
-                          },
-                          error => err(error, 'copying task')
-                        );
-                      }
-                    }
-                  });
-                },
-                error => err(error, 'getting data on tasks')
-              );
-            }
-            // Otherwise, if the user story has any test cases:
-            else if (casesSummary.Count) {
-              // Request their data.
-              restAPI.get({
-                ref: casesSummary._ref,
-                fetch: ['_ref']
-              })
-              .then(
-                /*
-                  When the data arrive, copy each test case, making
-                  the copy of the user story its parent.
-                */
-                casesResult => {
-                  const cases = casesResult.Object.Results;
-                  cases.forEach(testCase => {
-                    if (errorMessage) {
-                      serveError(response);
-                      return;
-                    }
-                    else {
-                      const caseRef = shorten(
-                        'testcase', testCase._ref
-                      );
-                      if (errorMessage) {
-                        serveError(response);
-                        return;
-                      }
-                      else {
-                        restAPI.copy({
-                          ref: caseRef,
-                          fetch: ['_ref'],
-                          data: {
-                            parent: copyRef
-                          }
-                        })
-                        .then(
-                          () => {
-                            upTotal(true, response);
-                          },
-                          error => err(error, 'copying task')
-                        );
-                      }
-                    }
-                  });
-                },
-                error => err(error, 'getting data on test cases')
-              );
-            }
           },
           error => err(error, 'copying user story')
         );
@@ -529,10 +418,9 @@ const serveDo = response => {
   fs.readFile('do.html', 'utf8')
   .then(
     content => {
-      const {RALLY_USERNAME, RALLY_PASSWORD} = process.env;
       const newContent = content
-      .replace('__userName__', RALLY_USERNAME || '')
-      .replace('__password__', RALLY_PASSWORD || '');
+      .replace('__userName__', RALLY_USERNAME)
+      .replace('__password__', RALLY_PASSWORD);
       response.setHeader('Content-Type', 'text/html');
       response.write(newContent);
       response.end();
@@ -758,6 +646,8 @@ const requestHandler = (request, response) => {
       const {
         userName, password, rootURL, op, takerName, parentURL
       } = bodyObject;
+      RALLY_USERNAME = userName;
+      RALLY_PASSWORD = password;
       rootRef = shorten('hierarchicalrequirement', rootURL);
       parentRef = shorten('hierarchicalrequirement', parentURL);
       if (errorMessage) {
