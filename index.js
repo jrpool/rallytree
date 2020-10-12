@@ -13,8 +13,6 @@ const fs = require('fs').promises;
 require('dotenv').config();
 // Module to create a web server.
 const http = require('http');
-// Module to make encrypted requests.
-const https = require('https');
 // Module to parse request bodies.
 const {parse} = require('querystring');
 // Rally module.
@@ -39,7 +37,6 @@ let rootRef = '';
 let parentRef = '';
 let total = 0;
 let changes = 0;
-let casesMade = 0;
 let idle = false;
 let {RALLY_USERNAME, RALLY_PASSWORD} = process.env;
 RALLY_USERNAME = RALLY_USERNAME || '';
@@ -69,16 +66,12 @@ const shorten = (type, longRef) => {
 };
 // Increments the totals and sends the new totals as events.
 const upTotal = response => {
-  const totalMsg = `event: total\ndata: ${++total}\n\n`;
-  response.write(`${totalMsg}`);
+  response.write(`event: total\ndata: ${++total}\n\n`);
 };
 // Increments the totals and sends the new totals as events.
 const upTotals = (isChange, response) => {
   const totalMsg = `event: total\ndata: ${++total}\n\n`;
-  let changeMsg = '';
-  if (isChange){
-    changeMsg = `event: changes\ndata: ${++changes}\n\n`;
-  }
+  const changeMsg = isChange ? `event: changes\ndata: ${++changes}\n\n` : '';
   response.write(`${totalMsg}${changeMsg}`);
 };
 /*
@@ -194,6 +187,32 @@ const takeTree = (restAPI, storyRef, response) => {
     error => err(error, 'getting data on user story')
   );
 };
+// Sequentially processes test-case creation for an array of user stories.
+const caseSequentially = (restAPI, stories, response) => {
+  if (errorMessage) {
+    serveError(response);
+    return '';
+  }
+  else if (! stories.length) {
+    return '';
+  }
+  else {
+    const firstRef = shorten(
+      'hierarchicalrequirement', stories[0]._ref
+    );
+    if (errorMessage) {
+      serveError(response);
+      return '';
+    }
+    else {
+      return caseTree(restAPI, firstRef, response)
+      .then(
+        () => caseSequentially(restAPI, stories.slice(1), response),
+        error => err(error, 'processing test-case creation')
+      );
+    }
+  }
+};
 /*
   Recursively checks a user story and its child user stories and,
   where one is a test-level user story missing a test case, creates
@@ -233,34 +252,17 @@ const caseTree = (restAPI, storyRef, response) => {
         if (childrenSummary.Count) {
           upTotals(false, response);
           // Get their data.
-          restAPI.get({
+          return restAPI.get({
             ref: childrenSummary._ref,
             fetch: ['_ref']
           })
           .then(
-            // After the data have been fetched, process each child.
-            childrenObj => {
-              const children = childrenObj.Object.Results;
-              children.forEach(child => {
-                if (errorMessage) {
-                  serveError(response);
-                  return;
-                }
-                else {
-                  const childRef = shorten(
-                    'hierarchicalrequirement', child._ref
-                  );
-                  if (errorMessage) {
-                    serveError(response);
-                    return;
-                  }
-                  else {
-                    caseTree(restAPI, childRef, response);
-                  }
-                }
-              });
+            // When the data arrive, process the children sequentially.
+            childrenResult => {
+              const children = childrenResult.Object.Results;
+              return caseSequentially(restAPI, children, response);
             },
-            error => err(error, 'getting data on children')
+            error => err(error, 'getting data on child user stories')
           );
         }
         /*
@@ -268,9 +270,8 @@ const caseTree = (restAPI, storyRef, response) => {
           test cases, assume it needs a test case and:
         */
         else if (tasksSummary.Count && ! casesSummary.Count) {
-          casesMade++;
           // Create a test case.
-          restAPI.create({
+          return restAPI.create({
             type: 'testcase',
             fetch: ['_ref'],
             data: {
@@ -281,32 +282,26 @@ const caseTree = (restAPI, storyRef, response) => {
           })
           .then(
             newCase => {
-              /*
-                After it is created, wait long enough for all other
-                test cases to have been created, and then link it to
-                the user story. Linking test cases while other test
-                cases are being created makes Rally throw errors.
-              */
+              // After it is created, link it to the user story.
               const caseRef = shorten('testcase', newCase.Object._ref);
               if (errorMessage) {
                 serveError(response);
-                return;
+                return '';
               }
               else {
-                setTimeout(() => {
-                  restAPI.add({
-                    ref: storyRef,
-                    collection: 'TestCases',
-                    data: [{_ref: caseRef}],
-                    fetch: ['_ref']
-                  })
-                  .then(
-                    () => {
-                      upTotals(true, response);
-                    },
-                    error => err(error, 'adding test case to user story')
-                  );
-                }, 2000 + 400 * casesMade);
+                return restAPI.add({
+                  ref: storyRef,
+                  collection: 'TestCases',
+                  data: [{_ref: caseRef}],
+                  fetch: ['_ref']
+                })
+                .then(
+                  () => {
+                    upTotals(true, response);
+                    return '';
+                  },
+                  error => err(error, 'adding test case to user story')
+                );
               }
             },
             error => err(error, 'creating test case')
@@ -318,6 +313,7 @@ const caseTree = (restAPI, storyRef, response) => {
         */
         else {
           upTotals(false, response);
+          return '';
         }
       },
       error => err(error, 'getting data on user story')
@@ -667,10 +663,8 @@ const requestHandler = (request, response) => {
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
       rootRef = shorten('hierarchicalrequirement', rootURL);
-      parentRef = shorten('hierarchicalrequirement', parentURL);
       if (errorMessage) {
         serveError(response);
-        return;
       }
       else if (rootRef) {
         restAPI = rally({
@@ -726,13 +720,23 @@ const requestHandler = (request, response) => {
           serveCaseReport(userName, response);
         }
         else if (op === 'copy') {
-          serveCopyReport(userName, parentRef, response);
+          parentRef = shorten('hierarchicalrequirement', parentURL);
+          if (errorMessage) {
+            serveError(response);
+          }
+          else {
+            serveCopyReport(userName, parentRef, response);
+          }
         }
       }
       else {
         errorMessage = 'Tree root not specified.';
         serveError(response);
       }
+    }
+    else {
+      errorMessage = 'Unanticipated request.';
+      serveError(response);
     }
   });
 };
