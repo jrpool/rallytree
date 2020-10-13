@@ -1,7 +1,7 @@
 # rallytree
 Automation of Rally work-item tree management.
 # Introduction
-RallyTree automates some operations on trees of work items in (Rally)[https://www.broadcom.com/products/software/agile-development/rally-software]. 
+RallyTree automates some operations on trees of work items in [Rally](https://www.broadcom.com/products/software/agile-development/rally-software). 
 
 # Features
 RallyTree can perform these operations on a tree:
