@@ -68,10 +68,10 @@ Because of these limitations, some potentially parallel RallyTree operations are
 # Installation and usage
 To install and use RallyTree:
 
-- Clone it from its temporary repository.
+- Clone it.
 - Make its directory the current directory.
-- Install dependencies with npm install.
-- Run the application with node index.
+- Install dependencies with `npm install`.
+- Run the application with `node index`.
 - Follow the instructions.
 
 If an error occurs when you are using RallyTree to create test cases, the effect is usually that orphan test cases are created that have not been linked to their user stories. RallyTree can then be run again. Any successfully linked test cases are not recreated, but any test cases that failed to be linked are recreated and linked. After RallyTree runs without error, any surplus orphaned test cases can be deleted in the Rally web interface.
