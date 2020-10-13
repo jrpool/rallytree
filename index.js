@@ -35,6 +35,7 @@ let userRef = '';
 let takerRef = '';
 let rootRef = '';
 let parentRef = '';
+const nameBloats = [];
 let total = 0;
 let changes = 0;
 let idle = false;
@@ -69,9 +70,10 @@ const upTotal = response => {
   response.write(`event: total\ndata: ${++total}\n\n`);
 };
 // Increments the totals and sends the new totals as events.
-const upTotals = (isChange, response) => {
+const upTotals = (changeCount, response) => {
   const totalMsg = `event: total\ndata: ${++total}\n\n`;
-  const changeMsg = isChange ? `event: changes\ndata: ${++changes}\n\n` : '';
+  changes += changeCount;
+  const changeMsg = changeCount ? `event: changes\ndata: ${++changes}\n\n` : '';
   response.write(`${totalMsg}${changeMsg}`);
 };
 /*
@@ -92,10 +94,10 @@ const takeTree = (restAPI, storyRef, response) => {
       const tasksSummary = storyObj.Tasks;
       const childrenSummary = storyObj.Children;
       // Make the specified user the owner of the user story, if not already.
-      const isChange = ownerRef !== takerRef;
+      const changeCount = ownerRef === takerRef ? 0 : 1;
       restAPI.update({
         ref: storyRef,
-        data: isChange ? {Owner: takerRef} : {}
+        data: changeCount ? {Owner: takerRef} : {}
       })
       /*
         Wait until the ownership change is complete. Otherwise, Rally will
@@ -104,7 +106,7 @@ const takeTree = (restAPI, storyRef, response) => {
       */
       .then(
         () => {
-          upTotals(isChange, response);
+          upTotals(changeCount, response);
           // If the user story has any tasks:
           if (tasksSummary.Count) {
             // Get their data.
@@ -136,7 +138,7 @@ const takeTree = (restAPI, storyRef, response) => {
                       })
                       .then(
                         () => {
-                          upTotals(true, response);
+                          upTotals(1, response);
                         },
                         error => err(error, 'changing the owner')
                       );
@@ -186,6 +188,162 @@ const takeTree = (restAPI, storyRef, response) => {
     },
     error => err(error, 'getting data on user story')
   );
+};
+// Sequentially processes test-case creation for an array of user stories.
+const taskSequentially = (restAPI, stories, response) => {
+  if (errorMessage) {
+    serveError(response);
+    return '';
+  }
+  else if (! stories.length) {
+    return '';
+  }
+  else {
+    const firstRef = shorten(
+      'hierarchicalrequirement', stories[0]._ref
+    );
+    if (errorMessage) {
+      serveError(response);
+      return '';
+    }
+    else {
+      return taskTree(restAPI, firstRef, response)
+      .then(
+        () => taskSequentially(restAPI, stories.slice(1), response),
+        error => err(error, 'processing task creation')
+      );
+    }
+  }
+};
+// Creates a task and links it to a user story.
+const createTask = (namePrefix, storyName, nameBloats, owner, storyRef, response) => {
+  let storyShortName = storyName;
+  if (nameBloats.length) {
+    nameBloats.forEach(bloat => {
+      storyShortName = storyShortName.replace(bloat, '');
+    });
+  }
+  // Create the task.
+  return restAPI.create({
+    type: 'task',
+    fetch: ['_ref'],
+    data: {
+      Name: `${namePrefix}${storyShortName}`,
+      Owner: owner
+    }
+  })
+  .then(
+    newCase => {
+      // After it is created, link it to the user story.
+      const taskRef = shorten('task', newCase.Object._ref);
+      if (errorMessage) {
+        serveError(response);
+        return '';
+      }
+      else {
+        return restAPI.add({
+          ref: storyRef,
+          collection: 'Tasks',
+          data: [{_ref: taskRef}],
+          fetch: ['_ref']
+        });
+      }
+    },
+    error => err(error, 'creating task')
+  );
+};
+/*
+  Recursively checks a user story and its child user stories and,
+  where one is a user story with no child user stories and no tasks,
+  creates 2 tasks for it.
+*/
+const taskTree = (restAPI, storyRef, response) => {
+  if (errorMessage) {
+    serveError(response);
+    return;
+  }
+  else {
+    // Get data on the user story.
+    return restAPI.get({
+      ref: storyRef,
+      fetch: [
+        'Name',
+        'Owner',
+        'Children',
+        'Tasks'
+      ]
+    })
+    .then(
+      storyResult => {
+        const storyObj = storyResult.Object;
+        const tasksSummary = storyObj.Tasks;
+        const childrenSummary = storyObj.Children;
+        const name = storyObj.Name;
+        const owner = storyObj.Owner;
+        /*
+          If the user story has any child user stories, assume it
+          does not need tasks and:
+        */
+        if (childrenSummary.Count) {
+          upTotals(0, response);
+          // Get data on its child user stories.
+          return restAPI.get({
+            ref: childrenSummary._ref,
+            fetch: ['_ref']
+          })
+          .then(
+            // When the data arrive, process the children sequentially.
+            childrenResult => {
+              const children = childrenResult.Object.Results;
+              return taskSequentially(restAPI, children, response);
+            },
+            error => err(error, 'getting data on child user stories')
+          );
+        }
+        /*
+          Otherwise, if the user story has no tasks, assume it needs
+          tasks and:
+        */
+        else if (! tasksSummary.Count) {
+          // Create 2 tasks for it.
+          return createTask(
+            'Create Test Case for ', name, nameBloats, owner, storyRef, response
+          )
+          .then(
+            () => {
+              if (errorMessage) {
+                serveError(response);
+                return '';
+              }
+              else {
+                return createTask('Run Test Case for ', name, owner, storyRef)
+                .then(
+                  () => {
+                    if (errorMessage) {
+                      serveError(response);
+                      return '';
+                    }
+                    else {
+                      upTotals(2, response);
+                      return '';
+                    }
+                  },
+                  error => err(error, 'creating run-test-case task')
+                );
+              }
+            },
+            error => err(error, 'creating create-test-case task')
+          );
+        }
+        // Otherwise, i.e. if the user story already has tasks:
+        else {
+          upTotals(0, response);
+          return '';
+        }
+      },
+      error => err(error, 'getting data on user story')
+    );
+  }
 };
 // Sequentially processes test-case creation for an array of user stories.
 const caseSequentially = (restAPI, stories, response) => {
@@ -250,7 +408,7 @@ const caseTree = (restAPI, storyRef, response) => {
           does not need a test case and:
         */
         if (childrenSummary.Count) {
-          upTotals(false, response);
+          upTotals(0, response);
           // Get their data.
           return restAPI.get({
             ref: childrenSummary._ref,
@@ -297,7 +455,7 @@ const caseTree = (restAPI, storyRef, response) => {
                 })
                 .then(
                   () => {
-                    upTotals(true, response);
+                    upTotals(1, response);
                     return '';
                   },
                   error => err(error, 'adding test case to user story')
@@ -312,7 +470,7 @@ const caseTree = (restAPI, storyRef, response) => {
           not need a test case:
         */
         else {
-          upTotals(false, response);
+          upTotals(0, response);
           return '';
         }
       },
@@ -465,6 +623,29 @@ const serveTakeReport = (userName, takerName, response) => {
       );
     },
     error => err(error, 'reading takeReport page')
+  );
+};
+// Serves the add-tasks report page.
+const serveTaskReport = (userName, response) => {
+  fs.readFile('taskReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('taskReport.js', 'utf8')
+      .then(
+        jsContent => {
+          const newContent = htmlContent
+          .replace('__script__', jsContent)
+          .replace('__rootRef__', rootRef)
+          .replace('__userName__', userName)
+          .replace('__userRef__', userRef);
+          response.setHeader('Content-Type', 'text/html');
+          response.write(newContent);
+          response.end();
+        },
+        error => err(error, 'reading taskReport script')
+      );
+    },
+    error => err(error, 'reading taskReport page')
   );
 };
 // Serves the add-test-cases report page.
@@ -658,7 +839,7 @@ const requestHandler = (request, response) => {
       idle = true;
       const bodyObject = parse(Buffer.concat(body).toString());
       const {
-        userName, password, rootURL, op, takerName, parentURL
+        userName, password, rootURL, op, takerName, parentURL, nameBloat0, nameBloat1
       } = bodyObject;
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
@@ -715,6 +896,15 @@ const requestHandler = (request, response) => {
               error => err(error, 'getting reference to user')
             );
           }
+        }
+        else if (op === 'task') {
+          if (nameBloat0) {
+            nameBloats.push(nameBloat0);
+          }
+          if (nameBloat1) {
+            nameBloats.push(nameBloat1);
+          }
+          serveTaskReport(userName, response);
         }
         else if (op === 'case') {
           serveCaseReport(userName, response);
