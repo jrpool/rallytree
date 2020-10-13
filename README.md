@@ -47,7 +47,14 @@ Asynchronicity in RallyTree has important limitations. Some theoretically indepe
 Typically, thrown errors yield irrelevant messages, such as lack of authorization. But sometimes there is an error message pointing to an asynchronicity problem, such as:
 
 ```
-Error copying user story: Concurrency conflict: [Object has been modified since being read for update in this context] - ConcurrencyConflictException : Modified since read on update : Object Class : com.f4tech.slm.domain.UserStory : ObjectID : 441863343664
+Error copying user story: Concurrency conflict:
+[Object has been modified since being read for update in this context]
+- ConcurrencyConflictException
+: Modified since read on update
+: Object Class
+: com.f4tech.slm.domain.UserStory
+: ObjectID
+: 441863343664
 ```
 
 Broadcom says that `POST` requests are throttled at 24 requests in progress at any time, but that exceeding this limit should merely queue requests, not throw errors.
