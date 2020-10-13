@@ -6,7 +6,7 @@ RallyTree automates some operations on trees of work items in [Rally](https://ww
 # Features
 RallyTree can perform these operations on a tree:
 
-## ## Owner change
+## Owner change
 This feature ensures that each user story and each task in a tree has the desired owner. The user can choose whether to become the new owner or instead to specify another user as the new owner.
 
 ## Test-case creation
