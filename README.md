@@ -10,7 +10,7 @@ RallyTree can perform these operations on a tree:
 This feature ensures that each user story and each task in a tree has the desired owner. The user can choose whether to become the new owner or instead to specify another user as the new owner.
 
 ## Test-case creation
-This feature adds a test case to each test-level user story (i.e. user story with at least 1 task) that doesn’t already have a test case. The new test case is given the same name, description, and owner as its user story. No matter how many tasks a user story has, only 1 test case is created for it.
+This feature adds a test case to each user story with at least 1 task that doesn’t already have a test case. The new test case is given the same name, description, and owner as its user story. No matter how many tasks a user story has, only 1 test case is created for it.
 
 ## Tree-copy creation
 This feature copies a tree. The user specifies which user story will be the parent of the root user story of the new tree. Only user stories are copied, not tasks, test cases, or defects. In a copy of a user story, the name, owner, and description are copied from the original.
