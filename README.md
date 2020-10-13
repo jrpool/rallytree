@@ -26,7 +26,7 @@ Once it is running, visiting `localhost:3000` with a web browser gets an informa
 
 The report page displays the new counts as they arrive from the server.
 
-RallyTree gives instructions to Rally by means of Rally’s (web-services API)[https://rally1.rallydev.com/slm/doc/webservice/], using Rally’s `node.js` integration package, (`rally-node`)[https://github.com/RallyTools/rally-node].
+RallyTree gives instructions to Rally by means of Rally’s [web-services API](https://rally1.rallydev.com/slm/doc/webservice/), using Rally’s `node.js` integration package, [`rally-node`](https://github.com/RallyTools/rally-node).
 
 The core functionality of RallyTree is performed by the functions `takeTree()`, `caseTree()`, and `copyTree()` in the `index.js` file. These functions recursively perform operations on a specified user story and its applicable descendants.
 
