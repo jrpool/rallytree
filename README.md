@@ -9,6 +9,9 @@ RallyTree can perform these operations on a tree:
 ## Owner change
 This feature ensures that each user story and each task in a tree has the desired owner. The user can choose whether to become the new owner or instead to specify another user as the new owner.
 
+## Task creation
+This feature adds 2 tasks to each user story that has no child user stories and no tasks. The new tasks are given the same name and owner as their user story. By default, one task has the name “Create Test Case.” and the other task has the name “Run Test Case.” But you can specify custom names that are based on the user story’s name.
+
 ## Test-case creation
 This feature adds a test case to each user story with at least 1 task that doesn’t already have a test case. The new test case is given the same name, description, and owner as its user story. No matter how many tasks a user story has, only 1 test case is created for it.
 
