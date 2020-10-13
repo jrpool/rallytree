@@ -57,7 +57,7 @@ Error copying user story: Concurrency conflict:
 : 441863343664
 ```
 
-Broadcom says that `POST` requests are throttled at 24 requests in progress at any time, but that exceeding this limit should merely queue requests, not throw errors.
+[Broadcom says](https://community.broadcom.com/enterprisesoftware/communities/community-home/digestviewer/viewthread?GroupId=2437&MessageKey=a41c7c1b-f37b-4eb3-9647-b8d518341f86&CommunityKey=f303f769-8d4c-44d9-924c-3845bba6444e&tab=digestviewer&ReturnUrl=%2Fenterprisesoftware%2Fcommunities%2Fcommunity-home%2Fdigestviewer%3FCommunityKey%3Df303f769-8d4c-44d9-924c-3845bba6444e) that `POST` requests are throttled at 24 requests in progress at any time, but that exceeding this limit should merely queue requests, not throw errors.
 
 Because of these limitations, some potentially parallel RallyTree operations are forced to be sequential instead. This makes the fulfillment of a RallyTree request slower than it might otherwise be, in the interest of integrity. Specifically:
 
