@@ -159,14 +159,9 @@ const takeTree = storyRef => {
         ref: storyRef,
         data: changeCount ? {Owner: takerRef} : {}
       })
-      /*
-        Wait until the ownership change is complete. Otherwise, Rally will
-        reject changes to the descendants of the user story while it is
-        being modified, causing erratic failures.
-      */
+      // Wait until the ownership change is complete to prevent concurrency errors.
       .then(
         () => {
-          upTotals(changeCount, response);
           // If the user story has any tasks and no child user stories:
           if (taskCount && ! childCount) {
             // Get the data on the tasks.
@@ -175,10 +170,10 @@ const takeTree = storyRef => {
               fetch: ['_ref', 'Owner']
             })
             .then(
-              // Make the specified user the owner of each, if not already.
+              // When the data arrive:
               tasksObj => {
                 const tasks = tasksObj.Object.Results;
-                // Change the owner of tasks of the user story, when necessary.
+                // Ensure that the specified user owns them.
                 tasks.forEach(taskObj => {
                   takeTask(taskObj);
                 });
