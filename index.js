@@ -104,7 +104,7 @@ const upTotal = () => {
 const upTotals = changeCount => {
   const totalMsg = `event: total\ndata: ${++total}\n\n`;
   changes += changeCount;
-  const changeMsg = changeCount ? `event: changes\ndata: ${++changes}\n\n` : '';
+  const changeMsg = changeCount ? `event: changes\ndata: ${changes}\n\n` : '';
   response.write(`${totalMsg}${changeMsg}`);
 };
 // Change the ownership of a task.
@@ -122,13 +122,13 @@ const takeTask = taskObj => {
           })
           .then(
             () => {
-              upTotals(1, response);
+              upTotals(1);
             },
             error => err(error, 'changing the owner')
           );
         }
         else {
-          upTotals(0, response);
+          upTotals(0);
         }
       }
     }
@@ -154,7 +154,7 @@ const takeTree = storyRef => {
       const childrenSummary = storyObj.Children;
       const childCount = childrenSummary.Count;
       const changeCount = ownerRef === takerRef ? 0 : 1;
-      // Make the specified user the owner of the user story, if not already.
+      // Ensure that the specified user owns the user story.
       restAPI.update({
         ref: storyRef,
         data: changeCount ? {Owner: takerRef} : {}
@@ -162,6 +162,7 @@ const takeTree = storyRef => {
       // Wait until the ownership change is complete to prevent concurrency errors.
       .then(
         () => {
+          upTotals(changeCount);
           // If the user story has any tasks and no child user stories:
           if (taskCount && ! childCount) {
             // Get the data on the tasks.
