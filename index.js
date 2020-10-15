@@ -30,8 +30,8 @@ const requestOptions = {
   }
 };
 let isError = false;
-let restAPI;
-let response;
+let restAPI = {};
+let response = {};
 let userRef = '';
 let takerRef = '';
 let taskNames = [];
@@ -46,8 +46,11 @@ RALLY_PASSWORD = RALLY_PASSWORD || '';
 
 // ########## FUNCTIONS
 
-// Reinitialize the global variables.
+// Reinitialize the global variables, except response.
 const reinit = () => {
+  isError = false;
+  restAPI = {};
+  userRef = '';
   takerRef = '';
   taskNames = [];
   rootRef = '';
@@ -58,12 +61,11 @@ const reinit = () => {
 };
 // Processes a thrown error.
 const err = (error, context) => {
-  const problem = typeof error === 'string' ? error : error.message;
+  const problem = (typeof error) === 'string' ? error : error.message;
   const msg = `Error ${context}: ${problem}`;
   console.log(msg);
-  reinit();
   isError = true;
-  return fs.readFile('error.html', 'utf8')
+  fs.readFile('error.html', 'utf8')
   .then(
     content => {
       const newContent = content.replace(
@@ -72,22 +74,26 @@ const err = (error, context) => {
       response.setHeader('Content-Type', 'text/html');
       response.write(newContent);
       response.end();
-      return '';
+      reinit();
     },
     error => {
       console.log(`Error reading error page: ${error.message}`);
-      return '';
+      reinit();
     }
   );
 };
 // Shortens a long reference.
-const shorten = (type, longRef, context) => {
+const shorten = (type, longRef) => {
   const num = longRef.replace(/^http.+([/]|%2F)(?=\d+)/, '');
-  if (/^\d+/.test(num)) {
+  if (/^\d+$/.test(num)) {
     return `/${type}/${num}`;
   }
   else {
-    return err(`Invalid Rally URL: ${longRef} shortened to /${type}/${num}`, context);
+    err(
+      `Invalid Rally URL:\nlong ${longRef}\nshort /${type}/${num}`,
+      'shortening URL'
+    );
+    return '';
   }
 };
 // Increments the total count and sends the new count as an event.
@@ -478,7 +484,7 @@ const getUserRef = userName => {
   })
   .then(
     userRef => shorten('user', userRef.Results[0]._ref),
-    error => err(error, 'getting user')
+    error => err(error, 'getting user reference')
   );
 };
 // Serves the introduction page.
@@ -675,23 +681,23 @@ const requestHandler = (request, res) => {
       // If the requested resource is a file, serve it.
       if (requestURL === '/' || requestURL === '/index.html') {
         // Serves the introduction page.
-        serveIntro(response);
+        serveIntro();
       }
       else if (requestURL === '/do.html') {
         // Serves the request page.
-        serveDo(response);
+        serveDo();
       }
       else if (requestURL === '/style.css') {
         // Serves the stylesheet when the home page requests it.
-        serveStyles(response);
+        serveStyles();
       }
       else if (requestURL.endsWith('.png')) {
         // Serves a PNG image when a page requests it.
-        servePNG(requestURL, response);
+        servePNG(requestURL);
       }
       else if (requestURL === '/favicon.ico') {
         // Serves the site icon when a page requests it.
-        serveIcon(response);
+        serveIcon();
       }
       /*
         Otherwise, if the requested resource is an event stream, start it and
@@ -758,8 +764,11 @@ const requestHandler = (request, res) => {
             getUserRef(userName)
             .then(
               ref => {
-                takerRef = userRef = ref;
-                serveTakeReport(userName, userName);
+                // If the username is valid (otherwise its type is object):
+                if (! isError) {
+                  takerRef = userRef = ref;
+                  serveTakeReport(userName, userName);
+                }
               },
               error => err(error, 'getting reference to user as new owner')
             );

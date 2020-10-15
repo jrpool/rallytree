@@ -79,8 +79,7 @@ p {
 }
 
 pre {
-  margin: 0 auto;
-  text-align: center;
+  white-space: pre-wrap;
 }
 
 .rfloat {
