@@ -20,7 +20,6 @@ const rally = require('rally');
 
 // ########## GLOBAL VARIABLES
 
-let errorMessage = '';
 const queryUtils = rally.util.query;
 // REST API.
 const requestOptions = {
@@ -30,12 +29,14 @@ const requestOptions = {
     'X-RallyIntegrationVersion': process.env.RALLYINTEGRATIONVERSION || '1.0'
   }
 };
+let isError = false;
 let restAPI;
+let response;
 let userRef = '';
 let takerRef = '';
+let taskNames = [];
 let rootRef = '';
 let parentRef = '';
-const nameBloats = [];
 let total = 0;
 let changes = 0;
 let idle = false;
@@ -45,44 +46,95 @@ RALLY_PASSWORD = RALLY_PASSWORD || '';
 
 // ########## FUNCTIONS
 
-// Creates and logs an error message.
+// Reinitialize the global variables.
+const reinit = () => {
+  takerRef = '';
+  taskNames = [];
+  rootRef = '';
+  parentRef = '';
+  total = 0;
+  changes = 0;
+  idle = false;
+};
+// Processes a thrown error.
 const err = (error, context) => {
-  errorMessage = `Error ${context}: ${error.message}`;
-  // userRef = takerRef = rootRef = '';
-  // total = changes = 0;
-  // busy = false;
-  console.log(errorMessage);
-  return '';
+  const problem = typeof error === 'string' ? error : error.message;
+  const msg = `Error ${context}: ${problem}`;
+  console.log(msg);
+  reinit();
+  isError = true;
+  return fs.readFile('error.html', 'utf8')
+  .then(
+    content => {
+      const newContent = content.replace(
+        '__errorMessage__', msg
+      );
+      response.setHeader('Content-Type', 'text/html');
+      response.write(newContent);
+      response.end();
+      return '';
+    },
+    error => {
+      console.log(`Error reading error page: ${error.message}`);
+      return '';
+    }
+  );
 };
 // Shortens a long reference.
-const shorten = (type, longRef) => {
+const shorten = (type, longRef, context) => {
   const num = longRef.replace(/^http.+([/]|%2F)(?=\d+)/, '');
   if (/^\d+/.test(num)) {
     return `/${type}/${num}`;
   }
   else {
-    errorMessage = `Invalid Rally URL: ${longRef} shortened to /${type}/${num}`;
-    return '';
+    return err(`Invalid Rally URL: ${longRef} shortened to /${type}/${num}`, context);
   }
 };
-// Increments the totals and sends the new totals as events.
-const upTotal = response => {
+// Increments the total count and sends the new count as an event.
+const upTotal = () => {
   response.write(`event: total\ndata: ${++total}\n\n`);
 };
-// Increments the totals and sends the new totals as events.
-const upTotals = (changeCount, response) => {
+// Increments the total count and the change count and sends the counts as events.
+const upTotals = changeCount => {
   const totalMsg = `event: total\ndata: ${++total}\n\n`;
   changes += changeCount;
   const changeMsg = changeCount ? `event: changes\ndata: ${++changes}\n\n` : '';
   response.write(`${totalMsg}${changeMsg}`);
 };
+// Change the ownership of a task.
+const takeTask = taskObj => {
+  if (! isError) {
+    const taskRef = shorten('task', taskObj._ref);
+    if (! isError) {
+      const taskOwner = taskObj.Owner;
+      const ownerRef = taskOwner ? shorten('user', taskOwner._ref) : '';
+      if (! isError) {
+        if (ownerRef !== takerRef) {
+          restAPI.update({
+            ref: taskRef,
+            data: {Owner: takerRef}
+          })
+          .then(
+            () => {
+              upTotals(1, response);
+            },
+            error => err(error, 'changing the owner')
+          );
+        }
+        else {
+          upTotals(0, response);
+        }
+      }
+    }
+  }
+};
 /*
   Recursively processes ownership changes on a user story and its child
   user stories.
 */
-const takeTree = (restAPI, storyRef, response) => {
+const takeTree = storyRef => {
   // Get data on the user story.
-  return restAPI.get({
+  restAPI.get({
     ref: storyRef,
     fetch: ['Owner', 'Children', 'Tasks']
   })
@@ -92,9 +144,11 @@ const takeTree = (restAPI, storyRef, response) => {
       const storyOwner = storyObj.Owner;
       const ownerRef = storyOwner ? shorten('user', storyObj.Owner._ref) : '';
       const tasksSummary = storyObj.Tasks;
+      const taskCount = tasksSummary.Count;
       const childrenSummary = storyObj.Children;
-      // Make the specified user the owner of the user story, if not already.
+      const childCount = childrenSummary.Count;
       const changeCount = ownerRef === takerRef ? 0 : 1;
+      // Make the specified user the owner of the user story, if not already.
       restAPI.update({
         ref: storyRef,
         data: changeCount ? {Owner: takerRef} : {}
@@ -107,9 +161,9 @@ const takeTree = (restAPI, storyRef, response) => {
       .then(
         () => {
           upTotals(changeCount, response);
-          // If the user story has any tasks:
-          if (tasksSummary.Count) {
-            // Get their data.
+          // If the user story has any tasks and no child user stories:
+          if (taskCount && ! childCount) {
+            // Get the data on the tasks.
             restAPI.get({
               ref: tasksSummary._ref,
               fetch: ['_ref', 'Owner']
@@ -118,62 +172,32 @@ const takeTree = (restAPI, storyRef, response) => {
               // Make the specified user the owner of each, if not already.
               tasksObj => {
                 const tasks = tasksObj.Object.Results;
-                // If the user story has any tasks:
+                // Change the owner of tasks of the user story, when necessary.
                 tasks.forEach(taskObj => {
-                  if (! errorMessage) {
-                    const taskRef = shorten('task', taskObj._ref);
-                    const taskOwner = taskObj.Owner;
-                    const ownerRef = taskOwner
-                      ? shorten('user', taskOwner._ref)
-                      : '';
-                    const isChange = ownerRef !== takerRef;
-                    if (errorMessage) {
-                      serveError(response);
-                      return;
-                    }
-                    if (isChange) {
-                      restAPI.update({
-                        ref: taskRef,
-                        data: {Owner: takerRef}
-                      })
-                      .then(
-                        () => {
-                          upTotals(1, response);
-                        },
-                        error => err(error, 'changing the owner')
-                      );
-                    }
-                    else {
-                      upTotal(false, response);
-                    }
-                  }
+                  takeTask(taskObj);
                 });
               },
               error => err(error, 'getting data on tasks')
             );
           }
-          // If the user story has any child user stories:
-          if (childrenSummary.Count) {
-            // Get their data.
+          // Otherwise, if the user story has any child user stories and no tasks:
+          else if (childCount && ! taskCount) {
+            // Get the data on the child user stories.
             restAPI.get({
               ref: childrenSummary._ref,
               fetch: ['_ref']
             })
             .then(
-              // Process each.
+              // When the data arrive, process the children in parallel.
               childrenObj => {
                 const children = childrenObj.Object.Results;
                 children.forEach(child => {
-                  if (! errorMessage) {
+                  if (! isError) {
                     const childRef = shorten(
                       'hierarchicalrequirement', child._ref
                     );
-                    if (errorMessage) {
-                      serveError(response);
-                      return;
-                    }
-                    else {
-                      takeTree(restAPI, childRef, response);
+                    if (! isError) {
+                      takeTree(childRef);
                     }
                   }
                 });
@@ -181,67 +205,48 @@ const takeTree = (restAPI, storyRef, response) => {
               error => err(error, 'getting data on children')
             );
           }
-          return '';
+          else if (childCount && taskCount) {
+            err('User story with both children and tasks', 'ownership changes');
+          }
         },
         error => err(error, 'changing user-story owner')
       );
     },
-    error => err(error, 'getting data on user story')
+    error => err(error, 'getting data on user story for ownership changes')
   );
 };
-// Sequentially processes test-case creation for an array of user stories.
-const taskSequentially = (restAPI, stories, response) => {
-  if (errorMessage) {
-    serveError(response);
-    return '';
-  }
-  else if (! stories.length) {
-    return '';
-  }
-  else {
+// Sequentially perform an operation on work items.
+const iterate = (operation, workItems, itemType, context, otherRef) => {
+  if (workItems.length && ! isError) {
     const firstRef = shorten(
-      'hierarchicalrequirement', stories[0]._ref
+      itemType, workItems[0]._ref
     );
-    if (errorMessage) {
-      serveError(response);
-      return '';
-    }
-    else {
-      return taskTree(restAPI, firstRef, response)
+    if (! isError) {
+      operation(firstRef, otherRef)
       .then(
-        () => taskSequentially(restAPI, stories.slice(1), response),
-        error => err(error, 'processing task creation')
+        () => iterate(operation, workItems.slice(1), itemType, context),
+        error => err(error, context)
       );
     }
   }
 };
-// Creates a task and links it to a user story.
-const createTask = (namePrefix, storyName, nameBloats, owner, storyRef, response) => {
-  let storyShortName = storyName;
-  if (nameBloats.length) {
-    nameBloats.forEach(bloat => {
-      storyShortName = storyShortName.replace(bloat, '');
-    });
-  }
+// Creates a task for a user story.
+const createTask = (storyRef, owner, name) => {
   // Create the task.
   return restAPI.create({
     type: 'task',
     fetch: ['_ref'],
     data: {
-      Name: `${namePrefix}${storyShortName}`,
+      Name: name,
       Owner: owner
     }
   })
   .then(
-    newCase => {
+    task => {
       // After it is created, link it to the user story.
-      const taskRef = shorten('task', newCase.Object._ref);
-      if (errorMessage) {
-        serveError(response);
-        return '';
-      }
-      else {
-        return restAPI.add({
+      const taskRef = shorten('task', task.Object._ref);
+      if (! isError) {
+        restAPI.add({
           ref: storyRef,
           collection: 'Tasks',
           data: [{_ref: taskRef}],
@@ -252,318 +257,221 @@ const createTask = (namePrefix, storyName, nameBloats, owner, storyRef, response
     error => err(error, 'creating task')
   );
 };
-/*
-  Recursively checks a user story and its child user stories and,
-  where one is a user story with no child user stories and no tasks,
-  creates 2 tasks for it.
-*/
-const taskTree = (restAPI, storyRef, response) => {
-  if (errorMessage) {
-    serveError(response);
-    return;
-  }
-  else {
-    // Get data on the user story.
-    return restAPI.get({
-      ref: storyRef,
-      fetch: [
-        'Name',
-        'Owner',
-        'Children',
-        'Tasks'
-      ]
-    })
+// Sequentially create tasks for a user story.
+const createTasks = (storyRef, owner, names) => {
+  if (names.length && ! isError) {
+    createTask(storyRef, owner, names[0])
     .then(
-      storyResult => {
-        const storyObj = storyResult.Object;
-        const tasksSummary = storyObj.Tasks;
-        const childrenSummary = storyObj.Children;
-        const name = storyObj.Name;
-        const owner = storyObj.Owner;
-        /*
-          If the user story has any child user stories, assume it
-          does not need tasks and:
-        */
-        if (childrenSummary.Count) {
-          upTotals(0, response);
-          // Get data on its child user stories.
-          return restAPI.get({
-            ref: childrenSummary._ref,
-            fetch: ['_ref']
-          })
-          .then(
-            // When the data arrive, process the children sequentially.
-            childrenResult => {
-              const children = childrenResult.Object.Results;
-              return taskSequentially(restAPI, children, response);
-            },
-            error => err(error, 'getting data on child user stories')
-          );
-        }
-        /*
-          Otherwise, if the user story has no tasks, assume it needs
-          tasks and:
-        */
-        else if (! tasksSummary.Count) {
-          // Create 2 tasks for it.
-          return createTask(
-            'Create Test Case for ', name, nameBloats, owner, storyRef, response
-          )
-          .then(
-            () => {
-              if (errorMessage) {
-                serveError(response);
-                return '';
-              }
-              else {
-                return createTask('Run Test Case for ', name, owner, storyRef)
-                .then(
-                  () => {
-                    if (errorMessage) {
-                      serveError(response);
-                      return '';
-                    }
-                    else {
-                      upTotals(2, response);
-                      return '';
-                    }
-                  },
-                  error => err(error, 'creating run-test-case task')
-                );
-              }
-            },
-            error => err(error, 'creating create-test-case task')
-          );
-        }
-        // Otherwise, i.e. if the user story already has tasks:
-        else {
-          upTotals(0, response);
-          return '';
-        }
-      },
-      error => err(error, 'getting data on user story')
+      () => createTasks(storyRef, owner, names.slice(1)),
+      error => err(error, 'calling createTask to create task')
     );
-  }
-};
-// Sequentially processes test-case creation for an array of user stories.
-const caseSequentially = (restAPI, stories, response) => {
-  if (errorMessage) {
-    serveError(response);
-    return '';
-  }
-  else if (! stories.length) {
-    return '';
-  }
-  else {
-    const firstRef = shorten(
-      'hierarchicalrequirement', stories[0]._ref
-    );
-    if (errorMessage) {
-      serveError(response);
-      return '';
-    }
-    else {
-      return caseTree(restAPI, firstRef, response)
-      .then(
-        () => caseSequentially(restAPI, stories.slice(1), response),
-        error => err(error, 'processing test-case creation')
-      );
-    }
   }
 };
 /*
-  Recursively checks a user story and its child user stories and,
-  where one is a test-level user story missing a test case, creates
-  it.
+  Recursively checks a user story and its descendant user stories and,
+  where one has no child user stories, creates tasks for it.
 */
-const caseTree = (restAPI, storyRef, response) => {
-  if (errorMessage) {
-    serveError(response);
-    return;
-  }
-  else {
-    // Get data on the user story.
-    return restAPI.get({
-      ref: storyRef,
-      fetch: [
-        'Name',
-        'Description',
-        'Owner',
-        'Children',
-        'Tasks',
-        'TestCases'
-      ]
-    })
-    .then(
-      storyResult => {
-        const storyObj = storyResult.Object;
-        const tasksSummary = storyObj.Tasks;
-        const casesSummary = storyObj.TestCases;
-        const childrenSummary = storyObj.Children;
-        const name = storyObj.Name;
-        const description = storyObj.Description;
-        const owner = storyObj.Owner;
-        /*
-          If the user story has any child user stories, assume it
-          does not need a test case and:
-        */
-        if (childrenSummary.Count) {
-          upTotals(0, response);
-          // Get their data.
-          return restAPI.get({
-            ref: childrenSummary._ref,
-            fetch: ['_ref']
-          })
-          .then(
-            // When the data arrive, process the children sequentially.
-            childrenResult => {
-              const children = childrenResult.Object.Results;
-              return caseSequentially(restAPI, children, response);
-            },
-            error => err(error, 'getting data on child user stories')
-          );
+const taskTree = storyRef => {
+  // Get data on the user story.
+  restAPI.get({
+    ref: storyRef,
+    fetch: ['Name', 'Owner', 'Children']
+  })
+  .then(
+    storyResult => {
+      // When the data arrive:
+      const storyObj = storyResult.Object;
+      const childrenSummary = storyObj.Children;
+      const owner = storyObj.Owner;
+      /*
+        If the user story has any child user stories, it does not need
+        tasks, so:
+      */
+      if (childrenSummary.Count) {
+        upTotals(0);
+        // Get data on its child user stories.
+        return restAPI.get({
+          ref: childrenSummary._ref,
+          fetch: ['_ref']
+        })
+        .then(
+          /*
+            When the data arrive, process the children sequentially to
+            prevent concurrency errors.
+          */
+          childrenResult => {
+            const children = childrenResult.Object.Results;
+            iterate(
+              taskTree, children, 'hierarchicalrequirement', 'creating tasks in tree'
+            );
+          },
+          error => err(error, 'getting data on child user stories')
+        );
+      }
+      // Otherwise the user story needs tasks, so:
+      else {
+        // Create them sequentially, to prevent concurrency errors.
+        createTasks(storyRef, owner, taskNames);
+        if (! isError) {
+          upTotals(taskNames.length);
         }
-        /*
-          Otherwise, if the user story has any tasks but has no
-          test cases, assume it needs a test case and:
-        */
-        else if (tasksSummary.Count && ! casesSummary.Count) {
-          // Create a test case.
-          return restAPI.create({
-            type: 'testcase',
-            fetch: ['_ref'],
-            data: {
-              Name: name,
-              Description: description,
-              Owner: owner
-            }
-          })
-          .then(
-            newCase => {
-              // After it is created, link it to the user story.
-              const caseRef = shorten('testcase', newCase.Object._ref);
-              if (errorMessage) {
-                serveError(response);
-                return '';
-              }
-              else {
-                return restAPI.add({
-                  ref: storyRef,
-                  collection: 'TestCases',
-                  data: [{_ref: caseRef}],
-                  fetch: ['_ref']
-                })
-                .then(
-                  () => {
-                    upTotals(1, response);
-                    return '';
-                  },
-                  error => err(error, 'adding test case to user story')
-                );
-              }
-            },
-            error => err(error, 'creating test case')
-          );
-        }
-        /*
-          Otherwise, i.e. if the user story has no children but does
-          not need a test case:
-        */
-        else {
-          upTotals(0, response);
-          return '';
-        }
-      },
-      error => err(error, 'getting data on user story')
-    );
-  }
+      }
+    },
+    error => err(error, 'getting data on user story')
+  );
 };
-// Sequentially copies an array of user stories.
-const copySequentially = (restAPI, stories, parentRef, response) => {
-  if (errorMessage) {
-    serveError(response);
-    return '';
-  }
-  else if (! stories.length) {
-    return '';
-  }
-  else {
-    const firstRef = shorten(
-      'hierarchicalrequirement', stories[0]._ref
-    );
-    if (errorMessage) {
-      serveError(response);
-      return '';
-    }
-    else {
-      return copyTree(restAPI, firstRef, parentRef, response)
-      .then(
-        () => copySequentially(restAPI, stories.slice(1), parentRef, response),
-        error => err(error, 'copying user story')
-      );
-    }
-  }
-};
-// Recursively copies a user story and its child user stories.
-const copyTree = (restAPI, storyRef, parentRef, response) => {
-  if (errorMessage) {
-    serveError(response);
-    return '';
-  }
-  else {
-    // Get data on the user story.
-    return restAPI.get({
-      ref: storyRef,
-      fetch: ['Name', 'Description', 'Owner', 'Children']
-    })
-    .then(
-      storyResult => {
-        const storyObj = storyResult.Object;
-        const childrenRef = storyObj.Children._ref;
-        /*
-          When the data arrive, copy the user story and give it the specified
-          parent.
-        */
+/*
+  Recursively checks a user story and its descendant user stories and,
+  where one has no child user stories, creates a test case for it.
+*/
+const caseTree = storyRef => {
+  // Get data on the user story.
+  restAPI.get({
+    ref: storyRef,
+    fetch: [
+      'Name',
+      'Description',
+      'Owner',
+      'Children',
+      'Tasks',
+      'TestCases'
+    ]
+  })
+  .then(
+    storyResult => {
+      const storyObj = storyResult.Object;
+      const childrenSummary = storyObj.Children;
+      const name = storyObj.Name;
+      const description = storyObj.Description;
+      const owner = storyObj.Owner;
+      /*
+        If the user story has any child user stories, assume it does not
+        need a test case and:
+      */
+      if (childrenSummary.Count) {
+        upTotals(0);
+        // Get their data.
+        return restAPI.get({
+          ref: childrenSummary._ref,
+          fetch: ['_ref']
+        })
+        .then(
+          /*
+            When the data arrive, process the children sequentially to
+            prevent concurrency errors.
+          */
+          childrenResult => {
+            const children = childrenResult.Object.Results;
+            iterate(
+              caseTree,
+              children,
+              'hierarchicalrequirement',
+              'creating test cases in tree'
+            );
+          },
+          error => err(error, 'getting data on child user stories')
+        );
+      }
+      // Otherwise:
+      else {
+        // Create a test case.
         return restAPI.create({
-          type: 'hierarchicalrequirement',
+          type: 'testcase',
           fetch: ['_ref'],
           data: {
-            Name: storyObj.Name,
-            Description: storyObj.Description,
-            Owner: storyObj.Owner,
-            Parent: parentRef
+            Name: name,
+            Description: description,
+            Owner: owner
           }
         })
         .then(
-          copyResult => {
-            upTotal(response);
-            // When the user story has been copied, get data on its children.
-            const ref = copyResult.Object._ref;
-            return restAPI.get({
-              ref: childrenRef,
-              fetch: ['_ref']
-            })
-            .then(
-              /*
-                When the data arrive, process the children consecutively.
-                Parellel processing causes concurrency conflicts in Rally.
-              */
-              childrenResult => {
-                const children = childrenResult.Object.Results;
-                return copySequentially(restAPI, children, ref, response);
-              },
-              error => err(error, 'getting data on children')
-            );
+          newCase => {
+            // After it is created, link it to the user story.
+            const caseRef = shorten('testcase', newCase.Object._ref);
+            if (! isError) {
+              restAPI.add({
+                ref: storyRef,
+                collection: 'TestCases',
+                data: [{_ref: caseRef}],
+                fetch: ['_ref']
+              })
+              .then(
+                () => {
+                  upTotals(1);
+                },
+                error => err(error, 'adding test case to user story')
+              );
+            }
           },
-          error => err(error, 'copying user story')
+          error => err(error, 'creating test case')
         );
-      },
-      error => err(error, 'getting data on user story')
-    );
-  }
+      }
+    },
+    error => err(error, 'getting data on user story')
+  );
+};
+/*
+  Recursively copies a user story and its descendant user stories and
+  makes the new tree a child of an existing user story.
+*/
+const copyTree = (storyRef, parentRef) => {
+  // Get data on the user story.
+  restAPI.get({
+    ref: storyRef,
+    fetch: ['Name', 'Description', 'Owner', 'Children']
+  })
+  .then(
+    storyResult => {
+      /*
+        When the data arrive, copy the user story and give it the specified
+        parent.
+      */
+      const storyObj = storyResult.Object;
+      const childrenRef = storyObj.Children._ref;
+      restAPI.create({
+        type: 'hierarchicalrequirement',
+        fetch: ['_ref'],
+        data: {
+          Name: storyObj.Name,
+          Description: storyObj.Description,
+          Owner: storyObj.Owner,
+          Parent: parentRef
+        }
+      })
+      .then(
+        copyResult => {
+          /*
+            When the user story has been copied and linked, get data on
+            its children.
+          */
+          upTotal();
+          const ref = copyResult.Object._ref;
+          restAPI.get({
+            ref: childrenRef,
+            fetch: ['_ref']
+          })
+          .then(
+            /*
+              When the data arrive, process the children sequentially to
+              prevent concurrency errors.
+            */
+            childrenResult => {
+              const children = childrenResult.Object.Results;
+              iterate(
+                copyTree, children, 'hierarchicalrequirement', 'copying tree', ref
+              );
+            },
+            error => err(error, 'getting data on children')
+          );
+        },
+        error => err(error, 'copying user story')
+      );
+    },
+    error => err(error, 'getting data on user story to copy')
+  );
 };
 // Gets a reference to a user.
-const getUserRef = (restAPI, userName) => {
+const getUserRef = userName => {
   return restAPI.query({
     type: 'user',
     query: queryUtils.where('UserName', '=', userName)
@@ -574,7 +482,7 @@ const getUserRef = (restAPI, userName) => {
   );
 };
 // Serves the introduction page.
-const serveIntro = response => {
+const serveIntro = () => {
   fs.readFile('index.html', 'utf8')
   .then(
     content => {
@@ -586,7 +494,7 @@ const serveIntro = response => {
   );
 };
 // Serves the request page.
-const serveDo = response => {
+const serveDo = () => {
   fs.readFile('do.html', 'utf8')
   .then(
     content => {
@@ -601,7 +509,7 @@ const serveDo = response => {
   );
 };
 // Serves the change-owner report page.
-const serveTakeReport = (userName, takerName, response) => {
+const serveTakeReport = (userName, takerName) => {
   fs.readFile('takeReport.html', 'utf8')
   .then(
     htmlContent => {
@@ -626,15 +534,18 @@ const serveTakeReport = (userName, takerName, response) => {
   );
 };
 // Serves the add-tasks report page.
-const serveTaskReport = (userName, response) => {
+const serveTaskReport = userName => {
   fs.readFile('taskReport.html', 'utf8')
   .then(
     htmlContent => {
       fs.readFile('taskReport.js', 'utf8')
       .then(
         jsContent => {
+          const taskCount = `${taskNames.length} task${taskNames.length > 1 ? 's' : ''}`;
           const newContent = htmlContent
           .replace('__script__', jsContent)
+          .replace('__taskCount', taskCount)
+          .replace('__taskNames__', taskNames.join('\n'))
           .replace('__rootRef__', rootRef)
           .replace('__userName__', userName)
           .replace('__userRef__', userRef);
@@ -649,7 +560,7 @@ const serveTaskReport = (userName, response) => {
   );
 };
 // Serves the add-test-cases report page.
-const serveCaseReport = (userName, response) => {
+const serveCaseReport = userName => {
   fs.readFile('caseReport.html', 'utf8')
   .then(
     htmlContent => {
@@ -672,7 +583,7 @@ const serveCaseReport = (userName, response) => {
   );
 };
 // Serves the copy report page.
-const serveCopyReport = (userName, parentRef, response) => {
+const serveCopyReport = userName => {
   fs.readFile('copyReport.html', 'utf8')
   .then(
     htmlContent => {
@@ -696,7 +607,7 @@ const serveCopyReport = (userName, parentRef, response) => {
   );
 };
 // Serves the stylesheet.
-const serveStyles = response => {
+const serveStyles = () => {
   fs.readFile('style.css', 'utf8')
   .then(
     content => {
@@ -704,31 +615,11 @@ const serveStyles = response => {
       response.write(content);
       response.end();
     },
-    error => {
-      err(error, 'reading stylesheet');
-    }
-  );
-};
-// Serves the error page.
-const serveError = response => {
-  fs.readFile('error.html', 'utf8')
-  .then(
-    content => {
-      const newContent = content.replace(
-        '__errorMessage__', errorMessage
-      );
-      response.setHeader('Content-Type', 'text/html');
-      response.write(newContent);
-      response.end();
-      errorMessage = '';
-    },
-    error => {
-      err(error, 'reading error page');
-    }
+    error => err(error, 'reading stylesheet')
   );
 };
 // Serves an image.
-const servePNG = (src, response) => {
+const servePNG = src => {
   fs.readFile(src.replace(/^\//, ''))
   .then(
     content => {
@@ -736,13 +627,11 @@ const servePNG = (src, response) => {
       response.write(content, 'binary');
       response.end();
     },
-    error => {
-      err(error, 'reading PNG image');
-    }
+    error =>  err(error, 'reading PNG image')
   );
 };
 // Serves the site icon.
-const serveIcon = response => {
+const serveIcon = () => {
   fs.readFile('favicon.ico')
   .then(
     content => {
@@ -750,30 +639,40 @@ const serveIcon = response => {
       response.write(content, 'binary');
       response.end();
     },
-    error => {
-      err(error, 'reading site icon');
-    }
+    error => err(error, 'reading site icon')
   );
 };
-// Prepares to serves the event stream.
-const serveEventStart = response => {
+// Prepares to serve an event stream.
+const serveEventStart = () => {
   response.setHeader('Content-Type', 'text/event-stream');
   response.setHeader('Cache-Control', 'no-cache');
   response.setHeader('Connection', 'keep-alive');
 };
-// Handles requests, serving the home page and the acknowledgement page.
-const requestHandler = (request, response) => {
+// Reinitialize the event-stream variables and start an event stream.
+const streamInit = () => {
+  idle = false;
+  total = changes = 0;
+  serveEventStart();
+};
+/*
+  Handles requests, serving the home page, the request page, and the
+  acknowledgement page.
+*/
+const requestHandler = (request, res) => {
+  response = res;
   const {method} = request;
-  const body = [];
+  const bodyParts = [];
   request.on('error', err => {
     console.error(err);
   })
   .on('data', chunk => {
-    body.push(chunk);
+    bodyParts.push(chunk);
   })
   .on('end', () => {
     const requestURL = request.url;
+    // If the request requests a resource:
     if (method === 'GET') {
+      // If the requested resource is a file, serve it.
       if (requestURL === '/' || requestURL === '/index.html') {
         // Serves the introduction page.
         serveIntro(response);
@@ -794,139 +693,110 @@ const requestHandler = (request, response) => {
         // Serves the site icon when a page requests it.
         serveIcon(response);
       }
+      /*
+        Otherwise, if the requested resource is an event stream, start it and
+        prevent any others from being started.
+      */
       else if (requestURL === '/taketotals' && idle) {
-        /*
-          Serves the event stream, performs the operation, and reports
-          the events when a page first requests this. After the server
-          closes the connection, the client may periodically request
-          '/taketotals' again. Prevents response to those requests by
-          setting idle to false.
-        */
-        idle = false;
-        total = changes = 0;
-        serveEventStart(response);
-        takeTree(restAPI, rootRef, response);
+        streamInit();
+        takeTree(rootRef);
+      }
+      else if (requestURL === '/tasktotals' && idle) {
+        streamInit();
+        taskTree(restAPI, rootRef, response);
       }
       else if (requestURL === '/casetotals' && idle) {
-        /*
-          Serves the event stream, performs the operation, and reports
-          the events when a page first requests this. After the server
-          closes the connection, the client may periodically request
-          '/casetotals' again. Prevents response to those requests by
-          setting idle to false.
-        */
-        idle = false;
-        total = changes = 0;
-        serveEventStart(response);
+        streamInit();
         caseTree(restAPI, rootRef, response);
       }
       else if (requestURL === '/copytotals' && idle) {
-        /*
-          Serves the event stream, performs the operation, and reports
-          the events when a page first requests this. After the server
-          closes the connection, the client may periodically request
-          '/copytotals' again. Prevents response to those requests by
-          setting idle to false.
-        */
-        idle = false;
-        total = changes = 0;
-        serveEventStart(response);
+        streamInit();
         copyTree(restAPI, rootRef, parentRef, response);
       }
     }
+    // Otherwise, if the request submits the request form:
     else if (method === 'POST' && requestURL === '/do.html') {
-      // Enables a server response to the next /totals request.
+      reinit();
+      // Permit an event stream to be started.
       idle = true;
-      const bodyObject = parse(Buffer.concat(body).toString());
+      const bodyObject = parse(Buffer.concat(bodyParts).toString());
       const {
-        userName, password, rootURL, op, takerName, parentURL, nameBloat0, nameBloat1
+        userName, password, rootURL, op, takerName, parentURL, taskNameString
       } = bodyObject;
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
       rootRef = shorten('hierarchicalrequirement', rootURL);
-      if (errorMessage) {
-        serveError(response);
-      }
-      else if (rootRef) {
+      // Create and configure a Rally API client.
+      if (! isError) {
         restAPI = rally({
           user: userName,
           pass: password,
           requestOptions
         });
+        // If the requested operation is ownership change:
         if (op === 'take') {
+          // If an owner other than the user was specified:
           if (takerName) {
-            getUserRef(restAPI, takerName)
+            getUserRef(takerName)
             .then(
               ref => {
-                if (errorMessage) {
-                  serveError(response);
-                }
-                else {
-                  takerRef = ref;
-                  getUserRef(restAPI, userName)
-                  .then(
-                    ref => {
-                      if (errorMessage) {
-                        serveError(response);
-                      }
-                      else {
-                        userRef = ref;
-                        serveTakeReport(userName, takerName, response);
-                      }
-                    },
-                    error => err(error, 'getting reference to user')
-                  );
-                }
+                takerRef = ref;
+                getUserRef(userName)
+                .then(
+                  ref => {
+                    userRef = ref;
+                    serveTakeReport(userName, takerName);
+                  },
+                  error => err(error, 'getting reference to user for owner change')
+                );
               },
               error => err(error, 'getting reference to new owner')
             );
           }
+          // Otherwise, the new owner will be the user.
           else {
-            getUserRef(restAPI, userName)
+            getUserRef(userName)
             .then(
               ref => {
-                if (errorMessage) {
-                  serveError(response);
-                }
-                else {
-                  takerRef = userRef = ref;
-                  serveTakeReport(userName, userName, response);
-                }
+                takerRef = userRef = ref;
+                serveTakeReport(userName, userName);
               },
-              error => err(error, 'getting reference to user')
+              error => err(error, 'getting reference to user as new owner')
             );
           }
         }
-        else if (op === 'task') {
-          if (nameBloat0) {
-            nameBloats.push(nameBloat0);
-          }
-          if (nameBloat1) {
-            nameBloats.push(nameBloat1);
-          }
-          serveTaskReport(userName, response);
-        }
-        else if (op === 'case') {
-          serveCaseReport(userName, response);
-        }
-        else if (op === 'copy') {
-          parentRef = shorten('hierarchicalrequirement', parentURL);
-          if (errorMessage) {
-            serveError(response);
+        /*
+          Otherwise, if the requested operation is task creaation and at least
+          1 task name was specified:
+        */
+        else if (op === 'task' && taskNameString.length > 1) {
+          const delimiter = taskNameString[0];
+          taskNames.push(...taskNameString.slice(1).split(delimiter));
+          if (taskNames.every(taskName => taskName.length)) {
+            serveTaskReport(userName);
           }
           else {
-            serveCopyReport(userName, parentRef, response);
+            err('empty task name', 'creating tasks');
           }
         }
-      }
-      else {
-        errorMessage = 'Tree root not specified.';
-        serveError(response);
+        // Otherwise, if the requested operation is test-case creation:
+        else if (op === 'case') {
+          serveCaseReport(userName);
+        }
+        // Otherwise, if the requested operation is tree copying:
+        else if (op === 'copy') {
+          parentRef = shorten('hierarchicalrequirement', parentURL);
+          if (! isError) {
+            serveCopyReport(userName);
+          }
+        }
+        else {
+          err('Invalid request', 'request-form submission');
+        }
       }
     }
     else {
-      errorMessage = 'Unanticipated request.';
-      serveError(response);
+      err('Unanticipated request', 'RallyTree');
     }
   });
 };
