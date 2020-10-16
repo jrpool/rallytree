@@ -93,7 +93,6 @@ const shorten = (type, longRef) => {
       `Invalid Rally URL:\nlong ${longRef}\nshort /${type}/${num}`,
       'shortening URL'
     );
-    return '';
   }
 };
 // Increments the total count and sends the new count as an event.
@@ -135,8 +134,8 @@ const takeTask = taskObj => {
   }
 };
 /*
-  Recursively processes ownership changes on a user story and its child
-  user stories.
+  Recursively processes ownership changes on a user story and its
+  descendant user stories.
 */
 const takeTree = storyRef => {
   // Get data on the user story.
@@ -146,9 +145,10 @@ const takeTree = storyRef => {
   })
   .then(
     storyResult => {
+      // When the data arrive:
       const storyObj = storyResult.Object;
-      const storyOwner = storyObj.Owner;
-      const ownerRef = storyOwner ? shorten('user', storyObj.Owner._ref) : '';
+      const owner = storyObj.Owner;
+      const ownerRef = owner ? shorten('user', storyObj.Owner._ref) : '';
       const tasksSummary = storyObj.Tasks;
       const taskCount = tasksSummary.Count;
       const childrenSummary = storyObj.Children;
@@ -159,7 +159,10 @@ const takeTree = storyRef => {
         ref: storyRef,
         data: changeCount ? {Owner: takerRef} : {}
       })
-      // Wait until the ownership change is complete to prevent concurrency errors.
+      /*
+        Wait until the ownership change is complete to prevent
+        concurrency errors.
+      */
       .then(
         () => {
           upTotals(changeCount);
@@ -182,9 +185,12 @@ const takeTree = storyRef => {
               error => err(error, 'getting data on tasks')
             );
           }
-          // Otherwise, if the user story has any child user stories and no tasks:
+          /*
+            Otherwise, if the user story has any child user stories and
+            no tasks:
+          */
           else if (childCount && ! taskCount) {
-            // Get the data on the child user stories.
+            // Get data on its child user stories.
             restAPI.get({
               ref: childrenSummary._ref,
               fetch: ['_ref']
@@ -204,10 +210,17 @@ const takeTree = storyRef => {
                   }
                 });
               },
-              error => err(error, 'getting data on children')
+              error => err(
+                error, 'getting data on child user stories for ownership change'
+              )
             );
           }
+          /*
+            Otherwise, if the user story has both child user stories
+            and tasks:
+          */
           else if (childCount && taskCount) {
+            // Stop and report this as a precondition violation.
             err('User story with both children and tasks', 'ownership changes');
           }
         },
@@ -233,9 +246,6 @@ const iterate = (operation, workItems, itemType, context, otherRef, pause) => {
       );
     }
   }
-  else {
-    return Promise.resolve('');
-  }
 };
 // Creates a task for a user story.
 const createTask = (storyRef, owner, name) => {
@@ -254,7 +264,7 @@ const createTask = (storyRef, owner, name) => {
 // Sequentially create tasks for a user story.
 const createTasks = (storyRef, owner, names) => {
   if (names.length && ! isError) {
-    return createTask(storyRef, owner, names[0])
+    createTask(storyRef, owner, names[0])
     .then(
       () => createTasks(storyRef, owner, names.slice(1)),
       error => err(error, 'calling createTask to create task')
@@ -267,7 +277,7 @@ const createTasks = (storyRef, owner, names) => {
 */
 const taskTree = storyRef => {
   // Get data on the user story.
-  return restAPI.get({
+  restAPI.get({
     ref: storyRef,
     fetch: ['Owner', 'Children']
   })
@@ -275,8 +285,8 @@ const taskTree = storyRef => {
     storyResult => {
       // When the data arrive:
       const storyObj = storyResult.Object;
-      const childrenSummary = storyObj.Children;
       const owner = storyObj.Owner;
+      const childrenSummary = storyObj.Children;
       /*
         If the user story has any child user stories, it does not need
         tasks, so:
@@ -284,7 +294,7 @@ const taskTree = storyRef => {
       if (childrenSummary.Count) {
         upTotals(0);
         // Get data on its child user stories.
-        return restAPI.get({
+        restAPI.get({
           ref: childrenSummary._ref,
           fetch: ['_ref']
         })
@@ -295,7 +305,7 @@ const taskTree = storyRef => {
           */
           childrenResult => {
             const children = childrenResult.Object.Results;
-            return iterate(
+            iterate(
               taskTree,
               children,
               'hierarchicalrequirement',
@@ -303,7 +313,9 @@ const taskTree = storyRef => {
               1000
             );
           },
-          error => err(error, 'getting data on child user stories')
+          error => err(
+            error, 'getting data on child user stories for task creation'
+          )
         );
       }
       // Otherwise the user story needs tasks, so:
@@ -326,30 +338,24 @@ const caseTree = storyRef => {
   // Get data on the user story.
   restAPI.get({
     ref: storyRef,
-    fetch: [
-      'Name',
-      'Description',
-      'Owner',
-      'Children',
-      'Tasks',
-      'TestCases'
-    ]
+    fetch: ['Name', 'Description', 'Owner', 'Children']
   })
   .then(
     storyResult => {
+      // When the data arrive:
       const storyObj = storyResult.Object;
-      const childrenSummary = storyObj.Children;
       const name = storyObj.Name;
       const description = storyObj.Description;
       const owner = storyObj.Owner;
+      const childrenSummary = storyObj.Children;
       /*
-        If the user story has any child user stories, assume it does not
-        need a test case and:
+        If the user story has any child user stories, it does not
+        need a test case, so:
       */
       if (childrenSummary.Count) {
         upTotals(0);
-        // Get their data.
-        return restAPI.get({
+        // Get data on its child user stories.
+        restAPI.get({
           ref: childrenSummary._ref,
           fetch: ['_ref']
         })
@@ -368,13 +374,15 @@ const caseTree = storyRef => {
               0
             );
           },
-          error => err(error, 'getting data on child user stories')
+          error => err(
+            error, 'getting data on child user stories for test-case creation'
+          )
         );
       }
-      // Otherwise:
+      // Otherwise the user story needs a test case, so:
       else {
         // Create a test case.
-        return restAPI.create({
+        restAPI.create({
           type: 'testcase',
           fetch: ['_ref'],
           data: {
@@ -421,32 +429,33 @@ const copyTree = (storyRef, parentRef) => {
   })
   .then(
     storyResult => {
-      /*
-        When the data arrive, copy the user story and give it the specified
-        parent.
-      */
+      // When the data arrive:
       const storyObj = storyResult.Object;
-      const childrenRef = storyObj.Children._ref;
+      const name = storyObj.Name;
+      const description = storyObj.Description;
+      const owner = storyObj.Owner;
+      const childrenSummary = storyObj.Children;
+      // Copy the user story and give it the specified parent.
       restAPI.create({
         type: 'hierarchicalrequirement',
         fetch: ['_ref'],
         data: {
-          Name: storyObj.Name,
-          Description: storyObj.Description,
-          Owner: storyObj.Owner,
+          Name: name,
+          Description: description,
+          Owner: owner,
           Parent: parentRef
         }
       })
       .then(
-        copyResult => {
+        newStory => {
           /*
-            When the user story has been copied and linked, get data on
+            After the user story is copied and linked, get data on
             its children.
           */
           upTotal();
-          const ref = copyResult.Object._ref;
+          const ref = newStory.Object._ref;
           restAPI.get({
-            ref: childrenRef,
+            ref: childrenSummary._ref,
             fetch: ['_ref']
           })
           .then(
@@ -457,10 +466,17 @@ const copyTree = (storyRef, parentRef) => {
             childrenResult => {
               const children = childrenResult.Object.Results;
               iterate(
-                copyTree, children, 'hierarchicalrequirement', 'copying tree', ref, 0
+                copyTree,
+                children,
+                'hierarchicalrequirement',
+                'copying tree',
+                ref,
+                0
               );
             },
-            error => err(error, 'getting data on children')
+            error => err(
+              error, 'getting data on child user stories for copying'
+            )
           );
         },
         error => err(error, 'copying user story')
