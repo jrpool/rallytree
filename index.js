@@ -240,7 +240,6 @@ const iterate = (operation, workItems, itemType, context, otherRef, pause) => {
 // Creates a task for a user story.
 const createTask = (storyRef, owner, name) => {
   // Create the task.
-  console.log(`Creating task for ${storyRef}`);
   return restAPI.create({
     type: 'task',
     fetch: ['_ref'],
