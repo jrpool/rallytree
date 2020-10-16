@@ -36,7 +36,7 @@ let userRef = '';
 let takerRef = '';
 let taskNames = [];
 let rootRef = '';
-let parentRef = '';
+let treeParentRef = '';
 let total = 0;
 let changes = 0;
 let idle = false;
@@ -55,7 +55,7 @@ const reinit = () => {
   takerRef = '';
   taskNames = [];
   rootRef = '';
-  parentRef = '';
+  treeParentRef = '';
   total = 0;
   changes = 0;
   idle = false;
@@ -433,7 +433,7 @@ const caseTree = storyRef => {
   Recursively copies a user story and its descendant user stories and
   makes the new tree a child of an existing user story.
 */
-const copyTree = (storyRef, parentRef) => {
+const copyTree = (storyRef, storyParentRef) => {
   // Get data on the user story.
   restAPI.get({
     ref: storyRef,
@@ -447,52 +447,57 @@ const copyTree = (storyRef, parentRef) => {
       const description = storyObj.Description;
       const owner = storyObj.Owner;
       const childrenSummary = storyObj.Children;
-      // Copy the user story and give it the specified parent.
-      restAPI.create({
-        type: 'hierarchicalrequirement',
-        fetch: ['_ref'],
-        data: {
-          Name: name,
-          Description: description,
-          Owner: owner,
-          Parent: parentRef
-        }
-      })
-      .then(
-        newStory => {
-          /*
-            After the user story is copied and linked, get data on
-            its children.
-          */
-          upTotal();
-          const ref = newStory.Object._ref;
-          restAPI.get({
-            ref: childrenSummary._ref,
-            fetch: ['_ref']
-          })
-          .then(
+      if (storyRef === treeParentRef) {
+        err('Attempt to copy to itself', 'copying tree');
+      }
+      else {
+        // Copy the user story and give it the specified parent.
+        restAPI.create({
+          type: 'hierarchicalrequirement',
+          fetch: ['_ref'],
+          data: {
+            Name: name,
+            Description: description,
+            Owner: owner,
+            Parent: storyParentRef
+          }
+        })
+        .then(
+          newStory => {
             /*
-              When the data arrive, process the children sequentially to
-              prevent concurrency errors.
+              After the user story is copied and linked, get data on
+              its children.
             */
-            childrenResult => {
-              const children = childrenResult.Object.Results;
-              iterate(
-                copyTree,
-                children,
-                'hierarchicalrequirement',
-                'copying tree',
-                ref,
-                0
-              );
-            },
-            error => err(
-              error, 'getting data on child user stories for copying'
-            )
-          );
-        },
-        error => err(error, 'copying user story')
-      );
+            upTotal();
+            const ref = newStory.Object._ref;
+            restAPI.get({
+              ref: childrenSummary._ref,
+              fetch: ['_ref']
+            })
+            .then(
+              /*
+                When the data arrive, process the children sequentially to
+                prevent concurrency errors.
+              */
+              childrenResult => {
+                const children = childrenResult.Object.Results;
+                iterate(
+                  copyTree,
+                  children,
+                  'hierarchicalrequirement',
+                  'copying tree',
+                  ref,
+                  0
+                );
+              },
+              error => err(
+                error, 'getting data on child user stories for copying'
+              )
+            );
+          },
+          error => err(error, 'copying user story')
+        );
+      }
     },
     error => err(error, 'getting data on user story to copy')
   );
@@ -623,7 +628,7 @@ const serveCopyReport = userName => {
           const newContent = htmlContent
           .replace('__script__', jsContent)
           .replace('__rootRef__', rootRef)
-          .replace('__parentRef__', parentRef)
+          .replace('__parentRef__', treeParentRef)
           .replace('__userName__', userName)
           .replace('__userRef__', userRef);
           response.setHeader('Content-Type', 'text/html');
@@ -742,7 +747,7 @@ const requestHandler = (request, res) => {
       }
       else if (requestURL === '/copytotals' && idle) {
         streamInit();
-        copyTree(rootRef, parentRef);
+        copyTree(rootRef, treeParentRef);
       }
     }
     // Otherwise, if the request submits the request form:
@@ -819,7 +824,7 @@ const requestHandler = (request, res) => {
         }
         // Otherwise, if the requested operation is tree copying:
         else if (op === 'copy') {
-          parentRef = shorten('hierarchicalrequirement', parentURL);
+          treeParentRef = shorten('hierarchicalrequirement', parentURL);
           if (! isError) {
             serveCopyReport(userName);
           }
