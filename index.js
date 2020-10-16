@@ -40,6 +40,7 @@ let parentRef = '';
 let total = 0;
 let changes = 0;
 let idle = false;
+let reportServed = false;
 let {RALLY_USERNAME, RALLY_PASSWORD} = process.env;
 RALLY_USERNAME = RALLY_USERNAME || '';
 RALLY_PASSWORD = RALLY_PASSWORD || '';
@@ -58,6 +59,7 @@ const reinit = () => {
   total = 0;
   changes = 0;
   idle = false;
+  reportServed = false;
 };
 // Processes a thrown error.
 const err = (error, context) => {
@@ -65,22 +67,32 @@ const err = (error, context) => {
   const msg = `Error ${context}: ${problem}`;
   console.log(msg);
   isError = true;
-  fs.readFile('error.html', 'utf8')
-  .then(
-    content => {
-      const newContent = content.replace(
-        '__errorMessage__', msg
-      );
-      response.setHeader('Content-Type', 'text/html');
-      response.write(newContent);
-      response.end();
-      reinit();
-    },
-    error => {
-      console.log(`Error reading error page: ${error.message}`);
-      reinit();
-    }
-  );
+  // If a report page has been served:
+  if (reportServed) {
+    // Insert the error message there.
+    response.write(`event: error\ndata: ${msg}\n\n`);
+    response.end();
+  }
+  // Otherwise:
+  else {
+    // Serve an error page containing the error message.
+    fs.readFile('error.html', 'utf8')
+    .then(
+      content => {
+        const newContent = content.replace(
+          '__errorMessage__', msg
+        );
+        response.setHeader('Content-Type', 'text/html');
+        response.write(newContent);
+        response.end();
+        reinit();
+      },
+      error => {
+        console.log(`Error reading error page: ${error.message}`);
+        reinit();
+      }
+    );
+  }
 };
 // Shortens a long reference.
 const shorten = (type, longRef) => {
@@ -541,6 +553,7 @@ const serveTakeReport = (userName, takerName) => {
           response.setHeader('Content-Type', 'text/html');
           response.write(newContent);
           response.end();
+          reportServed = true;
         },
         error => err(error, 'reading takeReport script')
       );
@@ -567,6 +580,7 @@ const serveTaskReport = userName => {
           response.setHeader('Content-Type', 'text/html');
           response.write(newContent);
           response.end();
+          reportServed = true;
         },
         error => err(error, 'reading taskReport script')
       );
@@ -590,6 +604,7 @@ const serveCaseReport = userName => {
           response.setHeader('Content-Type', 'text/html');
           response.write(newContent);
           response.end();
+          reportServed = true;
         },
         error => err(error, 'reading caseReport script')
       );
@@ -614,6 +629,7 @@ const serveCopyReport = userName => {
           response.setHeader('Content-Type', 'text/html');
           response.write(newContent);
           response.end();
+          reportServed = true;
         },
         error => err(error, 'reading caseReport script')
       );

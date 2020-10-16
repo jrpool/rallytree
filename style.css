@@ -34,6 +34,11 @@ button:hover {
   background-color: #fff;
 }
 
+.error {
+  color: #f00;
+  font-weight: 700;
+}
+
 .flex {
   display: flex;
   flex-direction: column;

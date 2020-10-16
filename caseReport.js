@@ -26,6 +26,9 @@ document.addEventListener('DOMContentLoaded', () => {
   eventSource.addEventListener('changes', event => {
     messageHandler(event, 'changes');
   });
+  eventSource.addEventListener('error', event => {
+    messageHandler(event, 'error');
+  });
   // Stop listening after 10 idle seconds, assuming the job complete.
   const poller = setInterval(
     () => {
