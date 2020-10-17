@@ -243,6 +243,7 @@ const takeTree = storyRef => {
   );
 };
 // Sequentially perform an operation on work items.
+/*
 const iterate = (operation, workItems, itemType, context, otherRef, pause) => {
   if (workItems.length && ! isError) {
     const firstRef = shorten(
@@ -252,9 +253,35 @@ const iterate = (operation, workItems, itemType, context, otherRef, pause) => {
       operation(firstRef, otherRef)
       .then(
         () => setTimeout(
-          () => iterate(operation, workItems.slice(1), itemType, context), pause
+          () => iterate(
+            operation, workItems.slice(1), itemType, context, otherRef, pause
+          ),
+          pause
         ),
         error => err(error, context)
+      );
+    }
+  }
+};
+*/
+// Sequentially perform an operation on work items.
+const iterate = (operation, workItems, itemType, context, otherRef, pause) => {
+  console.log('Starting iterate');
+  if (workItems.length && ! isError) {
+    console.log(`workItems length: ${workItems.length}`);
+    const firstRef = shorten(itemType, workItems[0]._ref);
+    if (! isError) {
+      console.log(`About to run operation on ${firstRef}`);
+      operation(firstRef, otherRef);
+      setTimeout(
+        () => {
+          if (! isError) {
+            iterate(
+              operation, workItems.slice(1), itemType, context, otherRef, pause
+            );
+          }
+        },
+        pause
       );
     }
   }
@@ -383,7 +410,7 @@ const caseTree = storyRef => {
               children,
               'hierarchicalrequirement',
               'creating test cases in tree',
-              0
+              3000
             );
           },
           error => err(
@@ -476,8 +503,8 @@ const copyTree = (storyRef, storyParentRef) => {
             })
             .then(
               /*
-                When the data arrive, process the children sequentially to
-                prevent concurrency errors.
+                When the data arrive, process the children sequentially and
+                with 1,000 ms pauses to prevent concurrency errors.
               */
               childrenResult => {
                 const children = childrenResult.Object.Results;
@@ -487,7 +514,7 @@ const copyTree = (storyRef, storyParentRef) => {
                   'hierarchicalrequirement',
                   'copying tree',
                   ref,
-                  0
+                  1000
                 );
               },
               error => err(
@@ -826,16 +853,37 @@ const requestHandler = (request, res) => {
         else if (op === 'copy') {
           treeParentRef = shorten('hierarchicalrequirement', parentURL);
           if (! isError) {
-            serveCopyReport(userName);
+            // Get data on the parent user story of the copy.
+            restAPI.get({
+              ref: treeParentRef,
+              fetch: ['Tasks']
+            })
+            .then(
+              storyResult => {
+                // When the data arrive:
+                const storyObj = storyResult.Object;
+                const tasksSummary = storyObj.Tasks;
+                if (tasksSummary.Count) {
+                  err(
+                    'Attempt to copy to a user story with tasks', 'copying tree'
+                  );
+                }
+                else {
+                  // Copy the user story and give it the specified parent.
+                  serveCopyReport(userName);
+                }
+              },
+              error => err(error, 'getting data on parent of tree copy')
+            );
+          }
+          else {
+            err('Invalid request', 'submitting request-form');
           }
         }
         else {
-          err('Invalid request', 'submitting request-form');
+          err('Unanticipated request', 'RallyTree');
         }
       }
-    }
-    else {
-      err('Unanticipated request', 'RallyTree');
     }
   });
 };
