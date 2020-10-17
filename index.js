@@ -350,81 +350,82 @@ const caseTree = storyRefs => {
       fetch: ['Name', 'Description', 'Owner', 'Children']
     })
     .then(
-    storyResult => {
-      // When the data arrive:
-      const storyObj = storyResult.Object;
-      const name = storyObj.Name;
-      const description = storyObj.Description;
-      const owner = storyObj.Owner;
-      const childrenSummary = storyObj.Children;
-      /*
-        If the user story has any child user stories, it does not
-        need a test case, so:
-      */
-      if (childrenSummary.Count) {
-        upTotals(0);
-        // Get data on its child user stories.
-        restAPI.get({
-          ref: childrenSummary._ref,
-          fetch: ['_ref']
-        })
-        .then(
-          // When the data arrive, process the children.
-          childrenResult => {
-            const childRefs = childrenResult.Object.Results.map(
-              child => child._ref
-            );
-            caseTree(childRefs);
-          },
-          error => err(
-            error,
-            'getting data on child user stories for test-case creation'
-          )
-        );
-      }
-      // Otherwise the user story needs a test case, so:
-      else {
-        // Create a test case.
-        restAPI.create({
-          type: 'testcase',
-          fetch: ['_ref'],
-          data: {
-            Name: name,
-            Description: description,
-            Owner: owner
-          }
-        })
-        .then(
-          // After it is created:
-          newCase => {
-            // Link it to the user story.
-            const caseRef = shorten('testcase', newCase.Object._ref);
-            if (! isError) {
-              restAPI.add({
-                ref: storyRef,
-                collection: 'TestCases',
-                data: [{_ref: caseRef}],
-                fetch: ['_ref']
-              })
-              .then(
-                // After it is linked:
-                () => {
-                  upTotals(1);
-                  // Process the rest of the specified user stories.
-                  caseTree(storyRefs.slice(1));
-                },
-                error => err(error, 'adding test case to user story')
+      storyResult => {
+        // When the data arrive:
+        const storyObj = storyResult.Object;
+        const name = storyObj.Name;
+        const description = storyObj.Description;
+        const owner = storyObj.Owner;
+        const childrenSummary = storyObj.Children;
+        /*
+          If the user story has any child user stories, it does not
+          need a test case, so:
+        */
+        if (childrenSummary.Count) {
+          upTotals(0);
+          // Get data on its child user stories.
+          restAPI.get({
+            ref: childrenSummary._ref,
+            fetch: ['_ref']
+          })
+          .then(
+            // When the data arrive, process the children.
+            childrenResult => {
+              const childRefs = childrenResult.Object.Results.map(
+                child => child._ref
               );
+              caseTree(childRefs);
+            },
+            error => err(
+              error,
+              'getting data on child user stories for test-case creation'
+            )
+          );
+        }
+        // Otherwise the user story needs a test case, so:
+        else {
+          // Create a test case.
+          restAPI.create({
+            type: 'testcase',
+            fetch: ['_ref'],
+            data: {
+              Name: name,
+              Description: description,
+              Owner: owner
             }
-          },
-          error => err(error, 'creating test case')
-        );
-      }
-    },
-    error => err(
-      error, 'getting data on user story for test-case creation'
-    )
-  );
+          })
+          .then(
+            // After it is created:
+            newCase => {
+              // Link it to the user story.
+              const caseRef = shorten('testcase', newCase.Object._ref);
+              if (! isError) {
+                restAPI.add({
+                  ref: storyRef,
+                  collection: 'TestCases',
+                  data: [{_ref: caseRef}],
+                  fetch: ['_ref']
+                })
+                .then(
+                  // After it is linked:
+                  () => {
+                    upTotals(1);
+                    // Process the rest of the specified user stories.
+                    caseTree(storyRefs.slice(1));
+                  },
+                  error => err(error, 'adding test case to user story')
+                );
+              }
+            },
+            error => err(error, 'creating test case')
+          );
+        }
+      },
+      error => err(
+        error, 'getting data on user story for test-case creation'
+      )
+    );
+  }
 };
 // Recursively copies a tree of user stories.
 const copyTree = (storyRefs, copyParentRef) => {
@@ -436,70 +437,71 @@ const copyTree = (storyRefs, copyParentRef) => {
       fetch: ['Name', 'Description', 'Owner', 'Children']
     })
     .then(
-    storyResult => {
-      // When the data arrive:
-      const storyObj = storyResult.Object;
-      const name = storyObj.Name;
-      const description = storyObj.Description;
-      const owner = storyObj.Owner;
-      const childrenSummary = storyObj.Children;
-      // If the user story is the specified parent of the tree copy:
-      if (storyRef === treeCopyParentRef) {
-        /*
-          Quit and report the precondition violation. The parent of
-          the copy must be outside the original tree.
-        */
-        err('Attempt to copy to itself', 'copying tree');
-      }
-      else {
-        // Copy the user story and give it the specified parent.
-        restAPI.create({
-          type: 'hierarchicalrequirement',
-          fetch: ['_ref'],
-          data: {
-            Name: name,
-            Description: description,
-            Owner: owner,
-            Parent: copyParentRef
-          }
-        })
-        .then(
-          // When the user story has been copied and linked:
-          copy => {
-            upTotal();
-            // If the original has any child user stories:
-            if (childrenSummary.Count) {
-              const copyRef = copy.Object._ref;
-              // Get data on them.
-              restAPI.get({
-                ref: childrenSummary._ref,
-                fetch: ['_ref']
-              })
-              .then(
-                // When the data arrive, process the children.
-                childrenResult => {
-                  const childRefs = childrenResult.Object.Results.map(
-                    child => child._ref
-                  );
-                  copyTree(childRefs, copyRef);
-                },
-                error => err(
-                  error, 'getting data on child user stories for copying'
-                )
-              );
+      storyResult => {
+        // When the data arrive:
+        const storyObj = storyResult.Object;
+        const name = storyObj.Name;
+        const description = storyObj.Description;
+        const owner = storyObj.Owner;
+        const childrenSummary = storyObj.Children;
+        // If the user story is the specified parent of the tree copy:
+        if (storyRef === treeCopyParentRef) {
+          /*
+            Quit and report the precondition violation. The parent of
+            the copy must be outside the original tree.
+          */
+          err('Attempt to copy to itself', 'copying tree');
+        }
+        else {
+          // Copy the user story and give it the specified parent.
+          restAPI.create({
+            type: 'hierarchicalrequirement',
+            fetch: ['_ref'],
+            data: {
+              Name: name,
+              Description: description,
+              Owner: owner,
+              Parent: copyParentRef
             }
-            // Otherwise:
-            else {
-              // Process the rest of the specified user stories.
-              copyTree(storyRefs.slice(1), copyParentRef);
-            }
-          },
-          error => err(error, 'copying user story')
-        );
-      }
-    },
-    error => err(error, 'getting data on user story to copy')
-  );
+          })
+          .then(
+            // When the user story has been copied and linked:
+            copy => {
+              upTotal();
+              // If the original has any child user stories:
+              if (childrenSummary.Count) {
+                const copyRef = copy.Object._ref;
+                // Get data on them.
+                restAPI.get({
+                  ref: childrenSummary._ref,
+                  fetch: ['_ref']
+                })
+                .then(
+                  // When the data arrive, process the children.
+                  childrenResult => {
+                    const childRefs = childrenResult.Object.Results.map(
+                      child => child._ref
+                    );
+                    copyTree(childRefs, copyRef);
+                  },
+                  error => err(
+                    error, 'getting data on child user stories for copying'
+                  )
+                );
+              }
+              // Otherwise:
+              else {
+                // Process the rest of the specified user stories.
+                copyTree(storyRefs.slice(1), copyParentRef);
+              }
+            },
+            error => err(error, 'copying user story')
+          );
+        }
+      },
+      error => err(error, 'getting data on user story to copy')
+    );
+  }
 };
 // Gets a reference to a user.
 const getUserRef = userName => {
