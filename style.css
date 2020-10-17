@@ -35,8 +35,9 @@ button:hover {
 }
 
 .error {
-  color: #f00;
+  font-size: x-large;
   font-weight: 700;
+  color: #f00;
 }
 
 .flex {

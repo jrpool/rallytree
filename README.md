@@ -7,21 +7,21 @@ RallyTree automates some operations on trees of work items in [Rally](https://ww
 RallyTree can perform these operations on a tree:
 
 ## Owner change
-This feature ensures that each user story and each task in a tree has the desired owner. The user can choose whether to become the new owner or instead to specify another user as the new owner.
+This feature ensures that each user story and each task in a tree has the desired owner. You can choose whether to become the new owner or instead to specify another user as the new owner.
 
 ## Task creation
-This feature adds 2 tasks to each user story that has no child user stories and no tasks. The new tasks are given the same name and owner as their user story. By default, one task has the name “Create Test Case.” and the other task has the name “Run Test Case.” But you can specify custom names that are based on the user story’s name.
+This feature adds tasks to each of a tree&rsquo;s user stories that have no child user stories. You can choose how many tasks to add to each user story and give a name to each task.
 
 ## Test-case creation
-This feature adds a test case to each user story with at least 1 task that doesn’t already have a test case. The new test case is given the same name, description, and owner as its user story. No matter how many tasks a user story has, only 1 test case is created for it.
+This feature adds a test case to each of a tree&rsquo;s user stories that have no child user stories. The new test case is given the same name, description, and owner as its user story.
 
 ## Tree-copy creation
-This feature copies a tree. The user specifies which user story will be the parent of the root user story of the new tree. Only user stories are copied, not tasks, test cases, or defects. In a copy of a user story, the name, owner, and description are copied from the original.
+This feature copies a tree. You designate an existing user story as the parent of the root user story of the new tree. That parent must not have any tasks and must not be in the tree that you are copying. Only user stories are copied, not tasks, test cases, or defects. In a copy of a user story, the name, owner, and description are copied from the original.
 
 # Architecture
 RallyTree is a `node.js` application that can be installed locally. It creates a web server running on `localhost:3000`.
 
-Once it is running, visiting `localhost:3000` with a web browser gets an informational page, which contains a link to a request page. Filling the form out on the request page and submitting the form makes the server serve a report page. The report page, in turn, automatically submits a new request that causes the server to:
+Once it is running, visiting `localhost:3000` with a web browser gets an informational page, which contains a link to a request page. Filling the form out on the request page and submitting the form makes the server serve a report page. The report page, in turn, submits a new request that causes the server to:
 
 - create a server-sent-event stream
 - perform the form’s requested operation on the specified tree
@@ -29,44 +29,52 @@ Once it is running, visiting `localhost:3000` with a web browser gets an informa
 
 The report page displays the new counts as they arrive from the server.
 
+If an error occurs, including an error arising from your request form being improperly completed, an error message is displayed on the report page.
+
 RallyTree gives instructions to Rally by means of Rally’s [web-services API](https://rally1.rallydev.com/slm/doc/webservice/), using Rally’s `node.js` integration package, [`rally-node`](https://github.com/RallyTools/rally-node).
 
-The core functionality of RallyTree is performed by the functions `takeTree()`, `caseTree()`, and `copyTree()` in the `index.js` file. These functions recursively perform operations on a specified user story and its applicable descendants.
+The core functionality of RallyTree is performed by the functions `takeTree()`, `caseTree()`, `taskTree()`, and `copyTree()` in the `index.js` file. These functions recursively perform operations on a specified user story and its applicable descendants.
 
 # Asynchronicity
 
 ## Design
-The Rally operations are asynchronous, so they can, in principle, occur in parallel. For example, if a user story has 6 child user stories, an operation can be requested on each of the 6 children, and Rally can perform those 6 operations in parallel.
+The Rally operations are asynchronous, so operations on sets of work items can, in principle, occur in parallel. For example, if a user story has 6 child user stories, an operation can be requested on each of the 6 children, and Rally can perform those 6 operations in parallel.
 
-In such a case, the exact order of the operations is not forecastable, and it cannot be foreknown which operation will be the last one. Therefore, RallyTree is not designed to (1) process a request and then (2) serve the report page. Instead, it is designed to (1) immediately serve the report page, (2) let the report page request an operation on a tree, (3) perform the operation, and (4) incrementally send new totals to the report page as they are generated. The report page displays the totals and updates them as new totals arrive. When the user sees that a few seconds has passed without the total(s) being updated, the user knows that the process is finished.
+In such a case, the exact order of the operations is not forecastable, and it cannot be foreknown which operation will be the last one. Therefore, RallyTree is not designed to (1) process a request and then (2) serve the report page after it is finished. Instead, it is designed to (1) immediately serve the report page, (2) let the report page request an operation on a tree, (3) perform the operation, and (4) incrementally send new totals to the report page as they are generated. The report page displays the totals and updates them as new totals arrive. When the user sees that a few seconds has passed without the total(s) being updated, the user knows that the process is finished.
 
-# Limitations
-Asynchronicity in RallyTree has important limitations. Some theoretically independent operations are not in fact independent. Experimentation reveals that errors can be thrown when:
+## Limitations
+Asynchronicity in RallyTree has limitations. Some theoretically independent operations are not in fact independent. Errors can be thrown, for example, when:
 
 - A child user story is updated while its parent user story is being updated.
 - A test case is linked to a user story while another test case is being created.
 - A user story is linked to a parent while another user story is linked to the same parent.
 
-Typically, thrown errors yield irrelevant messages, such as lack of authorization. But sometimes there is an error message pointing to an asynchronicity problem, such as:
+These are concurrency conflicts. The errors that they throw are sometimes irrelevant, such as
+
+```
+Not authorized to perform action: Invalid key
+```
+
+In other cases they correctly point to asynchronicity problems, such as:
 
 ```
 Error copying user story: Concurrency conflict:
 [Object has been modified since being read for update in this context]
-- ConcurrencyConflictException
-: Modified since read on update
-: Object Class
-: com.f4tech.slm.domain.UserStory
-: ObjectID
-: 441863343664
 ```
 
-[Broadcom says](https://community.broadcom.com/enterprisesoftware/communities/community-home/digestviewer/viewthread?GroupId=2437&MessageKey=a41c7c1b-f37b-4eb3-9647-b8d518341f86&CommunityKey=f303f769-8d4c-44d9-924c-3845bba6444e&tab=digestviewer&ReturnUrl=%2Fenterprisesoftware%2Fcommunities%2Fcommunity-home%2Fdigestviewer%3FCommunityKey%3Df303f769-8d4c-44d9-924c-3845bba6444e) that `POST` requests are throttled at 24 requests in progress at any time, but that exceeding this limit should merely queue requests, not throw errors.
+[According to Broadcom](https://community.broadcom.com/enterprisesoftware/communities/community-home/digestviewer/viewthread?GroupId=2437&MessageKey=a41c7c1b-f37b-4eb3-9647-b8d518341f86&CommunityKey=f303f769-8d4c-44d9-924c-3845bba6444e&tab=digestviewer&ReturnUrl=%2Fenterprisesoftware%2Fcommunities%2Fcommunity-home%2Fdigestviewer%3FCommunityKey%3Df303f769-8d4c-44d9-924c-3845bba6444e), truly independent requests can be made at any rate without causing errors, because they are queued if they arrive faster than the 24-requests-at-once limit.
 
-Because of these limitations, some potentially parallel RallyTree operations are forced to be sequential instead. This makes the fulfillment of a RallyTree request slower than it might otherwise be, in the interest of integrity. Specifically:
+But [Broadcom acknowledges](https://knowledge.broadcom.com/external/article?articleId=77114) that interdependent requests will throw concurrency-conflict errors if they are made too rapidly in succession.
 
-- In takeTree(), completion of the ownership change of a user story is awaited before any child user story’s or child task’s ownership is changed. But the user story’s children’s ownerships are then changed in parallel.
-- In caseTree(), the child user stories of any user story are processed sequentially.
-- In copyTree(), the child user stories of any user story are copied sequentially.
+## Adaptation
+
+Because of these limitations, RallyTree performs operations in parallel when it can, but makes operations sequential when necessary in order to avoid concurrency conflicts. Specifically:
+
+- In `takeTree()`, completion of the ownership change of a user story is awaited before any child user story’s or task’s ownership is changed. But the ownership changes of all of the child user stories or tasks of any user story are performed in parallel.
+- In all the operations except ownership change, the child user stories of any user story are processed sequentially.
+- In `taskTree()`, if you have more than 1 task added to each user story, they are added sequentially.
+
+The sequential performance of operations makes RallyTree slower than it would be if Rally guaranteed transactional integrity. Speed increases may be possible by means of techniques suggested by Broadcom in its above-cited knowledge-base article.
 
 # Installation and usage
 To install and use RallyTree:
@@ -76,5 +84,3 @@ To install and use RallyTree:
 - Install dependencies with `npm install`.
 - Run the application with `node index`.
 - Follow the instructions.
-
-If an error occurs when you are using RallyTree to create test cases, the effect is usually that orphan test cases are created that have not been linked to their user stories. RallyTree can then be run again. Any successfully linked test cases are not recreated, but any test cases that failed to be linked are recreated and linked. After RallyTree runs without error, any surplus orphaned test cases can be deleted in the Rally web interface.
