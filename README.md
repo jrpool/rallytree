@@ -84,3 +84,6 @@ To install and use RallyTree:
 - Install dependencies with `npm install`.
 - Run the application with `node index`.
 - Follow the instructions.
+
+# Support
+Please report bugs, comments, and questions to Jonathan Pool (jonathan.pool@cvshealth.com).
