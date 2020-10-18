@@ -86,4 +86,4 @@ To install and use RallyTree:
 - Follow the instructions.
 
 # Support
-Please report bugs, comments, and questions to Jonathan Pool (jonathan.pool@cvshealth.com).
+Please report bugs, comments, feature suggestions, and questions to Jonathan Pool (jonathan.pool@cvshealth.com).
