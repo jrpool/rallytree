@@ -33,14 +33,14 @@ If an error occurs, including an error arising from your request form being impr
 
 RallyTree gives instructions to Rally by means of Rally’s [web-services API](https://rally1.rallydev.com/slm/doc/webservice/), using Rally’s `node.js` integration package, [`rally-node`](https://github.com/RallyTools/rally-node).
 
-The core functionality of RallyTree is performed by the functions `takeTree()`, `caseTree()`, `taskTree()`, and `copyTree()` in the `index.js` file. These functions recursively perform operations on a specified user story and its applicable descendants.
+The core functionality of RallyTree is performed by the functions `takeTree()`, `taskTree()`, `caseTree()`, and `copyTree()` in the `index.js` file. These functions recursively perform operations on a specified user story and its applicable descendants.
 
 # Asynchronicity
 
 ## Design
 The Rally operations are asynchronous, so operations on sets of work items can, in principle, occur in parallel. For example, if a user story has 6 child user stories, an operation can be requested on each of the 6 children, and Rally can perform those 6 operations in parallel.
 
-In such a case, the exact order of the operations is not forecastable, and it cannot be foreknown which operation will be the last one. Therefore, RallyTree is not designed to (1) process a request and then (2) serve the report page after it is finished. Instead, it is designed to (1) immediately serve the report page, (2) let the report page request an operation on a tree, (3) perform the operation, and (4) incrementally send new totals to the report page as they are generated. The report page displays the totals and updates them as new totals arrive. When the user sees that a few seconds has passed without the total(s) being updated, the user knows that the process is finished.
+When operations are performed in parallel, the order of the operations is not forecastable, and it cannot be foreknown which operation will be the last one. Therefore, RallyTree is not designed to (1) process a request and then (2) serve the report page after it is finished. Instead, it is designed to (1) immediately serve the report page, (2) let the report page request an operation on a tree, (3) perform the operation, and (4) incrementally send new totals to the report page as they are generated. The report page displays the totals and updates them as new totals arrive. When the user sees that a few seconds has passed without the total(s) being updated, the user knows that the process is finished.
 
 ## Limitations
 Asynchronicity in RallyTree has limitations. Some theoretically independent operations are not in fact independent. Errors can be thrown, for example, when:
@@ -55,7 +55,7 @@ These are concurrency conflicts. The errors that they throw are sometimes irrele
 Not authorized to perform action: Invalid key
 ```
 
-In other cases they correctly point to asynchronicity problems, such as:
+In other cases they correctly point to asynchronicity problems, such as
 
 ```
 Error copying user story: Concurrency conflict:
