@@ -275,7 +275,6 @@ const takeTree = storyRef => {
 // Sequentially creates tasks for a user story.
 const createTasks = (storyRef, owner, names) => {
   if (names.length && ! isError) {
-    console.log(`names is ${names}`);
     return restAPI.create({
       type: 'task',
       fetch: ['_ref'],
