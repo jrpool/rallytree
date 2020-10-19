@@ -71,7 +71,7 @@ But [Broadcom acknowledges](https://knowledge.broadcom.com/external/article?arti
 Because of these limitations, RallyTree performs operations in parallel when it can, but makes operations sequential when necessary in order to avoid concurrency conflicts. Specifically:
 
 - In `takeTree()`, completion of the ownership change of a user story is awaited before any child user story’s or task’s ownership is changed. But the ownership changes of all of the child user stories or tasks of any user story are performed in parallel.
-- In all the operations except ownership change, the child user stories of any user story are processed sequentially.
+- In the other three functions, the child user stories of any user story are processed sequentially.
 - In `taskTree()`, if you have more than 1 task added to each user story, they are added sequentially.
 
 The sequential performance of operations makes RallyTree slower than it would be if Rally guaranteed transactional integrity. Speed increases may be possible by means of techniques suggested by Broadcom in its above-cited knowledge-base article.
