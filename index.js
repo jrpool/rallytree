@@ -358,7 +358,7 @@ const taskTree = storyRefs => {
     }
   }
 };
-// Recursively creates test cases for a tree of user stories.
+// Recursively creates test cases for a tree or subtrees of user stories.
 const caseTree = storyRefs => {
   if (storyRefs.length && ! isError) {
     const firstRef = shorten('hierarchicalrequirement', storyRefs[0]);
@@ -447,7 +447,7 @@ const caseTree = storyRefs => {
     }
   }
 };
-// Recursively copies a tree of user stories.
+// Recursively copies a tree or subtrees of user stories.
 const copyTree = (storyRefs, copyParentRef) => {
   if (storyRefs.length && ! isError) {
     const firstRef = shorten('hierarchicalrequirement', storyRefs[0]);
