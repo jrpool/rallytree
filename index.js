@@ -113,10 +113,12 @@ const err = (error, context) => {
 };
 // Shortens a long reference.
 const shorten = (type, longRef) => {
+  // If it is already a short reference, return it.
   if (/^\/[a-z]+\/\d+$/.test(longRef)) {
     return longRef;
   }
   else {
+    // If not, return its short version.
     const num = longRef.replace(/^http.+([/]|%2F)(?=\d+)/, '');
     if (/^\d+$/.test(num)) {
       return `/${type}/${num}`;
