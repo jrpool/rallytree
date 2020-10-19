@@ -213,7 +213,7 @@ const takeTree = storyRef => {
               // When the data arrive:
               tasksObj => {
                 const tasks = tasksObj.Object.Results;
-                // Ensure that the specified user owns them.
+                // Process the tasks in parallel.
                 tasks.forEach(taskObj => {
                   takeTask(taskObj);
                 });
@@ -294,7 +294,7 @@ const createTasks = (storyRef, owner, names) => {
     return Promise.resolve('');
   }
 };
-// Recursively creates tasks for a tree of user stories.
+// Recursively creates tasks for a tree or subtrees of user stories.
 const taskTree = storyRefs => {
   if (storyRefs.length && ! isError) {
     const firstRef = shorten('hierarchicalrequirement', storyRefs[0]);
