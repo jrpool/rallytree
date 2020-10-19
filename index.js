@@ -321,7 +321,10 @@ const taskTree = storyRefs => {
               fetch: ['_ref']
             })
             .then(
-              // When the data arrive, process the children.
+              /*
+                When the data arrive, process the children sequentially
+                to prevent concurrency errors.
+              */
               childrenResult => {
                 const childRefs = childrenResult.Object.Results.map(
                   child => child._ref
@@ -336,14 +339,17 @@ const taskTree = storyRefs => {
           }
           // Otherwise the user story needs tasks, so:
           else {
-            // Create them sequentially, to prevent concurrency errors.
+            // Create them sequentially to prevent concurrency errors.
             createTasks(firstRef, owner, taskNames)
             // When they have been created:
             .then(
               () => {
                 if (! isError) {
                   upTotals(taskNames.length);
-                  // Process the rest of the specified user stories.
+                  /*
+                    Process the rest of the specified user stories
+                    sequentially to prevent concurrency errors.
+                  */
                   taskTree(storyRefs.slice(1));
                 }
               },
@@ -388,7 +394,10 @@ const caseTree = storyRefs => {
               fetch: ['_ref']
             })
             .then(
-              // When the data arrive, process the children.
+              /*
+                When the data arrive, process the children sequentially to
+                prevent concurrency errors.
+              */
               childrenResult => {
                 const childRefs = childrenResult.Object.Results.map(
                   child => child._ref
@@ -429,7 +438,10 @@ const caseTree = storyRefs => {
                     // After it is linked:
                     () => {
                       upTotals(1);
-                      // Process the rest of the specified user stories.
+                      /*
+                        Process the rest of the specified user stories
+                        sequentially to prevent concurrency errors.
+                      */
                       caseTree(storyRefs.slice(1));
                     },
                     error => err(error, 'adding test case to user story')
@@ -498,7 +510,10 @@ const copyTree = (storyRefs, copyParentRef) => {
                     fetch: ['_ref']
                   })
                   .then(
-                    // When the data arrive, process the children.
+                    /*
+                      When the data arrive, process the children sequentially
+                      to prevent concurrency errors.
+                    */
                     childrenResult => {
                       const childRefs = childrenResult.Object.Results.map(
                         child => child._ref
@@ -512,7 +527,10 @@ const copyTree = (storyRefs, copyParentRef) => {
                 }
                 // Otherwise:
                 else {
-                  // Process the rest of the specified user stories.
+                  /*
+                    Process the rest of the specified user stories
+                    sequentially to prevent concurrency errors.
+                  */
                   copyTree(storyRefs.slice(1), copyParentRef);
                 }
               },
