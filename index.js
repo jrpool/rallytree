@@ -1,11 +1,6 @@
 /*
   index.js
-  RallyTree script.
-
-  This script serves a web page with a form for submission of
-  a RallyTree request to make a user the owner of all work items
-  in a tree. When a request is submitted, the script fulfills
-  and acknowledges it.
+  RallyTree main script.
 */
 
 // ########## IMPORTS
