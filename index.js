@@ -144,8 +144,8 @@ const upTotals = changeCount => {
   const totalMsg = `event: total\ndata: ${++total}\n\n`;
   changes += changeCount;
   const changeMsg = changeCount
-  ? `event: changes\ndata: ${changes}\n\n`
-  : '';
+    ? `event: changes\ndata: ${changes}\n\n`
+    : '';
   response.write(`${totalMsg}${changeMsg}`);
 };
 // Change the ownership of a task.
