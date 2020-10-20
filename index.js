@@ -128,6 +128,7 @@ const shorten = (type, longRef) => {
         `Invalid Rally URL:\nlong ${longRef}\nshort /${type}/${num}`,
         'shortening URL'
       );
+      return '';
     }
   }
 };
@@ -487,6 +488,7 @@ const copyTree = (storyRefs, copyParentRef) => {
             */
             err('Attempt to copy to itself', 'copying tree');
           }
+          // Otherwise:
           else {
             // Copy the user story and give it the specified parent.
             restAPI.create({
@@ -553,7 +555,10 @@ const getUserRef = userName => {
   })
   .then(
     userRef => shorten('user', userRef.Results[0]._ref),
-    error => err(error, 'getting user reference')
+    error => {
+      err(error, 'getting user reference');
+      return '';
+    }
   );
 };
 // Serves the introduction page.
