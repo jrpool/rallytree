@@ -825,101 +825,92 @@ const requestHandler = (request, res) => {
           pass: password,
           requestOptions
         });
-        // If the requested operation is ownership change:
-        if (op === 'take') {
-          // If an owner other than the user was specified:
-          if (takerName) {
-            getUserRef(takerName)
-            .then(
-              ref => {
-                takerRef = ref;
-                getUserRef(userName)
-                .then(
-                  ref => {
-                    userRef = ref;
-                    serveTakeReport(userName, takerName);
-                  },
-                  error => err(
-                    error, 'getting reference to user for owner change'
-                  )
-                );
-              },
-              error => err(error, 'getting reference to new owner')
-            );
-          }
-          // Otherwise, the new owner will be the user.
-          else {
-            getUserRef(userName)
-            .then(
-              ref => {
-                // If the username is valid (otherwise its type is object):
-                if (! isError) {
-                  takerRef = userRef = ref;
-                  serveTakeReport(userName, userName);
-                }
-              },
-              error => err(error, 'getting reference to user as new owner')
-            );
-          }
-        }
-        /*
-          Otherwise, if the requested operation is task creaation and
-          at least 1 task name was specified:
-        */
-        else if (op === 'task') {
-          if (taskNameString.length < 2) {
-            err('Task names invalid', 'creating tasks');
-          }
-          else {
-            const delimiter = taskNameString[0];
-            taskNames.push(...taskNameString.slice(1).split(delimiter));
-            if (taskNames.every(taskName => taskName.length)) {
-              serveTaskReport(userName);
-            }
-            else {
-              err('Empty task name', 'creating tasks');
-            }
-          }
-        }
-        // Otherwise, if the requested operation is test-case creation:
-        else if (op === 'case') {
-          serveCaseReport(userName);
-        }
-        // Otherwise, if the requested operation is tree copying:
-        else if (op === 'copy') {
-          treeCopyParentRef = shorten('hierarchicalrequirement', parentURL);
-          if (! isError) {
-            // Get data on the parent user story of the copy.
-            restAPI.get({
-              ref: treeCopyParentRef,
-              fetch: ['Tasks']
-            })
-            .then(
-              storyResult => {
-                // When the data arrive:
-                const storyObj = storyResult.Object;
-                const tasksSummary = storyObj.Tasks;
-                if (tasksSummary.Count) {
-                  err(
-                    'Attempt to copy to a user story with tasks',
-                    'copying tree'
+        // Get a reference to the user.
+        getUserRef(userName)
+        .then(
+          ref => {
+            if (! isError) {
+              userRef = ref;
+              // If the requested operation is ownership change:
+              if (op === 'take') {
+                // If an owner other than the user was specified:
+                if (takerName) {
+                  // Serve a report identifying the new owner.
+                  getUserRef(takerName)
+                  .then(
+                    ref => {
+                      if (! isError) {
+                        takerRef = ref;
+                        serveTakeReport(userName, takerName);
+                      }
+                    },
+                    error => err(
+                      error, 'getting reference to new owner'
+                    )
                   );
                 }
+                // Otherwise, the new owner will be the user, so:
                 else {
-                  // Copy the user story and give it the specified parent.
-                  serveCopyReport(userName);
+                  // Serve a report identifying the user as new owner.
+                  serveTakeReport(userName, userName);
                 }
-              },
-              error => err(error, 'getting data on parent of tree copy')
-            );
-          }
-          else {
-            err('Invalid request', 'submitting request-form');
-          }
-        }
-        else {
-          err('Unanticipated request', 'RallyTree');
-        }
+              }
+              // Otherwise, if the requested operation is task creaation:
+              else if (op === 'task') {
+                if (taskNameString.length < 2) {
+                  err('Task names invalid', 'creating tasks');
+                }
+                else {
+                  const delimiter = taskNameString[0];
+                  taskNames.push(...taskNameString.slice(1).split(delimiter));
+                  if (taskNames.every(taskName => taskName.length)) {
+                    serveTaskReport(userName);
+                  }
+                  else {
+                    err('Empty task name', 'creating tasks');
+                  }
+                }
+              }
+              // Otherwise, if the requested operation is test-case creation:
+              else if (op === 'case') {
+                serveCaseReport(userName);
+              }
+              // Otherwise, if the requested operation is tree copying:
+              else if (op === 'copy') {
+                treeCopyParentRef = shorten('hierarchicalrequirement', parentURL);
+                if (! isError) {
+                  // Get data on the parent user story of the copy.
+                  restAPI.get({
+                    ref: treeCopyParentRef,
+                    fetch: ['Tasks']
+                  })
+                  .then(
+                    storyResult => {
+                      // When the data arrive:
+                      const storyObj = storyResult.Object;
+                      const tasksSummary = storyObj.Tasks;
+                      if (tasksSummary.Count) {
+                        err(
+                          'Attempt to copy to a user story with tasks',
+                          'copying tree'
+                        );
+                      }
+                      else {
+                        // Copy the user story and give it the specified parent.
+                        serveCopyReport(userName);
+                      }
+                    },
+                    error => err(error, 'getting data on parent of tree copy')
+                  );
+                }
+              }
+              else {
+                err('Unanticipated request', 'RallyTree');
+              }
+            }
+          },
+          error => err(error, 'getting reference to user')
+        );
       }
     }
   });
