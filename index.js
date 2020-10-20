@@ -851,6 +851,7 @@ const requestHandler = (request, res) => {
                 }
                 // Otherwise, the new owner will be the user, so:
                 else {
+                  takerRef = userRef;
                   // Serve a report identifying the user as new owner.
                   serveTakeReport(userName, userName);
                 }
