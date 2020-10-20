@@ -27,7 +27,7 @@ const requestOptions = {
     'X-RallyIntegrationVendor':
     process.env.RALLYINTEGRATIONVENDOR || '',
     'X-RallyIntegrationVersion':
-    process.env.RALLYINTEGRATIONVERSION || '1.0'
+    process.env.RALLYINTEGRATIONVERSION || '1.0.4'
   }
 };
 let isError = false;
