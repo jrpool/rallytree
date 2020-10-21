@@ -112,6 +112,7 @@ const err = (error, context) => {
 };
 // Shortens a long reference.
 const shorten = (type, longRef) => {
+  console.log(`Shortening ${longRef}`);
   // If it is already a short reference, return it.
   if (/^\/[a-z]+\/\d+$/.test(longRef)) {
     return longRef;
@@ -322,7 +323,7 @@ const createTasks = (storyRef, owner, names) => {
     return Promise.resolve('');
   }
 };
-// Recursively creates tasks for a tree of user stories.
+// Recursively creates tasks for a tree of user stories with retries.
 const taskTree1 = storyRef => {
   if (! isError) {
     const ref = shorten('hierarchicalrequirement', storyRef);
@@ -356,7 +357,7 @@ const taskTree1 = storyRef => {
                   child => child._ref
                 );
                 childRefs.forEach(childRef => {
-                  taskTree(childRef);
+                  taskTree1(childRef);
                 });
               },
               error => err(
@@ -480,7 +481,7 @@ const linkCase = (testCase, storyRef) => {
     );
   }
 };
-// Recursively creates test cases for a tree of user stories.
+// Recursively creates test cases for a tree of user stories with retries.
 const caseTree1 = storyRef => {
   if (! isError) {
     const ref = shorten('hierarchicalrequirement', storyRef);
@@ -516,7 +517,7 @@ const caseTree1 = storyRef => {
                   child => child._ref
                 );
                 childRefs.forEach(childRef => {
-                  caseTree(childRef);
+                  caseTree1(childRef);
                 });
               },
               error => err(
@@ -678,7 +679,7 @@ const copyStory = (ref, copyParentRef, name, description, owner) => {
     }
   );
 };
-// Recursively copies a tree of user stories.
+// Recursively copies a tree of user stories with retries.
 const copyTree1 = (storyRef, copyParentRef) => {
   if (! isError) {
     const ref = shorten('hierarchicalrequirement', storyRef);
@@ -726,7 +727,7 @@ const copyTree1 = (storyRef, copyParentRef) => {
                         child => child._ref
                       );
                       childRefs.forEach(childRef => {
-                        copyTree(childRef, copyRef);
+                        copyTree1(childRef, copyRef);
                       });
                     },
                     error => err(
@@ -746,6 +747,7 @@ const copyTree1 = (storyRef, copyParentRef) => {
 };
 // Recursively copies a tree or subtrees of user stories.
 const copyTree = (storyRefs, copyParentRef) => {
+  console.log(`About to copy trees rooted at ${JSON.stringify(storyRefs, null, 0)}`);
   if (storyRefs.length && ! isError) {
     const firstRef = shorten('hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
@@ -787,6 +789,7 @@ const copyTree = (storyRefs, copyParentRef) => {
               // When the user story has been copied and linked:
               copy => {
                 upTotal();
+                console.log(`Count of children is ${childrenSummary.Count}`);
                 // If the original has any child user stories:
                 if (childrenSummary.Count) {
                   const copyRef = copy.Object._ref;
@@ -803,6 +806,9 @@ const copyTree = (storyRefs, copyParentRef) => {
                     childrenResult => {
                       const childRefs = childrenResult.Object.Results.map(
                         child => child._ref
+                      );
+                      console.log(
+                        `About to call copyTree on ${JSON.stringify(childRefs, null, 2)}`
                       );
                       copyTree(childRefs, copyRef);
                     },
@@ -1079,6 +1085,7 @@ const requestHandler = (request, res) => {
       }
       else if (requestURL === '/copytotals' && idle) {
         streamInit();
+        console.log(`About to call ${tryAgain ? 'copyTree1' : 'copyTree'}`);
         tryAgain
           ? copyTree1(rootRef, treeCopyParentRef)
           : copyTree([rootRef], treeCopyParentRef);
