@@ -112,7 +112,6 @@ const err = (error, context) => {
 };
 // Shortens a long reference.
 const shorten = (type, longRef) => {
-  console.log(`Shortening ${longRef}`);
   // If it is already a short reference, return it.
   if (/^\/[a-z]+\/\d+$/.test(longRef)) {
     return longRef;
@@ -747,7 +746,6 @@ const copyTree1 = (storyRef, copyParentRef) => {
 };
 // Recursively copies a tree or subtrees of user stories.
 const copyTree = (storyRefs, copyParentRef) => {
-  console.log(`About to copy trees rooted at ${JSON.stringify(storyRefs, null, 0)}`);
   if (storyRefs.length && ! isError) {
     const firstRef = shorten('hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
@@ -789,7 +787,6 @@ const copyTree = (storyRefs, copyParentRef) => {
               // When the user story has been copied and linked:
               copy => {
                 upTotal();
-                console.log(`Count of children is ${childrenSummary.Count}`);
                 // If the original has any child user stories:
                 if (childrenSummary.Count) {
                   const copyRef = copy.Object._ref;
@@ -806,9 +803,6 @@ const copyTree = (storyRefs, copyParentRef) => {
                     childrenResult => {
                       const childRefs = childrenResult.Object.Results.map(
                         child => child._ref
-                      );
-                      console.log(
-                        `About to call copyTree on ${JSON.stringify(childRefs, null, 2)}`
                       );
                       copyTree(childRefs, copyRef);
                     },
@@ -1085,7 +1079,6 @@ const requestHandler = (request, res) => {
       }
       else if (requestURL === '/copytotals' && idle) {
         streamInit();
-        console.log(`About to call ${tryAgain ? 'copyTree1' : 'copyTree'}`);
         tryAgain
           ? copyTree1(rootRef, treeCopyParentRef)
           : copyTree([rootRef], treeCopyParentRef);
