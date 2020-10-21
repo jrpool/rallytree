@@ -46,7 +46,7 @@ let {RALLY_USERNAME, RALLY_PASSWORD} = process.env;
 RALLY_USERNAME = RALLY_USERNAME || '';
 RALLY_PASSWORD = RALLY_PASSWORD || '';
 let tryAgain = false;
-const maxTries = 8;
+const maxTries = 20;
 let tries = 0;
 
 // ########## FUNCTIONS
