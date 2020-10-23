@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8">
+    <title>Test-result report | RallyTree</title>
+    <meta name="description" content="Automation of Rally tree management">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+    <script>__script__</script>
+  </head>
+  <body class="ack">
+    <main>
+      <h1>RallyTree test-result report</h1>
+      <section class="flex">
+        <section class="even">
+          <h2>Results</h2>
+          <p>Test cases run: <span id="total" role="status">0</span></p>
+          <p class="more">Passed on last run: <span id="passed" role="status">0</span></p>
+          <p class="more">Failed on last run: <span id="failed" role="status">0</span></p>
+          <div id="error" class="error" role="alert"></div>
+        </section>
+        <section class="odd">
+          <h2>Tree</h2>
+          <p>You asked RallyTree to report test results for the Rally tree rooted at</p>
+          <pre>__rootRef__</pre>
+        </section>
+        <section class="odd">
+          <h2>You</h2>
+          <p>Your Rally user name is</p>
+          <pre>__userName__</pre>
+          <p class="more">Your Rally user reference is</p>
+          <pre>__userRef__</pre>
+        </section>
+      </section>
+      <p><a href="http://localhost:3000">Use RallyTree again.</a></p>
+    </main>
+  </body>
+</html>
