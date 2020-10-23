@@ -40,6 +40,8 @@ let rootRef = '';
 let treeCopyParentRef = '';
 let total = 0;
 let changes = 0;
+let passes = 0;
+let fails = 0;
 let idle = false;
 let reportServed = false;
 let {RALLY_USERNAME, RALLY_PASSWORD} = process.env;
@@ -62,6 +64,8 @@ const reinit = () => {
   treeCopyParentRef = '';
   total = 0;
   changes = 0;
+  passes = 0;
+  fails = 0;
   idle = false;
   reportServed = false;
   tries = 0;
@@ -146,6 +150,111 @@ const upTotals = changeCount => {
     ? `event: changes\ndata: ${changes}\n\n`
     : '';
   response.write(`${totalMsg}${changeMsg}`);
+};
+/*
+  Increments the total count and the change count and sends
+  the counts as events.
+*/
+const upVerdicts = isPass=> {
+  const totalMsg = `event: total\ndata: ${++total}\n\n`;
+  let changeMsg;
+  if (isPass) {
+    passes++;
+    changeMsg = `event: passes\ndata: ${passes}\n\n`;
+  }
+  else {
+    fails++;
+    changeMsg = `event: fails\ndata: ${fails}\n\n`;
+  }
+  response.write(`${totalMsg}${changeMsg}`);
+};
+// Recursively acquires test results from a tree of user stories.
+const verdictTree = storyRef => {
+  // Get data on the user story.
+  restAPI.get({
+    ref: storyRef,
+    fetch: ['Children', 'TestCases']
+  })
+  .then(
+    storyResult => {
+      // When the data arrive:
+      const storyObj = storyResult.Object;
+      const caseSummary = storyObj.TestCases;
+      const caseCount = caseSummary.Count;
+      const childrenSummary = storyObj.Children;
+      const childCount = childrenSummary.Count;
+      // If the user story has any test cases and no child user stories:
+      if (caseCount && ! childCount) {
+        // Get the data on the test cases.
+        restAPI.get({
+          ref: caseSummary._ref,
+          fetch: ['_ref', 'LastVerdict']
+        })
+        .then(
+          // When the data arrive:
+          casesObj => {
+            const cases = casesObj.Object.Results;
+            // Process the test cases in parallel.
+            cases.forEach(caseObj => {
+              const verdict = caseObj.LastVerdict;
+              if (verdict === 'Pass'){
+                upVerdicts(true);
+              }
+              else if (verdict === 'Fail') {
+                upVerdicts(false);
+              }
+            });
+          },
+          error => err(error, 'getting data on test cases')
+        );
+      }
+      /*
+        Otherwise, if the user story has any child user stories and
+        no test cases:
+      */
+      else if (childCount && ! caseCount) {
+        // Get data on its child user stories.
+        restAPI.get({
+          ref: childrenSummary._ref,
+          fetch: ['_ref']
+        })
+        .then(
+          // When the data arrive, process the children in parallel.
+          childrenObj => {
+            const children = childrenObj.Object.Results;
+            children.forEach(child => {
+              if (! isError) {
+                const childRef = shorten(
+                  'hierarchicalrequirement', child._ref
+                );
+                if (! isError) {
+                  verdictTree(childRef);
+                }
+              }
+            });
+          },
+          error => err(
+            error,
+            'getting data on child user stories for test-result acquisition'
+          )
+        );
+      }
+      /*
+        Otherwise, if the user story has both child user stories
+        and test cases:
+      */
+      else if (childCount && caseCount) {
+        // Stop and report this as a precondition violation.
+        err(
+          'User story with both children and test cases',
+          'test-result acquisition'
+        );
+      }
+    },
+    error => err(
+      error, 'getting data on user story for test-result acquisition'
+    )
+  );
 };
 // Change the ownership of a task.
 const takeTask = taskObj => {
@@ -859,15 +968,46 @@ const serveIntro = () => {
 const serveDo = () => {
   fs.readFile('do.html', 'utf8')
   .then(
-    content => {
-      const newContent = content
-      .replace('__userName__', RALLY_USERNAME)
-      .replace('__password__', RALLY_PASSWORD);
-      response.setHeader('Content-Type', 'text/html');
-      response.write(newContent);
-      response.end();
+    htmlContent => {
+      fs.readFile('do.js', 'utf8')
+      .then(
+        jsContent => {
+          const newContent = htmlContent
+          .replace('__script__', jsContent)
+          .replace('__userName__', RALLY_USERNAME)
+          .replace('__password__', RALLY_PASSWORD);
+          response.setHeader('Content-Type', 'text/html');
+          response.write(newContent);
+          response.end();
+        },
+        error => err(error, 'reading do script')
+      );
     },
     error => err(error, 'reading do page')
+  );
+};
+// Serves the change-owner report page.
+const serveVerdictReport = userName => {
+  fs.readFile('verdictReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('verdictReport.js', 'utf8')
+      .then(
+        jsContent => {
+          const newContent = htmlContent
+          .replace('__script__', jsContent)
+          .replace('__rootRef__', rootRef)
+          .replace('__userName__', userName)
+          .replace('__userRef__', userRef);
+          response.setHeader('Content-Type', 'text/html');
+          response.write(newContent);
+          response.end();
+          reportServed = true;
+        },
+        error => err(error, 'reading verdictReport script')
+      );
+    },
+    error => err(error, 'reading verdictReport page')
   );
 };
 // Serves the change-owner report page.
@@ -1065,6 +1205,10 @@ const requestHandler = (request, res) => {
         Otherwise, if the requested resource is an event stream, start it
         and prevent any others from being started.
       */
+      else if (requestURL === '/verdicttotals' && idle) {
+        streamInit();
+        verdictTree(rootRef);
+      }
       else if (requestURL === '/taketotals' && idle) {
         streamInit();
         takeTree(rootRef);
@@ -1117,8 +1261,13 @@ const requestHandler = (request, res) => {
           ref => {
             if (! isError) {
               userRef = ref;
+              // If the requested operation is test-result acquisition:
+              if (op === 'verdict') {
+                // Serve a report of the test results.
+                serveVerdictReport(userName);
+              }
               // If the requested operation is ownership change:
-              if (op === 'take') {
+              else if (op === 'take') {
                 // If an owner other than the user was specified:
                 if (takerName) {
                   // Serve a report identifying the new owner.
