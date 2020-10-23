@@ -6,6 +6,7 @@
     <meta name="description" content="Automation of Rally tree management">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="style.css">
+    <script>__script__</script>
   </head>
   <body class="home">
     <main>
@@ -37,11 +38,11 @@
             <fieldset>
               <legend>Choose an operation</legend>
               <p><label>
-                <input type="radio" name="op" value="verdict">
+                <input id="op-verdict" type="radio" name="op" value="verdict" checked>
                 <span class="label">Get test results</span>
               </label></p>
               <p><label>
-                <input type="radio" name="op" value="take" checked>
+                <input id="op-take" type="radio" name="op" value="take">
                 <span class="label">
                   Change the owner to you, or else to
                 </span><br>
@@ -57,7 +58,7 @@
                 </span>
               </label></p>
               <p><label>
-                <input type="radio" name="op" value="task">
+                <input id="op-task" type="radio" name="op" value="task">
                 <span class="label">Add tasks, with names</span><br>
                 <input
                   id="taskNameString"
@@ -70,11 +71,11 @@
                 </span>
               </label></p>
               <p><label>
-                <input type="radio" name="op" value="case">
+                <input id = "op-case" type="radio" name="op" value="case">
                 <span class="label">Add test cases</span>
               </label></p>
               <p><label>
-                <input type="radio" name="op" value="copy">
+                <input id="op-copy" type="radio" name="op" value="copy">
                 <span class="label">Copy to</span><br>
                 <input
                   id="parentURL"
@@ -119,7 +120,7 @@
               </label>
             </p>
           </section>
-          <section class="even">
+          <section id="mode" class="even covert">
             <h2>Concurrency mode</h2>
             <fieldset>
               <legend>

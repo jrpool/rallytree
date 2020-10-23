@@ -197,10 +197,10 @@ const verdictTree = storyRef => {
             // Process the test cases in parallel.
             cases.forEach(caseObj => {
               const verdict = caseObj.LastVerdict;
-              if (verdict === 'pass'){
+              if (verdict === 'Pass'){
                 upVerdicts(true);
               }
-              else if (verdict === 'fail') {
+              else if (verdict === 'Fail') {
                 upVerdicts(false);
               }
             });
@@ -968,13 +968,20 @@ const serveIntro = () => {
 const serveDo = () => {
   fs.readFile('do.html', 'utf8')
   .then(
-    content => {
-      const newContent = content
-      .replace('__userName__', RALLY_USERNAME)
-      .replace('__password__', RALLY_PASSWORD);
-      response.setHeader('Content-Type', 'text/html');
-      response.write(newContent);
-      response.end();
+    htmlContent => {
+      fs.readFile('do.js', 'utf8')
+      .then(
+        jsContent => {
+          const newContent = htmlContent
+          .replace('__script__', jsContent)
+          .replace('__userName__', RALLY_USERNAME)
+          .replace('__password__', RALLY_PASSWORD);
+          response.setHeader('Content-Type', 'text/html');
+          response.write(newContent);
+          response.end();
+        },
+        error => err(error, 'reading do script')
+      );
     },
     error => err(error, 'reading do page')
   );

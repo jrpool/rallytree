@@ -34,6 +34,10 @@ button:hover {
   background-color: #fff;
 }
 
+.covert {
+  display: none;
+}
+
 .error {
   font-size: x-large;
   font-weight: 700;
@@ -78,6 +82,10 @@ label:hover .label {
 
 .more{
   margin-top: 0.25rem;
+}
+
+.overt {
+  display: block;
 }
 
 p {
