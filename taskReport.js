@@ -1,5 +1,5 @@
 /*
-  taskreport.js
+  taskReport.js
   Server-side event client script.
 
   This script makes the web page subscribe to server-side events

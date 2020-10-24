@@ -1,10 +1,14 @@
 # rallytree
 Automation of Rally work-item tree management.
+
 # Introduction
 RallyTree automates some operations on trees of work items in [Rally](https://www.broadcom.com/products/software/agile-development/rally-software). 
 
 # Features
 RallyTree can perform these operations on a tree:
+
+## Test-result acquisition
+This feature reports a tally of the last verdicts of the test cases in a tree.
 
 ## Owner change
 This feature ensures that each user story and each task in a tree has the desired owner. You can choose whether to become the new owner or instead to specify another user as the new owner.
@@ -68,13 +72,15 @@ But [Broadcom acknowledges](https://knowledge.broadcom.com/external/article?arti
 
 ## Adaptation
 
-Because of these limitations, RallyTree performs operations in parallel when it can, but makes operations sequential when necessary in order to avoid concurrency conflicts. Specifically:
+RallyTree adapts to these limitations in two ways:
 
-- In `takeTree()`, completion of the ownership change of a user story is awaited before any child user story’s or task’s ownership is changed. But the ownership changes of all of the child user stories or tasks of any user story are performed in parallel.
-- In the other three functions, the child user stories of any user story are processed sequentially.
-- In `taskTree()`, if you have more than 1 task added to each user story, they are added sequentially.
+- &ldquo;Await&rdquo;: Perform operations in parallel when possible, but make operations sequential when necessary.
+- &ldquo;Try&rdquo;: Perform all operations in parallel when logically possible. Respond to Rally errors by trying operations again, up to 20 times. (This maximum has been set empirically in testing.)
 
-The sequential performance of operations makes RallyTree slower than it would be if Rally guaranteed transactional integrity. Speed increases may be possible by means of techniques suggested by Broadcom in its above-cited knowledge-base article.
+Testing indicates that the &ldquo;Try&rdquo; method is faster than the &ldquo;Await&rdquo; method, but, if Rally&rsquo;s server cluster is experiencing a heavy load of requests, is more vulnerable to failure. However, concurrency errors have not occurred in the first two operations (test-result acquisition and ownership change), so they are performed without either accommodation.
+
+In the above-cited knowledge-base article, Broadcom also suggests a technique that restricts all requests to a single host in its server cluster. RallyTree does not yet have a branch that implements that technique.
+
 
 # Installation and usage
 To install and use RallyTree:
