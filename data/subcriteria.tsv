@@ -1,0 +1,29 @@
+Name	Principle	Guideline	SC	Subcriterion	Major
+Active Images	1	1	1	a	TRUE
+Informative Images	1	1	1	b	TRUE
+Complex Images	1	1	1	c	TRUE
+Decorative Images	1	1	1	d	TRUE
+CSS Images	1	1	1	e	TRUE
+Input Type Images	1	1	1	f	TRUE
+Captcha Images	1	1	1	g	TRUE
+Video/Audio Purpose	1	1	1	h	TRUE
+Semantics	1	3	1	a	TRUE
+Data Tables	1	3	1	b	TRUE
+Programmatic Labels	1	3	1	c	TRUE
+Group Related Form Elements	1	3	1	d	TRUE
+Headings	1	3	1	e	TRUE
+Lists	1	3	1	f	TRUE
+Reflow	1	4	10	a	TRUE
+Non-text Contrast - Active User Interface Components	1	4	11	a	FALSE
+Non-text Contrast - States of User Interface Components	1	4	11	b	FALSE
+Non-Text Contrast - Graphical Objects	1	4	11	c	FALSE
+Text Spacing	1	4	12	a	TRUE
+Content on Hover or Focus	1	4	13	a	TRUE
+Keyboard Navigation	2	1	1	a	TRUE
+Keyboard - Shortcut Keys	2	1	1	b	TRUE
+Custom Gestures -	2	1	1	c	TRUE
+Visible Labels	3	3	2	a	TRUE
+Missing Instructions	3	3	2	b	TRUE
+Required Form Fields	3	3	2	c	TRUE
+"Name, Role, Value"	4	1	2	a	TRUE
+Custom Controls	4	1	2	b	TRUE
