@@ -42,6 +42,7 @@ let total = 0;
 let changes = 0;
 let passes = 0;
 let fails = 0;
+let defects = 0;
 let idle = false;
 let reportServed = false;
 let {RALLY_USERNAME, RALLY_PASSWORD} = process.env;
@@ -66,6 +67,7 @@ const reinit = () => {
   changes = 0;
   passes = 0;
   fails = 0;
+  defects = 0;
   idle = false;
   reportServed = false;
   tries = 0;
@@ -152,8 +154,8 @@ const upTotals = changeCount => {
   response.write(`${totalMsg}${changeMsg}`);
 };
 /*
-  Increments the total count and the change count and sends
-  the counts as events.
+  Increments the total count and the applicable verdict count
+  and sends the counts as events.
 */
 const upVerdicts = isPass=> {
   const totalMsg = `event: total\ndata: ${++total}\n\n`;
@@ -168,12 +170,17 @@ const upVerdicts = isPass=> {
   }
   response.write(`${totalMsg}${changeMsg}`);
 };
+// Increments the defect count.
+const upDefects = count => {
+  defects += count;
+  response.write(`event: defects\ndata: ${defects}\n\n`);
+};
 // Recursively acquires test results from a tree of user stories.
 const verdictTree = storyRef => {
   // Get data on the user story.
   restAPI.get({
     ref: storyRef,
-    fetch: ['Children', 'TestCases']
+    fetch: ['Children', 'TestCases', 'Defects']
   })
   .then(
     storyResult => {
@@ -181,6 +188,8 @@ const verdictTree = storyRef => {
       const storyObj = storyResult.Object;
       const caseSummary = storyObj.TestCases;
       const caseCount = caseSummary.Count;
+      const defectSummary = storyObj.Defects;
+      const defectCount = defectSummary.Count;
       const childrenSummary = storyObj.Children;
       const childCount = childrenSummary.Count;
       // If the user story has any test cases and no child user stories:
@@ -207,10 +216,17 @@ const verdictTree = storyRef => {
           },
           error => err(error, 'getting data on test cases')
         );
+        /*
+          In parallel, increment the reported defect count with
+          the count of defects of the user story. Counting the
+          defects of the test cases of the user story would be
+          equivalent.
+        */
+        upDefects(defectCount);
       }
       /*
         Otherwise, if the user story has any child user stories and
-        no test cases:
+        no test cases (and therefore also no defects):
       */
       else if (childCount && ! caseCount) {
         // Get data on its child user stories.

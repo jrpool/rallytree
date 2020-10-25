@@ -29,6 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
   eventSource.addEventListener('fails', event => {
     messageHandler(event, 'failed');
   });
+  eventSource.addEventListener('defects', event => {
+    messageHandler(event, 'defects');
+  });
   eventSource.addEventListener('error', event => {
     messageHandler(event, 'error');
   });

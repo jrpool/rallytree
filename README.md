@@ -8,7 +8,7 @@ RallyTree automates some operations on trees of work items in [Rally](https://ww
 RallyTree can perform these operations on a tree:
 
 ## Test-result acquisition
-This feature reports a tally of the last verdicts of the test cases in a tree.
+This feature reports a tally of the last test-case verdicts and defects in a tree.
 
 ## Owner change
 This feature ensures that each user story and each task in a tree has the desired owner. You can choose whether to become the new owner or instead to specify another user as the new owner.
