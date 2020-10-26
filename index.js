@@ -40,6 +40,8 @@ let rootRef = '';
 let treeCopyParentRef = '';
 let total = 0;
 let changes = 0;
+let doc = [];
+let docTime = Date.now();
 let passes = 0;
 let fails = 0;
 let defects = 0;
@@ -51,6 +53,7 @@ RALLY_PASSWORD = RALLY_PASSWORD || '';
 let tryAgain = false;
 const maxTries = 20;
 let tries = 0;
+const docWait = 1500;
 
 // ########## FUNCTIONS
 
@@ -65,6 +68,8 @@ const reinit = () => {
   treeCopyParentRef = '';
   total = 0;
   changes = 0;
+  doc = [];
+  docTime = Date.now();
   passes = 0;
   fails = 0;
   defects = 0;
@@ -137,6 +142,13 @@ const shorten = (type, longRef) => {
     }
   }
 };
+// Sends the tree documentation as an event.
+const outDoc = () => {
+  if (docTime + docWait < Date.now()) {
+    response.write(`event: doc\ndata: ${JSON.stringify(doc, null, 2)}\n\n`);
+  }
+  docTime = Date.now();
+};
 // Increments the total count and sends the new count as an event.
 const upTotal = () => {
   response.write(`event: total\ndata: ${++total}\n\n`);
@@ -174,6 +186,63 @@ const upVerdicts = isPass=> {
 const upDefects = count => {
   defects += count;
   response.write(`event: defects\ndata: ${defects}\n\n`);
+};
+// Recursively documents a tree of user stories.
+const docTree = (storyRef, currentArray) => {
+  // Get data on the user story.
+  restAPI.get({
+    ref: storyRef,
+    fetch: ['Name', 'Children']
+  })
+  .then(
+    storyResult => {
+      // When the data arrive:
+      const storyObj = storyResult.Object;
+      const name = storyObj.Name;
+      const childrenSummary = storyObj.Children;
+      const childCount = childrenSummary.Count;
+      // If the user story has any child user stories:
+      if (childCount) {
+        // Get data on its child user stories.
+        restAPI.get({
+          ref: childrenSummary._ref,
+          fetch: ['_ref']
+        })
+        .then(
+          // When the data arrive, document the user story and its children.
+          childrenObj => {
+            const children = childrenObj.Object.Results;
+            const newLength = currentArray.push({
+              name,
+              children: []
+            });
+            const newArray = currentArray[newLength - 1].children;
+            children.forEach(child => {
+              if (! isError) {
+                const childRef = shorten('hierarchicalrequirement', child._ref);
+                storyRef(childRef, newArray);
+              }
+            });
+          },
+          error => err(
+            error,
+            'getting data on child user stories for tree documentation'
+          )
+        );
+      }
+      // Otherwise, i.e. if the user story has no child user stories:
+      else {
+        // Document the user story.
+        currentArray.push({
+          name
+        });
+        outDoc();
+      }
+    },
+    error => err(
+      error, 'getting data on user story for tree documentation'
+    )
+  );
 };
 // Recursively acquires test results from a tree of user stories.
 const verdictTree = storyRef => {
@@ -1003,6 +1072,30 @@ const serveDo = () => {
   );
 };
 // Serves the change-owner report page.
+const serveDocReport = userName => {
+  fs.readFile('docReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('docReport.js', 'utf8')
+      .then(
+        jsContent => {
+          const newContent = htmlContent
+          .replace('__script__', jsContent)
+          .replace('__rootRef__', rootRef)
+          .replace('__userName__', userName)
+          .replace('__userRef__', userRef);
+          response.setHeader('Content-Type', 'text/html');
+          response.write(newContent);
+          response.end();
+          reportServed = true;
+        },
+        error => err(error, 'reading docReport script')
+      );
+    },
+    error => err(error, 'reading docReport page')
+  );
+};
+// Serves the change-owner report page.
 const serveVerdictReport = userName => {
   fs.readFile('verdictReport.html', 'utf8')
   .then(
@@ -1172,7 +1265,7 @@ const serveEventStart = () => {
   response.setHeader('Cache-Control', 'no-cache');
   response.setHeader('Connection', 'keep-alive');
 };
-// Reinitialize the event-stream variables and start an event stream.
+// Reinitializes the event-stream variables and starts an event stream.
 const streamInit = () => {
   idle = false;
   total = changes = 0;
@@ -1221,6 +1314,10 @@ const requestHandler = (request, res) => {
         Otherwise, if the requested resource is an event stream, start it
         and prevent any others from being started.
       */
+      else if (requestURL === '/doc' && idle) {
+        streamInit();
+        docTree(rootRef, doc);
+      }
       else if (requestURL === '/verdicttotals' && idle) {
         streamInit();
         verdictTree(rootRef);
@@ -1277,12 +1374,17 @@ const requestHandler = (request, res) => {
           ref => {
             if (! isError) {
               userRef = ref;
+              // If the requested operation is tree documentation:
+              if (op === 'doc') {
+                // Serve a report of the tree documentation.
+                serveDocReport(userName);
+              }
               // If the requested operation is test-result acquisition:
-              if (op === 'verdict') {
+              olso if (op === 'verdict') {
                 // Serve a report of the test results.
                 serveVerdictReport(userName);
               }
-              // If the requested operation is ownership change:
+              // Otherwise, if the requested operation is ownership change:
               else if (op === 'take') {
                 // If an owner other than the user was specified:
                 if (takerName) {
