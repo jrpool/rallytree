@@ -7,6 +7,9 @@ RallyTree automates some operations on trees of work items in [Rally](https://ww
 # Features
 RallyTree can perform these operations on a tree:
 
+## Documentation
+This feature produces a JSON representation of a tree of user stories.
+
 ## Test-result acquisition
 This feature reports a tally of the last test-case verdicts and defects in a tree.
 
@@ -77,7 +80,7 @@ RallyTree adapts to these limitations in two ways:
 - &ldquo;Await&rdquo;: Perform operations in parallel when possible, but make operations sequential when necessary.
 - &ldquo;Try&rdquo;: Perform all operations in parallel when logically possible. Respond to Rally errors by trying operations again, up to 20 times. (This maximum has been set empirically in testing.)
 
-Testing indicates that the &ldquo;Try&rdquo; method is faster than the &ldquo;Await&rdquo; method, but, if Rally&rsquo;s server cluster is experiencing a heavy load of requests, is more vulnerable to failure. However, concurrency errors have not occurred in the first two operations (test-result acquisition and ownership change), so they are performed without either accommodation.
+Testing indicates that the &ldquo;Try&rdquo; method is faster than the &ldquo;Await&rdquo; method, but, if Rally&rsquo;s server cluster is experiencing a heavy load of requests, is more vulnerable to failure. However, concurrency errors have not occurred in the first three operations (documentation, test-result acquisition, and ownership change), so they are performed without either accommodation.
 
 In the above-cited knowledge-base article, Broadcom also suggests a technique that restricts all requests to a single host in its server cluster. RallyTree does not yet have a branch that implements that technique.
 
