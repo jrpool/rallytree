@@ -41,7 +41,7 @@ let treeCopyParentRef = '';
 let total = 0;
 let changes = 0;
 let doc = [];
-let docTime = Date.now();
+let docTimeout = 0;
 let passes = 0;
 let fails = 0;
 let defects = 0;
@@ -69,7 +69,7 @@ const reinit = () => {
   total = 0;
   changes = 0;
   doc = [];
-  docTime = Date.now();
+  docTimeout = 0;
   passes = 0;
   fails = 0;
   defects = 0;
@@ -144,10 +144,18 @@ const shorten = (type, longRef) => {
 };
 // Sends the tree documentation as an event.
 const outDoc = () => {
-  if (docTime + docWait < Date.now()) {
-    response.write(`event: doc\ndata: ${JSON.stringify(doc, null, 2)}\n\n`);
+  if (docTimeout) {
+    clearTimeout(docTimeout);
   }
-  docTime = Date.now();
+  docTimeout = setTimeout(
+    () => {
+      const docJSON = JSON.stringify(doc[0], null, 2).replace(
+        /\n/g, '<br>'
+      );
+      response.write(`event: doc\ndata: ${docJSON}\n\n`);
+    },
+    docWait
+  );
 };
 // Increments the total count and sends the new count as an event.
 const upTotal = () => {
@@ -187,12 +195,14 @@ const upDefects = count => {
   defects += count;
   response.write(`event: defects\ndata: ${defects}\n\n`);
 };
+// Gets the numeric rank of a rankable artifact.
+const rankOf = artifact => artifact.DragAndDropRank;
 // Recursively documents a tree of user stories.
-const docTree = (storyRef, currentArray) => {
+const docTree = (storyRef, currentArray, index) => {
   // Get data on the user story.
   restAPI.get({
     ref: storyRef,
-    fetch: ['Name', 'Children']
+    fetch: ['Name', 'DragAndDropRank', 'Children']
   })
   .then(
     storyResult => {
@@ -203,26 +213,39 @@ const docTree = (storyRef, currentArray) => {
       const childCount = childrenSummary.Count;
       // If the user story has any child user stories:
       if (childCount) {
+        /*
+          Document the user story and initialize documentations
+          of its children.
+        */
+        currentArray[index] = {
+          name,
+          children: []
+        };
         // Get data on its child user stories.
         restAPI.get({
           ref: childrenSummary._ref,
-          fetch: ['_ref']
+          fetch: ['_ref', 'DragAndDropRank']
         })
         .then(
-          // When the data arrive, document the user story and its children.
+          // When the data arrive, document the children.
           childrenObj => {
-            const children = childrenObj.Object.Results;
-            const newLength = currentArray.push({
-              name,
-              children: []
+            const children = Array.from(childrenObj.Object.Results);
+            // Sort the children by rank, smaller numbers first.
+            children.sort((a, b) => {
+              const aRank = rankOf(a);
+              const bRank = rankOf(b);
+              const sorter = aRank < bRank ? -1 : 1;
+              return sorter;
             });
-            const newArray = currentArray[newLength - 1].children;
-            children.forEach(child => {
+            const childArray = currentArray[index].children;
+            for (let i = 0; i < children.length; i++) {
               if (! isError) {
-                const childRef = shorten('hierarchicalrequirement', child._ref);
-                storyRef(childRef, newArray);
+                const childRef = shorten('hierarchicalrequirement', children[i]._ref);
+                if (! isError) {
+                  docTree(childRef, childArray, i);
+                }
               }
-            });
+            }
           },
           error => err(
             error,
@@ -233,9 +256,9 @@ const docTree = (storyRef, currentArray) => {
       // Otherwise, i.e. if the user story has no child user stories:
       else {
         // Document the user story.
-        currentArray.push({
+        currentArray[index] = {
           name
-        });
+        };
         outDoc();
       }
     },
@@ -1316,7 +1339,7 @@ const requestHandler = (request, res) => {
       */
       else if (requestURL === '/doc' && idle) {
         streamInit();
-        docTree(rootRef, doc);
+        docTree(rootRef, doc, 0);
       }
       else if (requestURL === '/verdicttotals' && idle) {
         streamInit();
@@ -1380,7 +1403,7 @@ const requestHandler = (request, res) => {
                 serveDocReport(userName);
               }
               // If the requested operation is test-result acquisition:
-              olso if (op === 'verdict') {
+              else if (op === 'verdict') {
                 // Serve a report of the test results.
                 serveVerdictReport(userName);
               }

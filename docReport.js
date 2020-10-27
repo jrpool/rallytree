@@ -12,13 +12,15 @@ let lastEventTime;
 const messageHandler = (event, type) => {
   const data = event.data;
   if (data) {
-    document.getElementById(type).textContent = event.data;
+    document.getElementById(type).textContent = event.data.replace(
+      /<br>/g, '\n'
+    );
     lastEventTime = Date.now();
   }
 };
 document.addEventListener('DOMContentLoaded', () => {
   // Request an event stream.
-  eventSource = new EventSource('/verdicttotals');
+  eventSource = new EventSource('/doc');
   // Listen for message events.
   eventSource.addEventListener('doc', event => {
     messageHandler(event, 'doc');
