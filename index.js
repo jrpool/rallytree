@@ -80,13 +80,9 @@ const reinit = () => {
 // Processes a thrown error.
 const err = (error, context) => {
   let problem;
-  // If error is application-defined, remove newlines.
-  if (typeof error === 'string') {
-    problem = error.replace(/\n/g, ' ');
-  }
-  // Otherwise, if system-defined:
-  else {
-    // If HTML-formatted, reduce it to a string.
+  // If error is system-defined, convert newlines.
+  if (typeof error !== 'string') {
+    // Reduce it to a string.
     problem = error.message.replace(
       /^.+<title>|^.+<Errors>|<\/title>.+$|<\/Errors>.+$/gs, ''
     );
@@ -94,10 +90,13 @@ const err = (error, context) => {
   const msg = `Error ${context}: ${problem}`;
   console.log(msg);
   isError = true;
+  const pageMsg = msg.replace(/\n/g, '<br>');
   // If a report page has been served:
   if (reportServed) {
     // Insert the error message there.
-    response.write(`event: error\ndata: ${msg}\n\n`);
+    response.write(
+      `event: error\ndata: ${pageMsg}\n\n`
+    );
     response.end();
   }
   // Otherwise:
@@ -107,7 +106,7 @@ const err = (error, context) => {
     .then(
       content => {
         const newContent = content.replace(
-          '__errorMessage__', msg
+          '__errorMessage__', pageMsg
         );
         response.setHeader('Content-Type', 'text/html');
         response.write(newContent);
@@ -122,20 +121,25 @@ const err = (error, context) => {
   }
 };
 // Shortens a long reference.
-const shorten = (type, longRef) => {
+const shorten = (readType, writeType, longRef) => {
   // If it is already a short reference, return it.
-  if (/^\/[a-z]+\/\d+$/.test(longRef)) {
+  const shortTest = new RegExp(`^/${writeType}/\\d+$`);
+  if (shortTest.test(longRef)) {
     return longRef;
   }
   else {
     // If not, return its short version.
-    const num = longRef.replace(/^http.+([/]|%2F)(?=\d+)/, '');
-    if (/^\d+$/.test(num)) {
-      return `/${type}/${num}`;
+    const longReadPrefix = new RegExp(`^http.+(/|%2F)${readType}(/|%2F)(?=\\d+)`);
+    const longWritePrefix = new RegExp(`^http.+(/|%2F)${writeType}(/|%2F)(?=\\d+)`);
+    const num
+      = Number.parseInt(longRef.replace(longReadPrefix, ''))
+      || Number.parseInt(longRef.replace(longWritePrefix, ''));
+    if (num) {
+      return `/${writeType}/${num}`;
     }
     else {
       err(
-        `Invalid Rally URL:\nlong ${longRef}\nshort /${type}/${num}`,
+        `Invalid Rally URL:\nlong ${longRef}\nshort /${writeType}/${num}`,
         'shortening URL'
       );
       return '';
@@ -240,7 +244,11 @@ const docTree = (storyRef, currentArray, index) => {
             const childArray = currentArray[index].children;
             for (let i = 0; i < children.length; i++) {
               if (! isError) {
-                const childRef = shorten('hierarchicalrequirement', children[i]._ref);
+                const childRef = shorten(
+                  'hierarchicalrequirement',
+                  'hierarchicalrequirement',
+                  children[i]._ref
+                );
                 if (! isError) {
                   docTree(childRef, childArray, i);
                 }
@@ -333,7 +341,9 @@ const verdictTree = storyRef => {
             children.forEach(child => {
               if (! isError) {
                 const childRef = shorten(
-                  'hierarchicalrequirement', child._ref
+                  'hierarchicalrequirement',
+                  'hierarchicalrequirement',
+                  child._ref
                 );
                 if (! isError) {
                   verdictTree(childRef);
@@ -370,7 +380,7 @@ const takeTask = taskObj => {
     const taskRef = shorten('task', taskObj._ref);
     if (! isError) {
       const taskOwner = taskObj.Owner;
-      const ownerRef = taskOwner ? shorten('user', taskOwner._ref) : '';
+      const ownerRef = taskOwner ? shorten('user', 'user', taskOwner._ref) : '';
       if (! isError) {
         if (ownerRef !== takerRef) {
           restAPI.update({
@@ -403,7 +413,7 @@ const takeTree = storyRef => {
       // When the data arrive:
       const storyObj = storyResult.Object;
       const owner = storyObj.Owner;
-      const ownerRef = owner ? shorten('user', storyObj.Owner._ref) : '';
+      const ownerRef = owner ? shorten('user', 'user', storyObj.Owner._ref) : '';
       const tasksSummary = storyObj.Tasks;
       const taskCount = tasksSummary.Count;
       const childrenSummary = storyObj.Children;
@@ -457,7 +467,9 @@ const takeTree = storyRef => {
                 children.forEach(child => {
                   if (! isError) {
                     const childRef = shorten(
-                      'hierarchicalrequirement', child._ref
+                      'hierarchicalrequirement',
+                      'hierarchicalrequirement',
+                      child._ref
                     );
                     if (! isError) {
                       takeTree(childRef);
@@ -542,7 +554,7 @@ const createTasks = (storyRef, owner, names) => {
 // Recursively creates tasks for a tree of user stories with retries.
 const taskTree1 = storyRef => {
   if (! isError) {
-    const ref = shorten('hierarchicalrequirement', storyRef);
+    const ref = shorten('userstory', 'hierarchicalrequirement', storyRef);
     if (! isError) {
       // Get data on the user story.
       restAPI.get({
@@ -603,10 +615,10 @@ const taskTree1 = storyRef => {
 // Recursively creates tasks for a tree or subtrees of user stories.
 const taskTree = storyRefs => {
   if (storyRefs.length && ! isError) {
-    const firstRef = shorten('hierarchicalrequirement', storyRefs[0]);
+    const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
       // Get data on the first user story of the specified array.
-      restAPI.get({
+      return restAPI.get({
         ref: firstRef,
         fetch: ['Owner', 'Children']
       })
@@ -623,7 +635,7 @@ const taskTree = storyRefs => {
           if (childrenSummary.Count) {
             upTotals(0);
             // Get data on its child user stories.
-            restAPI.get({
+            return restAPI.get({
               ref: childrenSummary._ref,
               fetch: ['_ref']
             })
@@ -636,7 +648,17 @@ const taskTree = storyRefs => {
                 const childRefs = childrenResult.Object.Results.map(
                   child => child._ref
                 );
-                taskTree(childRefs);
+                return taskTree(childRefs)
+                .then(
+                  () => {
+                    /*
+                      Process the rest of the specified user stories
+                      sequentially to prevent concurrency errors.
+                    */
+                    return taskTree(storyRefs.slice(1));
+                  },
+                  error => err(error, 'creating tasks for child user stories')
+                );
               },
               error => err(
                 error,
@@ -647,7 +669,7 @@ const taskTree = storyRefs => {
           // Otherwise the user story needs tasks, so:
           else {
             // Create them sequentially to prevent concurrency errors.
-            createTasks(firstRef, owner, taskNames)
+            return createTasks(firstRef, owner, taskNames)
             // When they have been created:
             .then(
               () => {
@@ -657,7 +679,7 @@ const taskTree = storyRefs => {
                     Process the rest of the specified user stories
                     sequentially to prevent concurrency errors.
                   */
-                  taskTree(storyRefs.slice(1));
+                  return taskTree(storyRefs.slice(1));
                 }
               },
               error => err(error, 'creating tasks')
@@ -670,10 +692,13 @@ const taskTree = storyRefs => {
       );
     }
   }
+  else {
+    return Promise.resolve('');
+  }
 };
 // Repetitively tries to link a test case to a user story.
 const linkCase = (testCase, storyRef) => {
-  const caseRef = shorten('testcase', testCase.Object._ref);
+  const caseRef = shorten('testcase', 'testcase', testCase.Object._ref);
   if (! isError) {
     restAPI.add({
       ref: storyRef,
@@ -700,7 +725,7 @@ const linkCase = (testCase, storyRef) => {
 // Recursively creates test cases for a tree of user stories with retries.
 const caseTree1 = storyRef => {
   if (! isError) {
-    const ref = shorten('hierarchicalrequirement', storyRef);
+    const ref = shorten('userstory', 'hierarchicalrequirement', storyRef);
     if (! isError) {
       // Get data on the user story.
       restAPI.get({
@@ -774,10 +799,10 @@ const caseTree1 = storyRef => {
 // Recursively creates test cases for a tree or subtrees of user stories.
 const caseTree = storyRefs => {
   if (storyRefs.length && ! isError) {
-    const firstRef = shorten('hierarchicalrequirement', storyRefs[0]);
+    const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
       // Get data on the first user story of the specified array.
-      restAPI.get({
+      return restAPI.get({
         ref: firstRef,
         fetch: ['Name', 'Description', 'Owner', 'Children']
       })
@@ -796,7 +821,7 @@ const caseTree = storyRefs => {
           if (childrenSummary.Count) {
             upTotals(0);
             // Get data on its child user stories.
-            restAPI.get({
+            return restAPI.get({
               ref: childrenSummary._ref,
               fetch: ['_ref']
             })
@@ -809,7 +834,11 @@ const caseTree = storyRefs => {
                 const childRefs = childrenResult.Object.Results.map(
                   child => child._ref
                 );
-                caseTree(childRefs);
+                return caseTree(childRefs)
+                .then(
+                  () => caseTree(storyRefs.slice(1)),
+                  error => err(error, 'creating test cases for child user stories')
+                );
               },
               error => err(
                 error,
@@ -820,7 +849,7 @@ const caseTree = storyRefs => {
           // Otherwise the user story needs a test case, so:
           else {
             // Create a test case.
-            restAPI.create({
+            return restAPI.create({
               type: 'testcase',
               fetch: ['_ref'],
               data: {
@@ -833,9 +862,9 @@ const caseTree = storyRefs => {
               // After it is created:
               newCase => {
                 // Link it to the user story.
-                const caseRef = shorten('testcase', newCase.Object._ref);
+                const caseRef = shorten('testcase', 'testcase', newCase.Object._ref);
                 if (! isError) {
-                  restAPI.add({
+                  return restAPI.add({
                     ref: firstRef,
                     collection: 'TestCases',
                     data: [{_ref: caseRef}],
@@ -849,7 +878,7 @@ const caseTree = storyRefs => {
                         Process the rest of the specified user stories
                         sequentially to prevent concurrency errors.
                       */
-                      caseTree(storyRefs.slice(1));
+                      return caseTree(storyRefs.slice(1));
                     },
                     error => err(error, 'adding test case to user story')
                   );
@@ -864,6 +893,9 @@ const caseTree = storyRefs => {
         )
       );
     }
+  }
+  else {
+    return Promise.resolve('');
   }
 };
 // Repetitively tries to copy a user story.
@@ -898,7 +930,7 @@ const copyStory = (ref, copyParentRef, name, description, owner) => {
 // Recursively copies a tree of user stories with retries.
 const copyTree1 = (storyRef, copyParentRef) => {
   if (! isError) {
-    const ref = shorten('hierarchicalrequirement', storyRef);
+    const ref = shorten('userstory', 'hierarchicalrequirement', storyRef);
     if (! isError) {
       // Get data on the user story.
       restAPI.get({
@@ -964,10 +996,10 @@ const copyTree1 = (storyRef, copyParentRef) => {
 // Recursively copies a tree or subtrees of user stories.
 const copyTree = (storyRefs, copyParentRef) => {
   if (storyRefs.length && ! isError) {
-    const firstRef = shorten('hierarchicalrequirement', storyRefs[0]);
+    const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
       // Get data on the first user story of the specified array.
-      restAPI.get({
+      return restAPI.get({
         ref: firstRef,
         fetch: ['Name', 'Description', 'Owner', 'Children']
       })
@@ -986,11 +1018,12 @@ const copyTree = (storyRefs, copyParentRef) => {
               the copy must be outside the original tree.
             */
             err('Attempt to copy to itself', 'copying tree');
+            return '';
           }
           // Otherwise:
           else {
             // Copy the user story and give it the specified parent.
-            restAPI.create({
+            return restAPI.create({
               type: 'hierarchicalrequirement',
               fetch: ['_ref'],
               data: {
@@ -1008,7 +1041,7 @@ const copyTree = (storyRefs, copyParentRef) => {
                 if (childrenSummary.Count) {
                   const copyRef = copy.Object._ref;
                   // Get data on them.
-                  restAPI.get({
+                  return restAPI.get({
                     ref: childrenSummary._ref,
                     fetch: ['_ref']
                   })
@@ -1021,7 +1054,11 @@ const copyTree = (storyRefs, copyParentRef) => {
                       const childRefs = childrenResult.Object.Results.map(
                         child => child._ref
                       );
-                      copyTree(childRefs, copyRef);
+                      return copyTree(childRefs, copyRef)
+                      .then(
+                        () => copyTree(storyRefs.slice(1), copyParentRef),
+                        error => err(error, 'copying child user stories')
+                      );
                     },
                     error => err(
                       error, 'getting data on child user stories for copying'
@@ -1034,7 +1071,7 @@ const copyTree = (storyRefs, copyParentRef) => {
                     Process the rest of the specified user stories
                     sequentially to prevent concurrency errors.
                   */
-                  copyTree(storyRefs.slice(1), copyParentRef);
+                  return copyTree(storyRefs.slice(1), copyParentRef);
                 }
               },
               error => err(error, 'copying user story')
@@ -1045,6 +1082,9 @@ const copyTree = (storyRefs, copyParentRef) => {
       );
     }
   }
+  else {
+    return Promise.resolve('');
+  }
 };
 // Gets a reference to a user.
 const getUserRef = userName => {
@@ -1053,7 +1093,7 @@ const getUserRef = userName => {
     query: queryUtils.where('UserName', '=', userName)
   })
   .then(
-    userRef => shorten('user', userRef.Results[0]._ref),
+    userRef => shorten('user', 'user', userRef.Results[0]._ref),
     error => {
       err(error, 'getting user reference');
       return '';
@@ -1383,7 +1423,7 @@ const requestHandler = (request, res) => {
       tryAgain = concurrencyMode === 'try';
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
-      rootRef = shorten('hierarchicalrequirement', rootURL);
+      rootRef = shorten('userstory', 'hierarchicalrequirement', rootURL);
       // Create and configure a Rally API client.
       if (! isError) {
         restAPI = rally({
@@ -1454,7 +1494,9 @@ const requestHandler = (request, res) => {
               }
               // Otherwise, if the requested operation is tree copying:
               else if (op === 'copy') {
-                treeCopyParentRef = shorten('hierarchicalrequirement', parentURL);
+                treeCopyParentRef = shorten(
+                  'userstory', 'hierarchicalrequirement', parentURL
+                );
                 if (! isError) {
                   // Get data on the parent user story of the copy.
                   restAPI.get({
