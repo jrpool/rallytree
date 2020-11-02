@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const modeOffHandler = () => {
     modeSection.classList.replace('overt', 'covert');
   };
-  // Request an event stream.
   document.getElementById('op-doc').addEventListener('change', modeOffHandler);
   document.getElementById('op-verdict').addEventListener('change', modeOffHandler);
   document.getElementById('op-take').addEventListener('change', modeOffHandler);

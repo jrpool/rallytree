@@ -38,6 +38,7 @@ let takerRef = '';
 let taskNames = [];
 let rootRef = '';
 let treeCopyParentRef = '';
+let testFolderRef = '';
 let total = 0;
 let changes = 0;
 let doc = [];
@@ -51,7 +52,7 @@ let {RALLY_USERNAME, RALLY_PASSWORD} = process.env;
 RALLY_USERNAME = RALLY_USERNAME || '';
 RALLY_PASSWORD = RALLY_PASSWORD || '';
 let tryAgain = false;
-const maxTries = 20;
+const maxTries = 30;
 let tries = 0;
 const docWait = 1500;
 
@@ -66,6 +67,7 @@ const reinit = () => {
   taskNames = [];
   rootRef = '';
   treeCopyParentRef = '';
+  testFolderRef = '';
   total = 0;
   changes = 0;
   doc = [];
@@ -713,10 +715,42 @@ const linkCase = (testCase, storyRef) => {
       },
       error => {
         if (++tries < maxTries) {
+          console.log(`Tries in linkCase: ${tries}`);
           linkCase(testCase, storyRef);
         }
         else {
           err(error, 'adding test case to user story');
+        }
+      }
+    );
+  }
+};
+// Repeatedly tries to create a test case for a user story.
+const createCase = (
+  storyRef, storyName, storyDescription, storyOwner
+) => {
+  if (! isError) {
+    console.log(`Tries: ${tries}`);
+    restAPI.create({
+      type: 'testcase',
+      fetch: ['_ref'],
+      data: {
+        Name: storyName,
+        Decription: storyDescription,
+        Owner: storyOwner
+      }
+    })
+    .then(
+      newCase => {
+        tries = 0;
+        linkCase(newCase, storyRef);
+      },
+      error => {
+        if (++tries < maxTries) {
+          createCase(storyRef, storyName, storyDescription, storyOwner);
+        }
+        else {
+          err(error, 'creating test case');
         }
       }
     );
@@ -769,24 +803,9 @@ const caseTree1 = storyRef => {
           }
           // Otherwise the user story needs a test case, so:
           else {
+            console.log(`About to create a test case for ${storyRef}`);
             // Create a test case.
-            restAPI.create({
-              type: 'testcase',
-              fetch: ['_ref'],
-              data: {
-                Name: name,
-                Description: description,
-                Owner: owner
-              }
-            })
-            .then(
-              // After it is created:
-              newCase => {
-                // Link it to the user story.
-                linkCase(newCase, storyRef);
-              },
-              error => err(error, 'creating test case')
-            );
+            createCase(storyRef, name, description, owner);
           }
         },
         error => err(
@@ -1418,6 +1437,7 @@ const requestHandler = (request, res) => {
         takerName,
         parentURL,
         taskNameString,
+        testFolderURL,
         concurrencyMode
       } = bodyObject;
       tryAgain = concurrencyMode === 'try';
@@ -1490,7 +1510,32 @@ const requestHandler = (request, res) => {
               }
               // Otherwise, if the requested operation is test-case creation:
               else if (op === 'case') {
-                serveCaseReport(userName);
+                // If a test folder was specified:
+                if (testFolderURL) {
+                  testFolderRef = shorten(
+                    'testfolder', 'testfolder', testFolderURL
+                  );
+                  if (! isError) {
+                    console.log(`Test folder ref is ${testFolderRef}`);
+                    // Get data on the test folder.
+                    restAPI.get({
+                      ref: testFolderRef,
+                      fetch: ['_ref']
+                    })
+                    .then(
+                      () => {
+                        // Serve a report on test-case creation.
+                        serveCaseReport(userName);
+                      },
+                      error => err(error, 'getting data on test folder')
+                    );
+                  }
+                }
+                // Otherwise, i.e. if no test folder was specified:
+                else {
+                  // Serve a report on test-case creation.
+                  serveCaseReport(userName);
+                }
               }
               // Otherwise, if the requested operation is tree copying:
               else if (op === 'copy') {
