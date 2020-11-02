@@ -148,6 +148,19 @@ const shorten = (readType, writeType, longRef) => {
     }
   }
 };
+// Returns the short reference of a member of a collection.
+const getRefOf = (type, formattedID) => {
+  const numericID = formattedID.replace(/^[A-Z]+/, '');
+  return restAPI.query({
+    type,
+    fetch: '_ref',
+    query: queryUtils.where('FormattedID', '=', numericID)
+  })
+  .then(
+    result => result.Results[0]._ref,
+    error => err(error, `getting reference to ${type} member`)
+  );
+};
 // Sends the tree documentation as an event.
 const outDoc = () => {
   if (docTimeout) {
@@ -1431,6 +1444,7 @@ const requestHandler = (request, res) => {
       const {
         userName,
         password,
+        rootID,
         rootURL,
         op,
         takerName,
@@ -1442,138 +1456,146 @@ const requestHandler = (request, res) => {
       tryAgain = concurrencyMode === 'try';
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
-      rootRef = shorten('userstory', 'hierarchicalrequirement', rootURL);
       // Create and configure a Rally API client.
-      if (! isError) {
-        restAPI = rally({
-          user: userName,
-          pass: password,
-          requestOptions
-        });
-        // Get a reference to the user.
-        getUserRef(userName)
-        .then(
-          ref => {
-            if (! isError) {
-              userRef = ref;
-              // If the requested operation is tree documentation:
-              if (op === 'doc') {
-                // Serve a report of the tree documentation.
-                serveDocReport(userName);
-              }
-              // If the requested operation is test-result acquisition:
-              else if (op === 'verdict') {
-                // Serve a report of the test results.
-                serveVerdictReport(userName);
-              }
-              // Otherwise, if the requested operation is ownership change:
-              else if (op === 'take') {
-                // If an owner other than the user was specified:
-                if (takerName) {
-                  // Serve a report identifying the new owner.
-                  getUserRef(takerName)
-                  .then(
-                    ref => {
-                      if (! isError) {
-                        takerRef = ref;
-                        serveTakeReport(userName, takerName);
-                      }
-                    },
-                    error => err(
-                      error, 'getting reference to new owner'
-                    )
-                  );
-                }
-                // Otherwise, the new owner will be the user, so:
-                else {
-                  takerRef = userRef;
-                  // Serve a report identifying the user as new owner.
-                  serveTakeReport(userName, userName);
-                }
-              }
-              // Otherwise, if the requested operation is task creaation:
-              else if (op === 'task') {
-                if (taskNameString.length < 2) {
-                  err('Task names invalid', 'creating tasks');
-                }
-                else {
-                  const delimiter = taskNameString[0];
-                  taskNames.push(...taskNameString.slice(1).split(delimiter));
-                  if (taskNames.every(taskName => taskName.length)) {
-                    serveTaskReport(userName);
-                  }
-                  else {
-                    err('Empty task name', 'creating tasks');
-                  }
-                }
-              }
-              // Otherwise, if the requested operation is test-case creation:
-              else if (op === 'case') {
-                // If a test folder was specified:
-                if (testFolderURL) {
-                  testFolderRef = shorten(
-                    'testfolder', 'testfolder', testFolderURL
-                  );
-                  if (! isError) {
-                    // Get data on the test folder.
-                    restAPI.get({
-                      ref: testFolderRef,
-                      fetch: ['_ref']
-                    })
-                    .then(
-                      () => {
-                        // Serve a report on test-case creation.
-                        serveCaseReport(userName);
-                      },
-                      error => err(error, 'getting data on test folder')
-                    );
-                  }
-                }
-                // Otherwise, i.e. if no test folder was specified:
-                else {
-                  // Serve a report on test-case creation.
-                  serveCaseReport(userName);
-                }
-              }
-              // Otherwise, if the requested operation is tree copying:
-              else if (op === 'copy') {
-                treeCopyParentRef = shorten(
-                  'userstory', 'hierarchicalrequirement', parentURL
-                );
+      restAPI = rally({
+        user: userName,
+        pass: password,
+        requestOptions
+      });
+      getRefOf('hierarchicalrequirement', rootID)
+      .then(
+        ref => {
+          if (! isError) {
+            console.log(`rootRef is ${ref}`);
+            // Get a reference to the user.
+            getUserRef(userName)
+            .then(
+              longRef => {
                 if (! isError) {
-                  // Get data on the parent user story of the copy.
-                  restAPI.get({
-                    ref: treeCopyParentRef,
-                    fetch: ['Tasks']
-                  })
-                  .then(
-                    storyResult => {
-                      // When the data arrive:
-                      const storyObj = storyResult.Object;
-                      const tasksSummary = storyObj.Tasks;
-                      if (tasksSummary.Count) {
-                        err(
-                          'Attempt to copy to a user story with tasks',
-                          'copying tree'
+                  userRef = shorten('userstory', 'hierarchicalrequirement', longRef);
+                  if (! isError) {
+                  // If the requested operation is tree documentation:
+                    if (op === 'doc') {
+                      // Serve a report of the tree documentation.
+                      serveDocReport(userName);
+                    }
+                    // If the requested operation is test-result acquisition:
+                    else if (op === 'verdict') {
+                      // Serve a report of the test results.
+                      serveVerdictReport(userName);
+                    }
+                    // Otherwise, if the requested operation is ownership change:
+                    else if (op === 'take') {
+                      // If an owner other than the user was specified:
+                      if (takerName) {
+                        // Serve a report identifying the new owner.
+                        getUserRef(takerName)
+                        .then(
+                          ref => {
+                            if (! isError) {
+                              takerRef = ref;
+                              serveTakeReport(userName, takerName);
+                            }
+                          },
+                          error => err(
+                            error, 'getting reference to new owner'
+                          )
                         );
                       }
+                      // Otherwise, the new owner will be the user, so:
                       else {
-                        // Copy the user story and give it the specified parent.
-                        serveCopyReport(userName);
+                        takerRef = userRef;
+                        // Serve a report identifying the user as new owner.
+                        serveTakeReport(userName, userName);
                       }
-                    },
-                    error => err(error, 'getting data on parent of tree copy')
-                  );
+                    }
+                    // Otherwise, if the requested operation is task creaation:
+                    else if (op === 'task') {
+                      if (taskNameString.length < 2) {
+                        err('Task names invalid', 'creating tasks');
+                      }
+                      else {
+                        const delimiter = taskNameString[0];
+                        taskNames.push(...taskNameString.slice(1).split(delimiter));
+                        if (taskNames.every(taskName => taskName.length)) {
+                          serveTaskReport(userName);
+                        }
+                        else {
+                          err('Empty task name', 'creating tasks');
+                        }
+                      }
+                    }
+                    // Otherwise, if the requested operation is test-case creation:
+                    else if (op === 'case') {
+                      // If a test folder was specified:
+                      if (testFolderURL) {
+                        testFolderRef = shorten(
+                          'testfolder', 'testfolder', testFolderURL
+                        );
+                        if (! isError) {
+                          // Get data on the test folder.
+                          restAPI.get({
+                            ref: testFolderRef,
+                            fetch: ['_ref']
+                          })
+                          .then(
+                            () => {
+                              // Serve a report on test-case creation.
+                              serveCaseReport(userName);
+                            },
+                            error => err(error, 'getting data on test folder')
+                          );
+                        }
+                      }
+                      // Otherwise, i.e. if no test folder was specified:
+                      else {
+                        // Serve a report on test-case creation.
+                        serveCaseReport(userName);
+                      }
+                    }
+                    // Otherwise, if the requested operation is tree copying:
+                    else if (op === 'copy') {
+                      treeCopyParentRef = shorten(
+                        'userstory', 'hierarchicalrequirement', parentURL
+                      );
+                      if (! isError) {
+                        // Get data on the parent user story of the copy.
+                        restAPI.get({
+                          ref: treeCopyParentRef,
+                          fetch: ['Tasks']
+                        })
+                        .then(
+                          storyResult => {
+                            // When the data arrive:
+                            const storyObj = storyResult.Object;
+                            const tasksSummary = storyObj.Tasks;
+                            if (tasksSummary.Count) {
+                              err(
+                                'Attempt to copy to a user story with tasks',
+                                'copying tree'
+                              );
+                            }
+                            else {
+                              // Copy the user story and give it the specified parent.
+                              serveCopyReport(userName);
+                            }
+                          },
+                          error => err(error, 'getting data on parent of tree copy')
+                        );
+                      }
+                    }
+                    else {
+                      err('Unanticipated request', 'RallyTree');
+                    }
+                  }
                 }
-              }
-              else {
-                err('Unanticipated request', 'RallyTree');
-              }
-            }
-          },
-          error => err(error, 'getting reference to user')
-        );
-      }
+              },
+              error => err(error, 'getting reference to user')
+            );
+          }
+        },
+        error => err(error, 'getting reference to tree root')
+      );
     }
   });
 };
