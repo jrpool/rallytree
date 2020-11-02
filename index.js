@@ -715,7 +715,6 @@ const linkCase = (testCase, storyRef) => {
       },
       error => {
         if (++tries < maxTries) {
-          console.log(`Tries in linkCase: ${tries}`);
           linkCase(testCase, storyRef);
         }
         else {
@@ -730,14 +729,14 @@ const createCase = (
   storyRef, storyName, storyDescription, storyOwner
 ) => {
   if (! isError) {
-    console.log(`Tries: ${tries}`);
     restAPI.create({
       type: 'testcase',
       fetch: ['_ref'],
       data: {
         Name: storyName,
         Decription: storyDescription,
-        Owner: storyOwner
+        Owner: storyOwner,
+        TestFolder: testFolderRef || null
       }
     })
     .then(
@@ -803,7 +802,6 @@ const caseTree1 = storyRef => {
           }
           // Otherwise the user story needs a test case, so:
           else {
-            console.log(`About to create a test case for ${storyRef}`);
             // Create a test case.
             createCase(storyRef, name, description, owner);
           }
@@ -874,7 +872,8 @@ const caseTree = storyRefs => {
               data: {
                 Name: name,
                 Description: description,
-                Owner: owner
+                Owner: owner,
+                TestFolder: testFolderRef || null
               }
             })
             .then(
@@ -1516,7 +1515,6 @@ const requestHandler = (request, res) => {
                     'testfolder', 'testfolder', testFolderURL
                   );
                   if (! isError) {
-                    console.log(`Test folder ref is ${testFolderRef}`);
                     // Get data on the test folder.
                     restAPI.get({
                       ref: testFolderRef,
