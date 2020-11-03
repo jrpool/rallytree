@@ -78,26 +78,28 @@
                 <input id = "op-case" type="radio" name="op" value="case">
                 <span class="label">Add test cases</span><br>
                 <span class="indent">
-                  URL of their test folder (if any):
+                  ID of their test folder (if any):
                 </span><br>
                 <input
-                  id="testFolderURL"
-                  name="testFolderURL"
-                  size="100"
+                  id="testFolderID"
+                  name="testFolderID"
+                  size="10"
                   class="indent"
+                  placeholder="US"
                 >
               </label></p>
               <p><label>
                 <input id="op-copy" type="radio" name="op" value="copy">
                 <span class="label">Copy to</span><br>
                 <input
-                  id="parentURL"
-                  name="parentURL"
-                  size="100"
+                  id="parentID"
+                  name="parentID"
+                  size="10"
                   class="indent"
+                  placeholder="US"
                 ><br>
                 <span class="indent">
-                  URL of the copy&rsquo;s parent user story
+                  ID of the copy&rsquo;s parent user story
                 </span>
               </label></p>
             </fieldset>
@@ -140,10 +142,10 @@
                 Which method should RallyTree use to prevent concurrency errors?
               </legend>
               <p><label>
-                <input type="radio" name="concurrencyMode" value="await" checked> Await
+                <input type="radio" name="concurrencyMode" value="await" checked> Await (safer)
               </label></p>
               <p><label>
-                <input type="radio" name="concurrencyMode" value="try"> Retry
+                <input type="radio" name="concurrencyMode" value="try"> Retry (faster)
               </label></p>
             </fieldset>
           </section>

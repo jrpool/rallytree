@@ -1447,9 +1447,9 @@ const requestHandler = (request, res) => {
         rootID,
         op,
         takerName,
-        parentURL,
+        parentID,
         taskNameString,
-        testFolderURL,
+        testFolderID,
         concurrencyMode
       } = bodyObject;
       tryAgain = concurrencyMode === 'try';
@@ -1530,24 +1530,32 @@ const requestHandler = (request, res) => {
                     // Otherwise, if the operation is test-case creation:
                     else if (op === 'case') {
                       // If a test folder was specified:
-                      if (testFolderURL) {
-                        testFolderRef = shorten(
-                          'testfolder', 'testfolder', testFolderURL
+                      if (testFolderID) {
+                        getRefOf('testfolder', testFolderID)
+                        .then(
+                          ref => {
+                            if (! isError) {
+                              testFolderRef = shorten(
+                                'testfolder', 'testfolder', ref
+                              );
+                              if (! isError) {
+                                // Get data on the test folder.
+                                restAPI.get({
+                                  ref: testFolderRef,
+                                  fetch: ['_ref']
+                                })
+                                .then(
+                                  () => {
+                                    // Serve a report on test-case creation.
+                                    serveCaseReport(userName);
+                                  },
+                                  error => err(error, 'getting data on test folder')
+                                );
+                              }
+                            }
+                          },
+                          error => err(error, 'getting reference to test folder')
                         );
-                        if (! isError) {
-                          // Get data on the test folder.
-                          restAPI.get({
-                            ref: testFolderRef,
-                            fetch: ['_ref']
-                          })
-                          .then(
-                            () => {
-                              // Serve a report on test-case creation.
-                              serveCaseReport(userName);
-                            },
-                            error => err(error, 'getting data on test folder')
-                          );
-                        }
                       }
                       // Otherwise, i.e. if no test folder was specified:
                       else {
@@ -1557,34 +1565,49 @@ const requestHandler = (request, res) => {
                     }
                     // Otherwise, if the operation is tree copying:
                     else if (op === 'copy') {
-                      treeCopyParentRef = shorten(
-                        'userstory', 'hierarchicalrequirement', parentURL
-                      );
-                      if (! isError) {
-                        // Get data on the parent user story of the copy.
-                        restAPI.get({
-                          ref: treeCopyParentRef,
-                          fetch: ['Tasks']
-                        })
-                        .then(
-                          storyResult => {
-                            // When the data arrive:
-                            const storyObj = storyResult.Object;
-                            const tasksSummary = storyObj.Tasks;
-                            if (tasksSummary.Count) {
-                              err(
-                                'Attempt to copy to a user story with tasks',
-                                'copying tree'
+                      getRefOf('hierarchicalrequirement', parentID)
+                      .then(
+                        ref => {
+                          if (! isError) {
+                            treeCopyParentRef = shorten(
+                              'userstory', 'hierarchicalrequirement', ref
+                            );
+                            if (! isError) {
+                              // Get data on the parent user story of the copy.
+                              restAPI.get({
+                                ref: treeCopyParentRef,
+                                fetch: ['Tasks']
+                              })
+                              .then(
+                                storyResult => {
+                                  // When the data arrive:
+                                  const storyObj = storyResult.Object;
+                                  const tasksSummary = storyObj.Tasks;
+                                  if (tasksSummary.Count) {
+                                    err(
+                                      'Attempt to copy to a user story with tasks',
+                                      'copying tree'
+                                    );
+                                  }
+                                  else {
+                                    /*
+                                      Copy the user story and give it the specified
+                                      parent.
+                                    */
+                                    serveCopyReport(userName);
+                                  }
+                                },
+                                error => err(
+                                  error, 'getting data on parent of tree copy'
+                                )
                               );
                             }
-                            else {
-                              // Copy the user story and give it the specified parent.
-                              serveCopyReport(userName);
-                            }
-                          },
-                          error => err(error, 'getting data on parent of tree copy')
-                        );
-                      }
+                          }
+                        },
+                        error => err(
+                          error, 'getting reference to parent of tree copy'
+                        )
+                      );
                     }
                     else {
                       err('Unknown operation', 'RallyTree');
