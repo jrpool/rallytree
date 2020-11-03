@@ -75,15 +75,18 @@ But [Broadcom acknowledges](https://knowledge.broadcom.com/external/article?arti
 
 ## Adaptation
 
-RallyTree adapts to these limitations in two ways:
+RallyTree adapts to these limitations by performing operations in parallel when this is reliable, but sequentially when not.
 
-- &ldquo;Await&rdquo;: Perform operations in parallel when possible, but make operations sequential when necessary.
-- &ldquo;Try&rdquo;: Perform all operations in parallel when logically possible. Respond to Rally errors by trying operations again, up to 20 times. (This maximum has been set empirically in testing.)
+In the above-cited knowledge-base article, Broadcom also suggests other adaptations, including:
 
-Testing indicates that the &ldquo;Try&rdquo; method is faster than the &ldquo;Await&rdquo; method, but, if Rally&rsquo;s server cluster is experiencing a heavy load of requests, is more vulnerable to failure. However, concurrency errors have not occurred in the first three operations (documentation, test-result acquisition, and ownership change), so they are performed without either accommodation.
+- trapping errors and retrying operations until they succeed
+- restricting all requests to a single host in its server cluster
 
-In the above-cited knowledge-base article, Broadcom also suggests a technique that restricts all requests to a single host in its server cluster. RallyTree does not yet have a branch that implements that technique.
+The `retry` branch of this project implements the error-trapping adaptation as an option choosable by the user. The `pause` branch implements it with a 1-second wait between tries. In both cases, up to 30 tries are permitted. However, testing shows that this accommodation often fails. Therefore, the `master` branch does not offer this accommodation option.
 
+RallyTree does not yet implement the single-host accommodation.
+
+Concurrency errors have not occurred in the first three operations (documentation, test-result acquisition, and ownership change), so they are performed in parallel whenever possible.
 
 # Installation and usage
 To install and use RallyTree:

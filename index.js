@@ -51,9 +51,6 @@ let reportServed = false;
 let {RALLY_USERNAME, RALLY_PASSWORD} = process.env;
 RALLY_USERNAME = RALLY_USERNAME || '';
 RALLY_PASSWORD = RALLY_PASSWORD || '';
-let tryAgain = false;
-const maxTries = 30;
-let tries = 0;
 const docWait = 1500;
 
 // ########## FUNCTIONS
@@ -77,11 +74,10 @@ const reinit = () => {
   defects = 0;
   idle = false;
   reportServed = false;
-  tries = 0;
 };
 // Processes a thrown error.
 const err = (error, context) => {
-  let problem;
+  let problem = error;
   // If error is system-defined, convert newlines.
   if (typeof error !== 'string') {
     // Reduce it to a string.
@@ -150,16 +146,31 @@ const shorten = (readType, writeType, longRef) => {
 };
 // Returns the long reference of a member of a collection.
 const getRefOf = (type, formattedID) => {
-  const numericID = formattedID.replace(/^[A-Z]+/, '');
-  return restAPI.query({
-    type,
-    fetch: '_ref',
-    query: queryUtils.where('FormattedID', '=', numericID)
-  })
-  .then(
-    result => result.Results[0]._ref,
-    error => err(error, `getting reference to ${type} member`)
-  );
+  const numericID = formattedID.replace(/^[A-Za-z]+/, '');
+  if (/^\d+$/.test(numericID)) {
+    return restAPI.query({
+      type,
+      fetch: '_ref',
+      query: queryUtils.where('FormattedID', '=', numericID)
+    })
+    .then(
+      result => {
+        const resultArray = result.Results;
+        if (resultArray.length) {
+          return resultArray[0]._ref;
+        }
+        else {
+          err('No such ID', `getting reference to ${type}`);
+          return '';
+        }
+      },
+      error => err(error, `getting reference to ${type}`)
+    );
+  }
+  else {
+    err('Invalid ID', `getting reference to ${type}`);
+    return Promise.resolve('');
+  }
 };
 // Sends the tree documentation as an event.
 const outDoc = () => {
@@ -518,33 +529,6 @@ const takeTree = storyRef => {
     )
   );
 };
-// Repeatedly tries to create a task for a user story.
-const createTask = (storyRef, owner, taskName) => {
-  if (! isError) {
-    restAPI.create({
-      type: 'task',
-      fetch: ['_ref'],
-      data: {
-        Name: taskName,
-        WorkProduct: storyRef,
-        Owner: owner
-      }
-    })
-    .then(
-      () => {
-        tries = 0;
-      },
-      error => {
-        if (++tries < maxTries) {
-          createTask(storyRef, owner, taskName);
-        }
-        else {
-          err(error, 'creating task');
-        }
-      }
-    );
-  }
-};
 // Sequentially creates tasks for a user story.
 const createTasks = (storyRef, owner, names) => {
   if (names.length && ! isError) {
@@ -564,67 +548,6 @@ const createTasks = (storyRef, owner, names) => {
   }
   else {
     return Promise.resolve('');
-  }
-};
-// Recursively creates tasks for a tree of user stories with retries.
-const taskTree1 = storyRef => {
-  if (! isError) {
-    const ref = shorten('userstory', 'hierarchicalrequirement', storyRef);
-    if (! isError) {
-      // Get data on the user story.
-      restAPI.get({
-        ref,
-        fetch: ['Owner', 'Children']
-      })
-      .then(
-        storyResult => {
-          // When the data arrive:
-          const storyObj = storyResult.Object;
-          const owner = storyObj.Owner;
-          const childrenSummary = storyObj.Children;
-          /*
-            If the user story has any child user stories, it does not
-            need tasks, so:
-          */
-          if (childrenSummary.Count) {
-            upTotals(0);
-            // Get data on its child user stories.
-            restAPI.get({
-              ref: childrenSummary._ref,
-              fetch: ['_ref']
-            })
-            .then(
-              // When the data arrive, process the children in parallel.
-              childrenResult => {
-                const childRefs = childrenResult.Object.Results.map(
-                  child => child._ref
-                );
-                childRefs.forEach(childRef => {
-                  taskTree1(childRef);
-                });
-              },
-              error => err(
-                error,
-                'getting data on child user stories for task creation'
-              )
-            );
-          }
-          // Otherwise the user story needs tasks, so:
-          else {
-            // Create them in parallel.
-            taskNames.forEach(taskName => {
-              createTask(ref, owner, taskName);
-            });
-            if (! isError) {
-              upTotals(taskNames.length);
-            }
-          }
-        },
-        error => err(
-          error, 'getting data on first user story for task creation'
-        )
-      );
-    }
   }
 };
 // Recursively creates tasks for a tree or subtrees of user stories.
@@ -709,121 +632,6 @@ const taskTree = storyRefs => {
   }
   else {
     return Promise.resolve('');
-  }
-};
-// Repetitively tries to link a test case to a user story.
-const linkCase = (testCase, storyRef) => {
-  const caseRef = shorten('testcase', 'testcase', testCase.Object._ref);
-  if (! isError) {
-    restAPI.add({
-      ref: storyRef,
-      collection: 'TestCases',
-      data: [{_ref: caseRef}],
-      fetch: ['_ref']
-    })
-    .then(
-      () => {
-        upTotals(1);
-        tries = 0;
-      },
-      error => {
-        if (++tries < maxTries) {
-          linkCase(testCase, storyRef);
-        }
-        else {
-          err(error, 'adding test case to user story');
-        }
-      }
-    );
-  }
-};
-// Repeatedly tries to create a test case for a user story.
-const createCase = (
-  storyRef, storyName, storyDescription, storyOwner
-) => {
-  if (! isError) {
-    restAPI.create({
-      type: 'testcase',
-      fetch: ['_ref'],
-      data: {
-        Name: storyName,
-        Decription: storyDescription,
-        Owner: storyOwner,
-        TestFolder: testFolderRef || null
-      }
-    })
-    .then(
-      newCase => {
-        tries = 0;
-        linkCase(newCase, storyRef);
-      },
-      error => {
-        if (++tries < maxTries) {
-          createCase(storyRef, storyName, storyDescription, storyOwner);
-        }
-        else {
-          err(error, 'creating test case');
-        }
-      }
-    );
-  }
-};
-// Recursively creates test cases for a tree of user stories with retries.
-const caseTree1 = storyRef => {
-  if (! isError) {
-    const ref = shorten('userstory', 'hierarchicalrequirement', storyRef);
-    if (! isError) {
-      // Get data on the user story.
-      restAPI.get({
-        ref,
-        fetch: ['Name', 'Description', 'Owner', 'Children']
-      })
-      .then(
-        storyResult => {
-          // When the data arrive:
-          const storyObj = storyResult.Object;
-          const name = storyObj.Name;
-          const description = storyObj.Description;
-          const owner = storyObj.Owner;
-          const childrenSummary = storyObj.Children;
-          /*
-            If the user story has any child user stories, it does not
-            need a test case, so:
-          */
-          if (childrenSummary.Count) {
-            upTotals(0);
-            // Get data on its child user stories.
-            restAPI.get({
-              ref: childrenSummary._ref,
-              fetch: ['_ref']
-            })
-            .then(
-              // When the data arrive, process the children in parallel.
-              childrenResult => {
-                const childRefs = childrenResult.Object.Results.map(
-                  child => child._ref
-                );
-                childRefs.forEach(childRef => {
-                  caseTree1(childRef);
-                });
-              },
-              error => err(
-                error,
-                'getting data on child user stories for test-case creation'
-              )
-            );
-          }
-          // Otherwise the user story needs a test case, so:
-          else {
-            // Create a test case.
-            createCase(storyRef, name, description, owner);
-          }
-        },
-        error => err(
-          error, 'getting data on user story for test-case creation'
-        )
-      );
-    }
   }
 };
 // Recursively creates test cases for a tree or subtrees of user stories.
@@ -929,101 +737,6 @@ const caseTree = storyRefs => {
     return Promise.resolve('');
   }
 };
-// Repetitively tries to copy a user story.
-const copyStory = (ref, copyParentRef, name, description, owner) => {
-  return restAPI.create({
-    type: 'hierarchicalrequirement',
-    fetch: ['_ref'],
-    data: {
-      Name: name,
-      Description: description,
-      Owner: owner,
-      Parent: copyParentRef
-    }
-  })
-  .then(
-    copy => {
-      upTotal();
-      tries = 0;
-      return copy;
-    },
-    error => {
-      if (++tries < maxTries) {
-        return copyStory(ref, copyParentRef, name, description, owner);
-      }
-      else {
-        err(error, 'copying user story');
-        return '';
-      }
-    }
-  );
-};
-// Recursively copies a tree of user stories with retries.
-const copyTree1 = (storyRef, copyParentRef) => {
-  if (! isError) {
-    const ref = shorten('userstory', 'hierarchicalrequirement', storyRef);
-    if (! isError) {
-      // Get data on the user story.
-      restAPI.get({
-        ref,
-        fetch: ['Name', 'Description', 'Owner', 'Children']
-      })
-      .then(
-        story => {
-          // When the data arrive:
-          const storyObj = story.Object;
-          const name = storyObj.Name;
-          const description = storyObj.Description;
-          const owner = storyObj.Owner;
-          const childrenSummary = storyObj.Children;
-          // If the user story is the specified parent of the tree copy:
-          if (ref === treeCopyParentRef) {
-            /*
-              Quit and report the precondition violation. The parent of
-              the copy must be outside the original tree.
-            */
-            err('Attempt to copy to itself', 'copying tree');
-          }
-          // Otherwise:
-          else {
-            // Copy the user story and give it the specified parent.
-            copyStory(ref, copyParentRef, name, description, owner)
-            .then(
-              // When the user story has been copied and linked:
-              copy => {
-                // If the original has any child user stories:
-                if (childrenSummary.Count && ! isError) {
-                  const copyRef = copy.Object._ref;
-                  // Get data on them.
-                  restAPI.get({
-                    ref: childrenSummary._ref,
-                    fetch: ['_ref']
-                  })
-                  .then(
-                    // When the data arrive, process the children in parallel.
-                    childrenResult => {
-                      const childRefs = childrenResult.Object.Results.map(
-                        child => child._ref
-                      );
-                      childRefs.forEach(childRef => {
-                        copyTree1(childRef, copyRef);
-                      });
-                    },
-                    error => err(
-                      error, 'getting data on child user stories for copying'
-                    )
-                  );
-                }
-              },
-              error => err(error, 'copying user story')
-            );
-          }
-        },
-        error => err(error, 'getting data on user story to copy')
-      );
-    }
-  }
-};
 // Recursively copies a tree or subtrees of user stories.
 const copyTree = (storyRefs, copyParentRef) => {
   if (storyRefs.length && ! isError) {
@@ -1124,9 +837,18 @@ const getUserRef = userName => {
     query: queryUtils.where('UserName', '=', userName)
   })
   .then(
-    userRef => shorten('user', 'user', userRef.Results[0]._ref),
+    result => {
+      const resultArray = result.Results;
+      if (resultArray.length) {
+        return shorten('user', 'user', resultArray[0]._ref);
+      }
+      else {
+        err('No such user', 'getting reference to user');
+        return '';
+      }
+    },
     error => {
-      err(error, 'getting user reference');
+      err(error, 'getting reference to user');
       return '';
     }
   );
@@ -1147,20 +869,13 @@ const serveIntro = () => {
 const serveDo = () => {
   fs.readFile('do.html', 'utf8')
   .then(
-    htmlContent => {
-      fs.readFile('do.js', 'utf8')
-      .then(
-        jsContent => {
-          const newContent = htmlContent
-          .replace('__script__', jsContent)
-          .replace('__userName__', RALLY_USERNAME)
-          .replace('__password__', RALLY_PASSWORD);
-          response.setHeader('Content-Type', 'text/html');
-          response.write(newContent);
-          response.end();
-        },
-        error => err(error, 'reading do script')
-      );
+    content => {
+      const newContent = content
+      .replace('__userName__', RALLY_USERNAME)
+      .replace('__password__', RALLY_PASSWORD);
+      response.setHeader('Content-Type', 'text/html');
+      response.write(newContent);
+      response.end();
     },
     error => err(error, 'reading do page')
   );
@@ -1422,17 +1137,15 @@ const requestHandler = (request, res) => {
       }
       else if (requestURL === '/tasktotals' && idle) {
         streamInit();
-        tryAgain ? taskTree1(rootRef) : taskTree([rootRef]);
+        taskTree([rootRef]);
       }
       else if (requestURL === '/casetotals' && idle) {
         streamInit();
-        tryAgain ? caseTree1(rootRef) : caseTree([rootRef]);
+        caseTree([rootRef]);
       }
       else if (requestURL === '/copytotals' && idle) {
         streamInit();
-        tryAgain
-          ? copyTree1(rootRef, treeCopyParentRef)
-          : copyTree([rootRef], treeCopyParentRef);
+        copyTree([rootRef], treeCopyParentRef);
       }
     }
     // Otherwise, if the request submits the request form:
@@ -1449,10 +1162,8 @@ const requestHandler = (request, res) => {
         takerName,
         parentID,
         taskNameString,
-        testFolderID,
-        concurrencyMode
+        testFolderID
       } = bodyObject;
-      tryAgain = concurrencyMode === 'try';
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
       // Create and configure a Rally API client.

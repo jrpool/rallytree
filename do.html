@@ -6,7 +6,6 @@
     <meta name="description" content="Automation of Rally tree management">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="style.css">
-    <script>__script__</script>
   </head>
   <body class="home">
     <main>
@@ -28,7 +27,6 @@
                 <span class="label">
                   <strong>ID</strong> of the user story at the root of the tree:
                 </span>
-                <br>
                 <input
                   id="rootID"
                   name="rootID"
@@ -53,7 +51,7 @@
               <p><label>
                 <input id="op-take" type="radio" name="op" value="take">
                 <span class="label">
-                  Change the owner to you, or else to
+                  Change the owner to you, or else to (Rally username, i.e. email)
                 </span><br>
                 <input
                   id="takerName"
@@ -62,31 +60,25 @@
                   size="60"
                   maxwidth="60"
                   class="indent"
-                ><br>
-                <span class="indent">
-                  Rally user name (i.e. email address)
-                </span>
+                >
               </label></p>
               <p><label>
                 <input id="op-task" type="radio" name="op" value="task">
-                <span class="label">Add tasks, with names</span><br>
+                <span class="label">
+                  Add tasks, with names
+                  (prefix with delimiter, e.g. <code>;Do this;Do that</code>)
+                </span><br>
                 <input
                   id="taskNameString"
                   name="taskNameString"
-                  size="80"
+                  size="60"
                   maxwidth="80"
                   class="indent"
-                ><br>
-                <span class="indent">
-                  Name(s), prefixed with delimiter (e.g., <code>;Do this;Do that</code>)
-                </span>
+                >
               </label></p>
               <p><label>
                 <input id = "op-case" type="radio" name="op" value="case">
-                <span class="label">Add test cases</span><br>
-                <span class="indent">
-                  ID of their test folder (if any):
-                </span><br>
+                <span class="label">Add test cases; if in a test folder, its ID:</span>
                 <input
                   id="testFolderID"
                   name="testFolderID"
@@ -98,7 +90,7 @@
               </label></p>
               <p><label>
                 <input id="op-copy" type="radio" name="op" value="copy">
-                <span class="label">Copy to</span><br>
+                <span class="label">Copy to (ID of parent user story)</span>
                 <input
                   id="parentID"
                   name="parentID"
@@ -106,10 +98,7 @@
                   maxwidth="12"
                   class="indent"
                   placeholder="US"
-                ><br>
-                <span class="indent">
-                  ID of the copy&rsquo;s parent user story
-                </span>
+                >
               </label></p>
             </fieldset>
           </section>
@@ -145,20 +134,6 @@
                 >
               </label>
             </p>
-          </section>
-          <section id="mode" class="even covert">
-            <h2>Concurrency mode</h2>
-            <fieldset>
-              <legend>
-                Which method should RallyTree use to prevent concurrency errors?
-              </legend>
-              <p><label>
-                <input type="radio" name="concurrencyMode" value="await" checked> Await (safer)
-              </label></p>
-              <p><label>
-                <input type="radio" name="concurrencyMode" value="try"> Retry (faster)
-              </label></p>
-            </fieldset>
           </section>
           <p><button>Submit</button></p>
         </form>
