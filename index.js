@@ -148,7 +148,7 @@ const shorten = (readType, writeType, longRef) => {
     }
   }
 };
-// Returns the short reference of a member of a collection.
+// Returns the long reference of a member of a collection.
 const getRefOf = (type, formattedID) => {
   const numericID = formattedID.replace(/^[A-Z]+/, '');
   return restAPI.query({
@@ -1117,7 +1117,7 @@ const copyTree = (storyRefs, copyParentRef) => {
     return Promise.resolve('');
   }
 };
-// Gets a reference to a user.
+// Gets a short reference to a user.
 const getUserRef = userName => {
   return restAPI.query({
     type: 'user',
@@ -1445,7 +1445,6 @@ const requestHandler = (request, res) => {
         userName,
         password,
         rootID,
-        rootURL,
         op,
         takerName,
         parentURL,
@@ -1462,29 +1461,32 @@ const requestHandler = (request, res) => {
         pass: password,
         requestOptions
       });
+      // Get a long reference to the root user story.
       getRefOf('hierarchicalrequirement', rootID)
       .then(
+        // When it arrives:
         ref => {
           if (! isError) {
-            console.log(`rootRef is ${ref}`);
-            // Get a reference to the user.
-            getUserRef(userName)
-            .then(
-              longRef => {
-                if (! isError) {
-                  userRef = shorten('userstory', 'hierarchicalrequirement', longRef);
+            rootRef = shorten('userstory', 'hierarchicalrequirement', ref);
+            if (! isError) {
+              // Get a reference to the user.
+              getUserRef(userName)
+              .then(
+                // When it arrives:
+                ref => {
                   if (! isError) {
-                  // If the requested operation is tree documentation:
+                    userRef = ref;
+                    // If the requested operation is tree documentation:
                     if (op === 'doc') {
                       // Serve a report of the tree documentation.
                       serveDocReport(userName);
                     }
-                    // If the requested operation is test-result acquisition:
+                    // Otherwise, if the operation is test-result acquisition:
                     else if (op === 'verdict') {
                       // Serve a report of the test results.
                       serveVerdictReport(userName);
                     }
-                    // Otherwise, if the requested operation is ownership change:
+                    // Otherwise, if the operation is ownership change:
                     else if (op === 'take') {
                       // If an owner other than the user was specified:
                       if (takerName) {
@@ -1509,7 +1511,7 @@ const requestHandler = (request, res) => {
                         serveTakeReport(userName, userName);
                       }
                     }
-                    // Otherwise, if the requested operation is task creaation:
+                    // Otherwise, if the operation is task creaation:
                     else if (op === 'task') {
                       if (taskNameString.length < 2) {
                         err('Task names invalid', 'creating tasks');
@@ -1525,7 +1527,7 @@ const requestHandler = (request, res) => {
                         }
                       }
                     }
-                    // Otherwise, if the requested operation is test-case creation:
+                    // Otherwise, if the operation is test-case creation:
                     else if (op === 'case') {
                       // If a test folder was specified:
                       if (testFolderURL) {
@@ -1553,7 +1555,7 @@ const requestHandler = (request, res) => {
                         serveCaseReport(userName);
                       }
                     }
-                    // Otherwise, if the requested operation is tree copying:
+                    // Otherwise, if the operation is tree copying:
                     else if (op === 'copy') {
                       treeCopyParentRef = shorten(
                         'userstory', 'hierarchicalrequirement', parentURL
@@ -1585,17 +1587,20 @@ const requestHandler = (request, res) => {
                       }
                     }
                     else {
-                      err('Unanticipated request', 'RallyTree');
+                      err('Unknown operation', 'RallyTree');
                     }
                   }
-                }
-              },
-              error => err(error, 'getting reference to user')
-            );
+                },
+                error => err(error, 'getting reference to user')
+              );
+            }
           }
         },
-        error => err(error, 'getting reference to tree root')
+        error => err(error, 'getting long reference to root user story')
       );
+    }
+    else {
+      err('Unanticipated request', 'RallyTree');
     }
   });
 };
