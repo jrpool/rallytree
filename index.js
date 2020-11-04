@@ -225,8 +225,6 @@ const upDefects = count => {
   defects += count;
   response.write(`event: defects\ndata: ${defects}\n\n`);
 };
-// Gets the numeric rank of a rankable artifact.
-const rankOf = artifact => artifact.DragAndDropRank;
 // Recursively documents a tree of user stories.
 const docTree = (storyRef, currentArray, index) => {
   // Get data on the user story.
@@ -261,12 +259,9 @@ const docTree = (storyRef, currentArray, index) => {
           childrenObj => {
             const children = Array.from(childrenObj.Object.Results);
             // Sort the children by rank, smaller numbers first.
-            children.sort((a, b) => {
-              const aRank = rankOf(a);
-              const bRank = rankOf(b);
-              const sorter = aRank < bRank ? -1 : 1;
-              return sorter;
-            });
+            children.sort(
+              (a, b) => a.DragAndDropRank < b.DragAndDropRank ? -1 : 1
+            );
             const childArray = currentArray[index].children;
             for (let i = 0; i < children.length; i++) {
               if (! isError) {
