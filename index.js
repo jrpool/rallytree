@@ -738,14 +738,15 @@ const caseTree = storyRefs => {
   }
 };
 // Recursively copies a tree or subtrees of user stories.
-const copyTree = (storyRefs, copyParentRef) => {
-  if (storyRefs.length && ! isError) {
-    const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
+const copyTree = (storyData, copyParentRef) => {
+  if (storyData.length && ! isError) {
+    const firstData = storyData[0];
+    const firstRef = shorten('userstory', 'hierarchicalrequirement', firstData[0]);
     if (! isError) {
       // Get data on the first user story of the specified array.
       return restAPI.get({
         ref: firstRef,
-        fetch: ['Name', 'Description', 'Owner', 'Children']
+        fetch: ['Name', 'Description', 'Owner', 'DragAndDropRank', 'Children']
       })
       .then(
         storyResult => {
@@ -754,6 +755,7 @@ const copyTree = (storyRefs, copyParentRef) => {
           const name = storyObj.Name;
           const description = storyObj.Description;
           const owner = storyObj.Owner;
+          const rank = storyObj.DragAndDropRank;
           const childrenSummary = storyObj.Children;
           // If the user story is the specified parent of the tree copy:
           if (firstRef === treeCopyParentRef) {
@@ -774,6 +776,7 @@ const copyTree = (storyRefs, copyParentRef) => {
                 Name: name,
                 Description: description,
                 Owner: owner,
+                DragAndDropRank: rank,
                 Parent: copyParentRef
               }
             })
@@ -787,7 +790,7 @@ const copyTree = (storyRefs, copyParentRef) => {
                   // Get data on them.
                   return restAPI.get({
                     ref: childrenSummary._ref,
-                    fetch: ['_ref']
+                    fetch: ['_ref', 'DragAndDropRank']
                   })
                   .then(
                     /*
@@ -795,12 +798,12 @@ const copyTree = (storyRefs, copyParentRef) => {
                       to prevent concurrency errors.
                     */
                     childrenResult => {
-                      const childRefs = childrenResult.Object.Results.map(
-                        child => child._ref
+                      const childData = childrenResult.Object.Results.map(
+                        child => [child._ref, child.DragAndDropRank]
                       );
-                      return copyTree(childRefs, copyRef)
+                      return copyTree(childData, copyRef)
                       .then(
-                        () => copyTree(storyRefs.slice(1), copyParentRef),
+                        () => copyTree(storyData.slice(1), copyParentRef),
                         error => err(error, 'copying child user stories')
                       );
                     },
@@ -815,7 +818,7 @@ const copyTree = (storyRefs, copyParentRef) => {
                     Process the rest of the specified user stories
                     sequentially to prevent concurrency errors.
                   */
-                  return copyTree(storyRefs.slice(1), copyParentRef);
+                  return copyTree(storyData.slice(1), copyParentRef);
                 }
               },
               error => err(error, 'copying user story')
@@ -1145,7 +1148,7 @@ const requestHandler = (request, res) => {
       }
       else if (requestURL === '/copytotals' && idle) {
         streamInit();
-        copyTree([rootRef], treeCopyParentRef);
+        copyTree([[rootRef, 1]], treeCopyParentRef);
       }
     }
     // Otherwise, if the request submits the request form:
