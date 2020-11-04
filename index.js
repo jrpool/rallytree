@@ -740,7 +740,9 @@ const caseTree = storyRefs => {
 // Recursively copies a tree or subtrees of user stories.
 const copyTree = (storyData, copyParentRef) => {
   if (storyData.length && ! isError) {
+    // Identify the reference on the first user story.
     const firstData = storyData[0];
+    // Identify and shorten the reference to that user story.
     const firstRef = shorten('userstory', 'hierarchicalrequirement', firstData[0]);
     if (! isError) {
       // Get data on the first user story of the specified array.
