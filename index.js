@@ -147,7 +147,7 @@ const shorten = (readType, writeType, longRef) => {
   }
 };
 // Returns the long reference of a member of a collection.
-const getRefOf = (type, formattedID) => {
+const getRefOf = (type, formattedID, context) => {
   const numericID = formattedID.replace(/^[A-Za-z]+/, '');
   if (/^\d+$/.test(numericID)) {
     return restAPI.query({
@@ -162,15 +162,15 @@ const getRefOf = (type, formattedID) => {
           return resultArray[0]._ref;
         }
         else {
-          err('No such ID', `getting reference to ${type}`);
+          err('No such ID', `getting reference to ${type} for ${context}`);
           return '';
         }
       },
-      error => err(error, `getting reference to ${type}`)
+      error => err(error, `getting reference to ${type} for ${context}`)
     );
   }
   else {
-    err('Invalid ID', `getting reference to ${type}`);
+    err('Invalid ID', `getting reference to ${type} for ${context}`);
     return Promise.resolve('');
   }
 };
@@ -1086,7 +1086,7 @@ const requestHandler = (request, res) => {
         requestOptions
       });
       // Get a long reference to the root user story.
-      getRefOf('hierarchicalrequirement', rootID)
+      getRefOf('hierarchicalrequirement', rootID, 'tree root')
       .then(
         // When it arrives:
         ref => {
@@ -1155,7 +1155,7 @@ const requestHandler = (request, res) => {
                     else if (op === 'case') {
                       // If a test folder was specified:
                       if (testFolderID) {
-                        getRefOf('testfolder', testFolderID)
+                        getRefOf('testfolder', testFolderID, 'test-case creation')
                         .then(
                           ref => {
                             if (! isError) {
@@ -1184,7 +1184,7 @@ const requestHandler = (request, res) => {
                     }
                     // Otherwise, if the operation is tree copying:
                     else if (op === 'copy') {
-                      getRefOf('hierarchicalrequirement', parentID)
+                      getRefOf('hierarchicalrequirement', parentID, 'parent of tree copy')
                       .then(
                         ref => {
                           if (! isError) {
