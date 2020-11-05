@@ -40,15 +40,17 @@ let taskNames = [];
 let rootRef = '';
 let treeCopyParentRef = '';
 let testFolderRef = '';
-let total = 0;
-let changes = 0;
+let totals = {
+  total: 0,
+  changes: 0,
+  passes: 0,
+  fails: 0,
+  defects: 0,
+  major: 0,
+  minor: 0
+};
 let doc = [];
 let docTimeout = 0;
-let passes = 0;
-let fails = 0;
-let defects = 0;
-let major = 0;
-let minor = 0;
 let idle = false;
 let reportServed = false;
 let {RALLY_USERNAME, RALLY_PASSWORD} = process.env;
@@ -69,15 +71,17 @@ const reinit = () => {
   rootRef = '';
   treeCopyParentRef = '';
   testFolderRef = '';
-  total = 0;
-  changes = 0;
+  totals = {
+    total: 0,
+    changes: 0,
+    passes: 0,
+    fails: 0,
+    defects: 0,
+    major: 0,
+    minor: 0
+  };
   doc = [];
   docTimeout = 0;
-  passes = 0;
-  fails = 0;
-  defects = 0;
-  major = 0;
-  minor = 0;
   idle = false;
   reportServed = false;
 };
@@ -193,19 +197,19 @@ const outDoc = () => {
     docWait
   );
 };
-// Increments the total count and sends the new count as an event.
-const upTotal = () => {
-  response.write(`event: total\ndata: ${++total}\n\n`);
+// Increments a total count and sends the new count as an event.
+const upTotal = event => {
+  response.write(`event: ${event}\ndata: ${++totals[event]}\n\n`);
 };
 /*
   Increments the total count and the change count and sends
   the counts as events.
 */
 const upTotals = changeCount => {
-  const totalMsg = `event: total\ndata: ${++total}\n\n`;
-  changes += changeCount;
+  const totalMsg = `event: total\ndata: ${++totals.total}\n\n`;
+  totals.changes += changeCount;
   const changeMsg = changeCount
-    ? `event: changes\ndata: ${changes}\n\n`
+    ? `event: changes\ndata: ${totals.changes}\n\n`
     : '';
   response.write(`${totalMsg}${changeMsg}`);
 };
@@ -214,32 +218,22 @@ const upTotals = changeCount => {
   and sends the counts as events.
 */
 const upVerdicts = isPass=> {
-  const totalMsg = `event: total\ndata: ${++total}\n\n`;
+  const totalMsg = `event: total\ndata: ${++totals.total}\n\n`;
   let changeMsg;
   if (isPass) {
-    passes++;
-    changeMsg = `event: passes\ndata: ${passes}\n\n`;
+    totals.passes++;
+    changeMsg = `event: passes\ndata: ${totals.passes}\n\n`;
   }
   else {
-    fails++;
-    changeMsg = `event: fails\ndata: ${fails}\n\n`;
+    totals.fails++;
+    changeMsg = `event: fails\ndata: ${totals.fails}\n\n`;
   }
   response.write(`${totalMsg}${changeMsg}`);
 };
 // Increments the defect count.
 const upDefects = count => {
-  defects += count;
-  response.write(`event: defects\ndata: ${defects}\n\n`);
-};
-// Increments the major-defect count.
-const upMajor = () => {
-  major++;
-  response.write(`event: major\ndata: ${major}\n\n`);
-};
-// Increments the minor-defect count.
-const upMinor = () => {
-  minor++;
-  response.write(`event: minor\ndata: ${minor}\n\n`);
+  totals.defects += count;
+  response.write(`event: defects\ndata: ${totals.defects}\n\n`);
 };
 // Gets data on a work item.
 const getData = (ref, fetch) => {
@@ -351,10 +345,10 @@ const verdictTree = storyRef => {
             defects.forEach(defect => {
               const severity = defect.Severity;
               if (severity === 'Major Problem') {
-                upMajor();
+                upTotal('major');
               }
               else if (severity === 'Minor Problem') {
-                upMinor();
+                upTotal('minor');
               }
             });
           },
@@ -409,7 +403,7 @@ const verdictTree = storyRef => {
 // Change the ownership of a task.
 const takeTask = taskObj => {
   if (! isError) {
-    const taskRef = shorten('task', taskObj._ref);
+    const taskRef = shorten('task', 'task', taskObj._ref);
     if (! isError) {
       const taskOwner = taskObj.Owner;
       const ownerRef = taskOwner ? shorten('user', 'user', taskOwner._ref) : '';
@@ -766,7 +760,7 @@ const copyTree = (storyData, copyParentRef) => {
             .then(
               // When the user story has been copied and linked:
               copy => {
-                upTotal();
+                upTotal('total');
                 // If the original has any child user stories:
                 if (childrenSummary.Count) {
                   const copyRef = copy.Object._ref;
