@@ -47,6 +47,8 @@ let docTimeout = 0;
 let passes = 0;
 let fails = 0;
 let defects = 0;
+let major = 0;
+let minor = 0;
 let idle = false;
 let reportServed = false;
 let {RALLY_USERNAME, RALLY_PASSWORD} = process.env;
@@ -74,6 +76,8 @@ const reinit = () => {
   passes = 0;
   fails = 0;
   defects = 0;
+  major = 0;
+  minor = 0;
   idle = false;
   reportServed = false;
 };
@@ -227,6 +231,16 @@ const upDefects = count => {
   defects += count;
   response.write(`event: defects\ndata: ${defects}\n\n`);
 };
+// Increments the major-defect count.
+const upMajor = () => {
+  major++;
+  response.write(`event: major\ndata: ${major}\n\n`);
+};
+// Increments the minor-defect count.
+const upMinor = () => {
+  minor++;
+  response.write(`event: minor\ndata: ${minor}\n\n`);
+};
 // Gets data on a work item.
 const getData = (ref, fetch) => {
   return restAPI.get({
@@ -328,6 +342,24 @@ const verdictTree = storyRef => {
         );
         // Add the user story’s defect count to the defect count.
         upDefects(defectCount);
+        // Get data on the defects.
+        getData(defectSummary._ref, ['Severity'])
+        .then(
+          // When the data arrive, report the severities of the defects.
+          defectsObj => {
+            const defects = defectsObj.Object.Results;
+            defects.forEach(defect => {
+              const severity = defect.Severity;
+              if (severity === 'Major Problem') {
+                upMajor();
+              }
+              else if (severity === 'Minor Problem') {
+                upMinor();
+              }
+            });
+          },
+          error => err(error, 'getting data on defects')
+        );
       }
       /*
         Otherwise, if the user story has any child user stories and

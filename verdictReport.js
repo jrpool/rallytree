@@ -32,6 +32,12 @@ document.addEventListener('DOMContentLoaded', () => {
   eventSource.addEventListener('defects', event => {
     messageHandler(event, 'defects');
   });
+  eventSource.addEventListener('major', event => {
+    messageHandler(event, 'major');
+  });
+  eventSource.addEventListener('minor', event => {
+    messageHandler(event, 'minor');
+  });
   eventSource.addEventListener('error', event => {
     messageHandler(event, 'error');
   });
