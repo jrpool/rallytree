@@ -12,9 +12,7 @@ let lastEventTime;
 const messageHandler = (event, type) => {
   const data = event.data;
   if (data) {
-    document.getElementById(type).textContent = event.data.replace(
-      /<br>/g, '\n'
-    );
+    document.getElementById(type).innerHTML = data;
     lastEventTime = Date.now();
   }
 };

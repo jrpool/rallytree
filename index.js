@@ -33,6 +33,7 @@ const requestOptions = {
 let isError = false;
 let restAPI = {};
 let response = {};
+let userName = '';
 let userRef = '';
 let takerRef = '';
 let taskNames = [];
@@ -59,6 +60,7 @@ const docWait = 1500;
 const reinit = () => {
   isError = false;
   restAPI = {};
+  userName = '';
   userRef = '';
   takerRef = '';
   taskNames = [];
@@ -232,7 +234,7 @@ const getData = (ref, fetch) => {
     fetch
   });
 };
-// Recursively documents a tree of user stories.
+// Recursively documents a tree or subtree of user stories.
 const docTree = (storyRef, currentArray, index) => {
   // Get data on the user story.
   getData(storyRef, ['Name', 'DragAndDropRank', 'Children'])
@@ -245,10 +247,7 @@ const docTree = (storyRef, currentArray, index) => {
       const childCount = childrenSummary.Count;
       // If the user story has any child user stories:
       if (childCount) {
-        /*
-          Document the user story and initialize documentations
-          of its children.
-        */
+        // Document the user story as an object with an initialized children array.
         currentArray[index] = {
           name,
           children: []
@@ -256,20 +255,15 @@ const docTree = (storyRef, currentArray, index) => {
         // Get data on its child user stories.
         getData(childrenSummary._ref, ['_ref', 'DragAndDropRank'])
         .then(
-          // When the data arrive, document the children.
+          // When the data arrive, populate the children array in rank order.
           childrenObj => {
             const children = Array.from(childrenObj.Object.Results);
-            // Sort the children by rank, smaller numbers first.
-            children.sort(
-              (a, b) => a.DragAndDropRank < b.DragAndDropRank ? -1 : 1
-            );
+            children.sort((a, b) => a.DragAndDropRank < b.DragAndDropRank ? -1 : 1);
             const childArray = currentArray[index].children;
             for (let i = 0; i < children.length; i++) {
               if (! isError) {
                 const childRef = shorten(
-                  'hierarchicalrequirement',
-                  'hierarchicalrequirement',
-                  children[i]._ref
+                  'hierarchicalrequirement', 'hierarchicalrequirement', children[i]._ref
                 );
                 if (! isError) {
                   docTree(childRef, childArray, i);
@@ -285,7 +279,7 @@ const docTree = (storyRef, currentArray, index) => {
       }
       // Otherwise, i.e. if the user story has no child user stories:
       else {
-        // Document the user story.
+        // Document the user story as an object without a children array.
         currentArray[index] = {
           name
         };
@@ -332,12 +326,7 @@ const verdictTree = storyRef => {
           },
           error => err(error, 'getting data on test cases')
         );
-        /*
-          In parallel, increment the reported defect count with
-          the count of defects of the user story. Counting the
-          defects of the test cases of the user story would be
-          equivalent.
-        */
+        // Add the user story’s defect count to the defect count.
         upDefects(defectCount);
       }
       /*
@@ -354,9 +343,7 @@ const verdictTree = storyRef => {
             children.forEach(child => {
               if (! isError) {
                 const childRef = shorten(
-                  'hierarchicalrequirement',
-                  'hierarchicalrequirement',
-                  child._ref
+                  'hierarchicalrequirement', 'hierarchicalrequirement', child._ref
                 );
                 if (! isError) {
                   verdictTree(childRef);
@@ -754,10 +741,7 @@ const copyTree = (storyData, copyParentRef) => {
                   // Get data on them.
                   return getData(childrenSummary._ref, ['_ref', 'DragAndDropRank'])
                   .then(
-                    /*
-                      When the data arrive, process the children sequentially
-                      to prevent concurrency errors.
-                    */
+                    // When the data arrive, process the children sequentially.
                     childrenResult => {
                       const childData = childrenResult.Object.Results.map(
                         child => [child._ref, child.DragAndDropRank]
@@ -795,10 +779,10 @@ const copyTree = (storyData, copyParentRef) => {
   }
 };
 // Gets a short reference to a user.
-const getUserRef = userName => {
+const getUserRef = name => {
   return restAPI.query({
     type: 'user',
-    query: queryUtils.where('UserName', '=', userName)
+    query: queryUtils.where('UserName', '=', name)
   })
   .then(
     result => {
@@ -817,14 +801,21 @@ const getUserRef = userName => {
     }
   );
 };
+// Serves a page.
+const servePage = (content, isReport) => {
+  response.setHeader('Content-Type', 'text/html');
+  response.write(content);
+  response.end();
+  if (isReport) {
+    reportServed = true;
+  }
+};
 // Serves the introduction page.
 const serveIntro = () => {
   fs.readFile('index.html', 'utf8')
   .then(
     content => {
-      response.setHeader('Content-Type', 'text/html');
-      response.write(content);
-      response.end();
+      servePage(content, false);
     },
     error => err(error, 'reading intro page')
   );
@@ -837,30 +828,29 @@ const serveDo = () => {
       const newContent = content
       .replace('__userName__', RALLY_USERNAME)
       .replace('__password__', RALLY_PASSWORD);
-      response.setHeader('Content-Type', 'text/html');
-      response.write(newContent);
-      response.end();
+      servePage(newContent, false);
     },
     error => err(error, 'reading do page')
   );
 };
+// Interpolates universal content into a report.
+const reportPrep = (content, jsContent) => {
+  return content
+  .replace('__script__', jsContent)
+  .replace('__rootRef__', rootRef)
+  .replace('__userName__', userName)
+  .replace('__userRef__', userRef);
+};
 // Serves the change-owner report page.
-const serveDocReport = userName => {
+const serveDocReport = () => {
   fs.readFile('docReport.html', 'utf8')
   .then(
     htmlContent => {
       fs.readFile('docReport.js', 'utf8')
       .then(
         jsContent => {
-          const newContent = htmlContent
-          .replace('__script__', jsContent)
-          .replace('__rootRef__', rootRef)
-          .replace('__userName__', userName)
-          .replace('__userRef__', userRef);
-          response.setHeader('Content-Type', 'text/html');
-          response.write(newContent);
-          response.end();
-          reportServed = true;
+          const newContent = reportPrep(htmlContent, jsContent);
+          servePage(newContent, true);
         },
         error => err(error, 'reading docReport script')
       );
@@ -869,22 +859,15 @@ const serveDocReport = userName => {
   );
 };
 // Serves the change-owner report page.
-const serveVerdictReport = userName => {
+const serveVerdictReport = () => {
   fs.readFile('verdictReport.html', 'utf8')
   .then(
     htmlContent => {
       fs.readFile('verdictReport.js', 'utf8')
       .then(
         jsContent => {
-          const newContent = htmlContent
-          .replace('__script__', jsContent)
-          .replace('__rootRef__', rootRef)
-          .replace('__userName__', userName)
-          .replace('__userRef__', userRef);
-          response.setHeader('Content-Type', 'text/html');
-          response.write(newContent);
-          response.end();
-          reportServed = true;
+          const newContent = reportPrep(htmlContent, jsContent);
+          servePage(newContent, true);
         },
         error => err(error, 'reading verdictReport script')
       );
@@ -893,24 +876,17 @@ const serveVerdictReport = userName => {
   );
 };
 // Serves the change-owner report page.
-const serveTakeReport = (userName, takerName) => {
+const serveTakeReport = (takerName) => {
   fs.readFile('takeReport.html', 'utf8')
   .then(
     htmlContent => {
       fs.readFile('takeReport.js', 'utf8')
       .then(
         jsContent => {
-          const newContent = htmlContent
-          .replace('__script__', jsContent)
-          .replace('__rootRef__', rootRef)
+          const newContent = reportPrep(htmlContent, jsContent)
           .replace('__takerName__', takerName)
-          .replace('__takerRef__', takerRef)
-          .replace('__userName__', userName)
-          .replace('__userRef__', userRef);
-          response.setHeader('Content-Type', 'text/html');
-          response.write(newContent);
-          response.end();
-          reportServed = true;
+          .replace('__takerRef__', takerRef);
+          servePage(newContent, true);
         },
         error => err(error, 'reading takeReport script')
       );
@@ -919,7 +895,7 @@ const serveTakeReport = (userName, takerName) => {
   );
 };
 // Serves the add-tasks report page.
-const serveTaskReport = userName => {
+const serveTaskReport = () => {
   fs.readFile('taskReport.html', 'utf8')
   .then(
     htmlContent => {
@@ -929,17 +905,10 @@ const serveTaskReport = userName => {
           const taskCount = `${taskNames.length} task${
             taskNames.length > 1 ? 's' : ''
           }`;
-          const newContent = htmlContent
-          .replace('__script__', jsContent)
+          const newContent = reportPrep(htmlContent, jsContent)
           .replace('__taskCount__', taskCount)
-          .replace('__taskNames__', taskNames.join('\n'))
-          .replace('__rootRef__', rootRef)
-          .replace('__userName__', userName)
-          .replace('__userRef__', userRef);
-          response.setHeader('Content-Type', 'text/html');
-          response.write(newContent);
-          response.end();
-          reportServed = true;
+          .replace('__taskNames__', taskNames.join('\n'));
+          servePage(newContent, true);
         },
         error => err(error, 'reading taskReport script')
       );
@@ -948,22 +917,15 @@ const serveTaskReport = userName => {
   );
 };
 // Serves the add-test-cases report page.
-const serveCaseReport = userName => {
+const serveCaseReport = () => {
   fs.readFile('caseReport.html', 'utf8')
   .then(
     htmlContent => {
       fs.readFile('caseReport.js', 'utf8')
       .then(
         jsContent => {
-          const newContent = htmlContent
-          .replace('__script__', jsContent)
-          .replace('__rootRef__', rootRef)
-          .replace('__userName__', userName)
-          .replace('__userRef__', userRef);
-          response.setHeader('Content-Type', 'text/html');
-          response.write(newContent);
-          response.end();
-          reportServed = true;
+          const newContent = reportPrep(htmlContent, jsContent);
+          servePage(newContent, true);
         },
         error => err(error, 'reading caseReport script')
       );
@@ -972,23 +934,16 @@ const serveCaseReport = userName => {
   );
 };
 // Serves the copy report page.
-const serveCopyReport = userName => {
+const serveCopyReport = () => {
   fs.readFile('copyReport.html', 'utf8')
   .then(
     htmlContent => {
       fs.readFile('copyReport.js', 'utf8')
       .then(
         jsContent => {
-          const newContent = htmlContent
-          .replace('__script__', jsContent)
-          .replace('__rootRef__', rootRef)
-          .replace('__parentRef__', treeCopyParentRef)
-          .replace('__userName__', userName)
-          .replace('__userRef__', userRef);
-          response.setHeader('Content-Type', 'text/html');
-          response.write(newContent);
-          response.end();
-          reportServed = true;
+          const newContent = reportPrep(htmlContent, jsContent)
+          .replace('__parentRef__', treeCopyParentRef);
+          servePage(newContent, true);
         },
         error => err(error, 'reading caseReport script')
       );
@@ -1118,15 +1073,9 @@ const requestHandler = (request, res) => {
       // Permit an event stream to be started.
       idle = true;
       const bodyObject = parse(Buffer.concat(bodyParts).toString());
+      userName = bodyObject.userName;
       const {
-        userName,
-        password,
-        rootID,
-        op,
-        takerName,
-        parentID,
-        taskNameString,
-        testFolderID
+        password, rootID, op, takerName, parentID, taskNameString, testFolderID
       } = bodyObject;
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
@@ -1154,12 +1103,12 @@ const requestHandler = (request, res) => {
                     // If the requested operation is tree documentation:
                     if (op === 'doc') {
                       // Serve a report of the tree documentation.
-                      serveDocReport(userName);
+                      serveDocReport();
                     }
                     // Otherwise, if the operation is test-result acquisition:
                     else if (op === 'verdict') {
                       // Serve a report of the test results.
-                      serveVerdictReport(userName);
+                      serveVerdictReport();
                     }
                     // Otherwise, if the operation is ownership change:
                     else if (op === 'take') {
@@ -1171,7 +1120,7 @@ const requestHandler = (request, res) => {
                           ref => {
                             if (! isError) {
                               takerRef = ref;
-                              serveTakeReport(userName, takerName);
+                              serveTakeReport(takerName);
                             }
                           },
                           error => err(
@@ -1183,7 +1132,7 @@ const requestHandler = (request, res) => {
                       else {
                         takerRef = userRef;
                         // Serve a report identifying the user as new owner.
-                        serveTakeReport(userName, userName);
+                        serveTakeReport(userName);
                       }
                     }
                     // Otherwise, if the operation is task creaation:
@@ -1195,7 +1144,7 @@ const requestHandler = (request, res) => {
                         const delimiter = taskNameString[0];
                         taskNames.push(...taskNameString.slice(1).split(delimiter));
                         if (taskNames.every(taskName => taskName.length)) {
-                          serveTaskReport(userName);
+                          serveTaskReport();
                         }
                         else {
                           err('Empty task name', 'creating tasks');
@@ -1210,16 +1159,14 @@ const requestHandler = (request, res) => {
                         .then(
                           ref => {
                             if (! isError) {
-                              testFolderRef = shorten(
-                                'testfolder', 'testfolder', ref
-                              );
+                              testFolderRef = shorten('testfolder', 'testfolder', ref);
                               if (! isError) {
                                 // Get data on the test folder.
                                 getData(testFolderRef, ['_ref'])
                                 .then(
                                   () => {
                                     // Serve a report on test-case creation.
-                                    serveCaseReport(userName);
+                                    serveCaseReport();
                                   },
                                   error => err(error, 'getting data on test folder')
                                 );
@@ -1232,7 +1179,7 @@ const requestHandler = (request, res) => {
                       // Otherwise, i.e. if no test folder was specified:
                       else {
                         // Serve a report on test-case creation.
-                        serveCaseReport(userName);
+                        serveCaseReport();
                       }
                     }
                     // Otherwise, if the operation is tree copying:
@@ -1254,16 +1201,12 @@ const requestHandler = (request, res) => {
                                   const tasksSummary = storyObj.Tasks;
                                   if (tasksSummary.Count) {
                                     err(
-                                      'Attempt to copy to a user story with tasks',
-                                      'copying tree'
+                                      'Attempt to copy to a user story with tasks', 'copying tree'
                                     );
                                   }
                                   else {
-                                    /*
-                                      Copy the user story and give it the specified
-                                      parent.
-                                    */
-                                    serveCopyReport(userName);
+                                    // Copy the user story and give it the specified parent.
+                                    serveCopyReport();
                                   }
                                 },
                                 error => err(
