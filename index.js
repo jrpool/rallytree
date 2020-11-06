@@ -182,21 +182,6 @@ const getRefOf = (type, formattedID, context) => {
     return Promise.resolve('');
   }
 };
-// Sends the tree documentation as an event.
-const outDoc = () => {
-  if (docTimeout) {
-    clearTimeout(docTimeout);
-  }
-  docTimeout = setTimeout(
-    () => {
-      const docJSON = JSON.stringify(doc[0], null, 2).replace(
-        /\n/g, '<br>'
-      );
-      response.write(`event: doc\ndata: ${docJSON}\n\n`);
-    },
-    docWait
-  );
-};
 // Increments a total count and sends the new count as an event.
 const upTotal = event => {
   response.write(`event: ${event}\ndata: ${++totals[event]}\n\n`);
@@ -242,10 +227,25 @@ const getData = (ref, fetch) => {
     fetch
   });
 };
+// Sends the tree documentation as an event.
+const outDoc = () => {
+  if (docTimeout) {
+    clearTimeout(docTimeout);
+  }
+  docTimeout = setTimeout(
+    () => {
+      const docJSON = JSON.stringify(doc[0], null, 2).replace(
+        /\n/g, '<br>'
+      );
+      response.write(`event: doc\ndata: ${docJSON}\n\n`);
+    },
+    docWait
+  );
+};
 // Recursively documents a tree or subtree of user stories.
 const docTree = (storyRef, currentArray, index) => {
-  // Get data on the user story.
-  getData(storyRef, ['Name', 'DragAndDropRank', 'Children'])
+  // Get data on the root user story.
+  return getData(storyRef, ['Name', 'DragAndDropRank', 'Children', 'TestCases'])
   .then(
     storyResult => {
       // When the data arrive:
@@ -253,18 +253,22 @@ const docTree = (storyRef, currentArray, index) => {
       const name = storyObj.Name;
       const childrenSummary = storyObj.Children;
       const childCount = childrenSummary.Count;
-      // If the user story has any child user stories:
+      const testCasesSummary = storyObj.TestCases;
+      let ownTestCaseCount = testCasesSummary.Count;
+      // If the user story has any child user stories (and therefore no test cases):
       if (childCount) {
-        // Document the user story as an object with an initialized children array.
+        // Document the user story as an object with initialized data.
         currentArray[index] = {
           name,
-          children: []
+          children: [],
+          testCaseCount: 0
         };
         // Get data on its child user stories.
-        getData(childrenSummary._ref, ['_ref', 'DragAndDropRank'])
+        return getData(childrenSummary._ref, ['_ref', 'DragAndDropRank'])
         .then(
-          // When the data arrive, populate the children array in rank order.
+          // When the data arrive:
           childrenObj => {
+            // Populate the children array in rank order.
             const children = Array.from(childrenObj.Object.Results);
             children.sort((a, b) => a.DragAndDropRank < b.DragAndDropRank ? -1 : 1);
             const childArray = currentArray[index].children;
@@ -274,29 +278,30 @@ const docTree = (storyRef, currentArray, index) => {
                   'hierarchicalrequirement', 'hierarchicalrequirement', children[i]._ref
                 );
                 if (! isError) {
-                  docTree(childRef, childArray, i);
+                  // Also increment the root user story’s count by the child’s cumulative count.
+                  currentArray[index].testCaseCount += docTree(childRef, childArray, i);
                 }
               }
             }
+            // Return the root user story’s cumulative count.
+            return currentArray[index].testCaseCount;
           },
-          error => err(
-            error,
-            'getting data on child user stories for tree documentation'
-          )
+          error => err(error, 'getting data on child user stories for tree documentation')
         );
       }
       // Otherwise, i.e. if the user story has no child user stories:
       else {
         // Document the user story as an object without a children array.
         currentArray[index] = {
-          name
+          name,
+          testCaseCount: ownTestCaseCount
         };
+        // Send the documentation to the client if apparently complete.
         outDoc();
+        return ownTestCaseCount;
       }
     },
-    error => err(
-      error, 'getting data on user story for tree documentation'
-    )
+    error => err(error, 'getting data on user story for tree documentation')
   );
 };
 // Recursively acquires test results from a tree of user stories.
