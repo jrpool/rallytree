@@ -260,8 +260,8 @@ const docTree = (storyRef, currentArray, index) => {
         // Document the user story as an object with initialized data.
         currentArray[index] = {
           name,
-          children: [],
-          testCaseCount: 0
+          testCaseCount: 0,
+          children: []
         };
         // Get data on its child user stories.
         return getData(childrenSummary._ref, ['_ref', 'DragAndDropRank'])
@@ -278,8 +278,14 @@ const docTree = (storyRef, currentArray, index) => {
                   'hierarchicalrequirement', 'hierarchicalrequirement', children[i]._ref
                 );
                 if (! isError) {
-                  // Also increment the root user story’s count by the child’s cumulative count.
-                  currentArray[index].testCaseCount += docTree(childRef, childArray, i);
+                  docTree(childRef, childArray, i)
+                  .then(
+                    count => {
+                      // Also increment the root user story’s count by the child’s cumulative count.
+                      currentArray[index].testCaseCount += count;
+                    },
+                    error => err(error, 'documenting child user story')
+                  );
                 }
               }
             }
