@@ -1077,7 +1077,7 @@ const requestHandler = (request, res) => {
       */
       else if (requestURL === '/doc' && idle) {
         streamInit();
-        docTree(rootRef, doc, 0);
+        docTree(rootRef, doc, 0, []);
       }
       else if (requestURL === '/verdicttotals' && idle) {
         streamInit();
