@@ -243,9 +243,9 @@ const outDoc = () => {
   );
 };
 // Recursively documents a tree or subtree of user stories.
-const docTree = (storyRef, currentArray, index) => {
+const docTree = (storyRef, storyArray, index, ancestors) => {
   // Get data on the root user story.
-  return getData(storyRef, ['Name', 'DragAndDropRank', 'Children', 'TestCases'])
+  getData(storyRef, ['Name', 'DragAndDropRank', 'Children', 'TestCases'])
   .then(
     storyResult => {
       // When the data arrive:
@@ -253,44 +253,37 @@ const docTree = (storyRef, currentArray, index) => {
       const name = storyObj.Name;
       const childrenSummary = storyObj.Children;
       const childCount = childrenSummary.Count;
-      const testCasesSummary = storyObj.TestCases;
-      let ownTestCaseCount = testCasesSummary.Count;
+      const casesSummary = storyObj.TestCases;
+      let ownCaseCount = casesSummary.Count;
       // If the user story has any child user stories (and therefore no test cases):
       if (childCount) {
         // Document the user story as an object with initialized data.
-        currentArray[index] = {
+        storyArray[index] = {
           name,
-          testCaseCount: 0,
+          caseCount: 0,
           children: []
         };
         // Get data on its child user stories.
-        return getData(childrenSummary._ref, ['_ref', 'DragAndDropRank'])
+        getData(childrenSummary._ref, ['_ref', 'DragAndDropRank'])
         .then(
           // When the data arrive:
           childrenObj => {
-            // Populate the children array in rank order.
+            // Create an array of the children in rank order.
             const children = Array.from(childrenObj.Object.Results);
             children.sort((a, b) => a.DragAndDropRank < b.DragAndDropRank ? -1 : 1);
-            const childArray = currentArray[index].children;
+            const childArray = storyArray[index].children;
             for (let i = 0; i < children.length; i++) {
               if (! isError) {
                 const childRef = shorten(
                   'hierarchicalrequirement', 'hierarchicalrequirement', children[i]._ref
                 );
                 if (! isError) {
-                  docTree(childRef, childArray, i)
-                  .then(
-                    count => {
-                      // Also increment the root user story’s count by the child’s cumulative count.
-                      currentArray[index].testCaseCount += count;
-                    },
-                    error => err(error, 'documenting child user story')
+                  docTree(
+                    childRef, childArray, i, ancestors.concat(storyArray[index])
                   );
                 }
               }
             }
-            // Return the root user story’s cumulative count.
-            return currentArray[index].testCaseCount;
           },
           error => err(error, 'getting data on child user stories for tree documentation')
         );
@@ -298,13 +291,16 @@ const docTree = (storyRef, currentArray, index) => {
       // Otherwise, i.e. if the user story has no child user stories:
       else {
         // Document the user story as an object without a children array.
-        currentArray[index] = {
+        storyArray[index] = {
           name,
-          testCaseCount: ownTestCaseCount
+          caseCount: ownCaseCount
         };
+        // Add the user story’s test-case count to its ancestors’.
+        ancestors.forEach(ancestor => {
+          ancestor.caseCount += ownCaseCount;
+        });
         // Send the documentation to the client if apparently complete.
         outDoc();
-        return ownTestCaseCount;
       }
     },
     error => err(error, 'getting data on user story for tree documentation')
