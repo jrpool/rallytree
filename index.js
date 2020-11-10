@@ -40,6 +40,7 @@ let taskNames = [];
 let rootRef = '';
 let treeCopyParentRef = '';
 let testFolderRef = '';
+let testSetRef = '';
 let totals = {
   total: 0,
   changes: 0,
@@ -71,6 +72,7 @@ const reinit = () => {
   rootRef = '';
   treeCopyParentRef = '';
   testFolderRef = '';
+  testSetRef = '';
   totals = {
     total: 0,
     changes: 0,
@@ -675,7 +677,7 @@ const caseTree = storyRefs => {
                 Name: name,
                 Description: description,
                 Owner: owner,
-                TestFolder: testFolderRef || null
+                TestFolder: testFolderRef || null,
                 TestSets: [testSetRef] || []
               }
             })
@@ -1104,7 +1106,7 @@ const requestHandler = (request, res) => {
       const bodyObject = parse(Buffer.concat(bodyParts).toString());
       userName = bodyObject.userName;
       const {
-        password, rootID, op, takerName, parentID, taskNameString, testFolderID
+        password, rootID, op, takerName, parentID, taskNameString, testFolderID, testSetID
       } = bodyObject;
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
@@ -1193,9 +1195,38 @@ const requestHandler = (request, res) => {
                                 // Get data on the test folder.
                                 getData(testFolderRef, ['_ref'])
                                 .then(
+                                  // When the data arrive:
                                   () => {
-                                    // Serve a report on test-case creation.
-                                    serveCaseReport();
+                                    // If a set set was specified:
+                                    if (testSetID) {
+                                      // Get a reference to it.
+                                      getRefOf('testset', testSetID, 'test-case creation')
+                                      .then(
+                                        ref => {
+                                          if (! isError) {
+                                            testSetRef = shorten('testst', 'testset', ref);
+                                            if (! isError) {
+                                              // Get data on the test set.
+                                              getData(testSetRef, ['_ref'])
+                                              .then(
+                                                // When the data arrive:
+                                                () => {
+                                                  // Serve a report on test-case creation.
+                                                  serveCaseReport();
+                                                },
+                                                error => err(error, 'getting data on test set')
+                                              );
+                                            }
+                                          }
+                                        },
+                                        error => err(error, 'getting reference to test set')
+                                      );
+                                    }
+                                    // Otherwise, i.e. if no test set was specified:
+                                    else {
+                                      // Serve a report on test-case creation.
+                                      serveCaseReport();
+                                    }
                                   },
                                   error => err(error, 'getting data on test folder')
                                 );
