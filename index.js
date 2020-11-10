@@ -647,16 +647,14 @@ const caseTree = storyRefs => {
             // Get data on its child user stories.
             return getData(childrenSummary._ref, ['_ref'])
             .then(
-              /*
-                When the data arrive, process the children sequentially to
-                prevent concurrency errors.
-              */
+              // When the data arrive, process the children sequentially.
               childrenResult => {
                 const childRefs = childrenResult.Object.Results.map(
                   child => child._ref
                 );
                 return caseTree(childRefs)
                 .then(
+                  // After they are processed, process the user story’s remaining siblings.
                   () => caseTree(storyRefs.slice(1)),
                   error => err(error, 'creating test cases for child user stories')
                 );
@@ -678,6 +676,7 @@ const caseTree = storyRefs => {
                 Description: description,
                 Owner: owner,
                 TestFolder: testFolderRef || null
+                TestSets: [testSetRef] || []
               }
             })
             .then(
@@ -696,10 +695,7 @@ const caseTree = storyRefs => {
                     // After it is linked:
                     () => {
                       upTotals(1);
-                      /*
-                        Process the rest of the specified user stories
-                        sequentially to prevent concurrency errors.
-                      */
+                      // Process the remaining siblings of the user story.
                       return caseTree(storyRefs.slice(1));
                     },
                     error => err(error, 'adding test case to user story')

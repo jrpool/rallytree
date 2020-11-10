@@ -78,16 +78,34 @@
               </label></p>
               <p><label>
                 <input id = "op-case" type="radio" name="op" value="case">
-                <span class="label">Add test cases; if in a test folder, its ID:</span>
-                <input
-                  id="testFolderID"
-                  name="testFolderID"
-                  size="12"
-                  maxwidth="12"
-                  class="indent"
-                  placeholder="TF"
-                >
+                <span class="label">Add test cases and (optionally) put them into:</span>
               </label></p>
+              <p>
+                <label>
+                  <span class="label">Test folder:</span>
+                  <input
+                    id="testFolderID"
+                    name="testFolderID"
+                    size="12"
+                    maxwidth="12"
+                    class="indent"
+                    placeholder="TF"
+                  >
+                </label>
+              </p>
+              <p>
+                <label>
+                  <span class="label">Test set:</span>
+                  <input
+                    id="testSetID"
+                    name="testSetID"
+                    size="12"
+                    maxwidth="12"
+                    class="indent"
+                    placeholder="TS"
+                  >
+                </label>
+              </p>
               <p><label>
                 <input id="op-copy" type="radio" name="op" value="copy">
                 <span class="label">Copy to (ID of parent user story)</span>
