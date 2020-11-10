@@ -1029,7 +1029,7 @@ const serveEventStart = () => {
 // Reinitializes the event-stream variables and starts an event stream.
 const streamInit = () => {
   idle = false;
-  total = changes = 0;
+  totals.total = totals.changes = 0;
   serveEventStart();
 };
 /*
