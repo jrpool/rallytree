@@ -669,7 +669,7 @@ const caseTree = storyRefs => {
           }
           // Otherwise the user story needs a test case, so:
           else {
-            // Create a test case.
+            // Create a test case. (Its test-set link cannot be made here.)
             return restAPI.create({
               type: 'testcase',
               fetch: ['_ref'],
@@ -677,8 +677,7 @@ const caseTree = storyRefs => {
                 Name: name,
                 Description: description,
                 Owner: owner,
-                TestFolder: testFolderRef || null,
-                TestSets: [testSetRef] || []
+                TestFolder: testFolderRef || null
               }
             })
             .then(
@@ -696,9 +695,31 @@ const caseTree = storyRefs => {
                   .then(
                     // After it is linked:
                     () => {
-                      upTotals(1);
-                      // Process the remaining siblings of the user story.
-                      return caseTree(storyRefs.slice(1));
+                      // If a test set was specified:
+                      if (testSetRef) {
+                        // Link the test case to it.
+                        return restAPI.add({
+                          ref: caseRef,
+                          collection: 'TestSets',
+                          data: [{_ref: testSetRef}],
+                          fetch: ['_ref']
+                        })
+                        .then(
+                          // After it is linked:
+                          () => {
+                            // Process the remaining siblings of the user story.
+                            upTotals(1);
+                            return caseTree(storyRefs.slice(1));
+                          },
+                          error => err(error, 'linking test case to test set')
+                        );
+                      }
+                      // Otherwise, i.e. if no test set was specified:
+                      else {
+                        upTotals(1);
+                        // Process the remaining siblings of the user story.
+                        return caseTree(storyRefs.slice(1));
+                      }
                     },
                     error => err(error, 'adding test case to user story')
                   );
@@ -1030,6 +1051,31 @@ const streamInit = () => {
   totals.total = totals.changes = 0;
   serveEventStart();
 };
+// Serves a test-case-creation report if a test set is specified.
+const serveCaseIfSet = (testSetID) => {
+  // Get a reference to it.
+  getRefOf('testset', testSetID, 'test-case creation')
+  .then(
+    ref => {
+      if (! isError) {
+        testSetRef = shorten('testset', 'testset', ref);
+        if (! isError) {
+          // Get data on the test set.
+          getData(testSetRef, ['_ref'])
+          .then(
+            // When the data arrive:
+            () => {
+              // Serve a report on test-case creation.
+              serveCaseReport();
+            },
+            error => err(error, 'getting data on test set')
+          );
+        }
+      }
+    },
+    error => err(error, 'getting reference to test set')
+  );
+};
 /*
   Handles requests, serving the home page, the request page, and the
   acknowledgement page.
@@ -1199,28 +1245,8 @@ const requestHandler = (request, res) => {
                                   () => {
                                     // If a set set was specified:
                                     if (testSetID) {
-                                      // Get a reference to it.
-                                      getRefOf('testset', testSetID, 'test-case creation')
-                                      .then(
-                                        ref => {
-                                          if (! isError) {
-                                            testSetRef = shorten('testst', 'testset', ref);
-                                            if (! isError) {
-                                              // Get data on the test set.
-                                              getData(testSetRef, ['_ref'])
-                                              .then(
-                                                // When the data arrive:
-                                                () => {
-                                                  // Serve a report on test-case creation.
-                                                  serveCaseReport();
-                                                },
-                                                error => err(error, 'getting data on test set')
-                                              );
-                                            }
-                                          }
-                                        },
-                                        error => err(error, 'getting reference to test set')
-                                      );
+                                      // Process it and serve a report on test-case creation.
+                                      serveCaseIfSet(testSetID);
                                     }
                                     // Otherwise, i.e. if no test set was specified:
                                     else {
@@ -1236,7 +1262,12 @@ const requestHandler = (request, res) => {
                           error => err(error, 'getting reference to test folder')
                         );
                       }
-                      // Otherwise, i.e. if no test folder was specified:
+                      // Otherwise, if a test set but no test folder was specified:
+                      else if (testSetID) {
+                        // Process the test set and serve a report on test-case creation.
+                        serveCaseIfSet(testSetID);
+                      }
+                      // Otherwise, i.e. if neither a test folder nor a test set was specified:
                       else {
                         // Serve a report on test-case creation.
                         serveCaseReport();
