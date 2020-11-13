@@ -41,6 +41,7 @@ let rootRef = '';
 let treeCopyParentRef = '';
 let testFolderRef = '';
 let testSetRef = '';
+let copyIncludesTasks = false;
 let totals = {
   total: 0,
   changes: 0,
@@ -73,6 +74,7 @@ const reinit = () => {
   treeCopyParentRef = '';
   testFolderRef = '';
   testSetRef = '';
+  copyIncludesTasks = false;
   totals = {
     total: 0,
     changes: 0,
@@ -740,7 +742,7 @@ const caseTree = storyRefs => {
   }
 };
 // Sequentially copies an array of tasks.
-const copyTasks = (taskRefs, copyParentRef) => {
+const copyTasks = (taskRefs, copyStoryRef) => {
   if (taskRefs.length && ! isError) {
     // Identify and shorten a reference to the first task.
     const firstRef = shorten('task', 'task', taskRefs[0]);
@@ -764,14 +766,14 @@ const copyTasks = (taskRefs, copyParentRef) => {
               Description: description,
               Owner: owner,
               DragAndDropRank: rank,
-              Parent: copyParentRef
+              WorkProduct: copyStoryRef
             }
           })
           .then(
             // When the task has been copied:
             () => {
               // Copy the remaining tasks in the specified array.
-              return copyTasks(taskRefs.slice(1), copyParentRef);
+              return copyTasks(taskRefs.slice(1), copyStoryRef);
             },
             error => err(error, 'copying task')
           );
@@ -830,8 +832,8 @@ const copyTree = (storyRefs, copyParentRef) => {
                 // Identify and shorten a reference to the copy.
                 const copyRef = shorten('userstory', 'hierarchicalrequirement', copy.Object._ref);
                 if (! isError) {
-                  // If the original has any tasks:
-                  if (tasksSummary.Count) {
+                  // If tasks are to be copied and the original has any tasks:
+                  if (copyIncludesTasks && tasksSummary.Count) {
                     // Get data on them.
                     return getData(tasksSummary._ref, ['_ref'])
                     .then(
@@ -855,7 +857,6 @@ const copyTree = (storyRefs, copyParentRef) => {
                   }
                   // Otherwise, if the original has any child user stories:
                   else if (childrenSummary.Count) {
-                    upTotal('total');
                     // Get data on them.
                     return getData(childrenSummary._ref, ['_ref'])
                     .then(
@@ -878,7 +879,7 @@ const copyTree = (storyRefs, copyParentRef) => {
                       }
                     );
                   }
-                  // Otherwise, i.e. if the original has no tasks or child user stories:
+                  // Otherwise, i.e. if the original has no copiable tasks or child user stories:
                   else {
                     upTotal('total');
                     // Process the remaining user stories.
@@ -1209,7 +1210,7 @@ const requestHandler = (request, res) => {
       }
       else if (requestURL === '/copytotals' && idle) {
         streamInit();
-        copyTree([[rootRef, 1]], treeCopyParentRef);
+        copyTree([rootRef], treeCopyParentRef);
       }
     }
     // Otherwise, if the request submits the request form:
@@ -1220,7 +1221,15 @@ const requestHandler = (request, res) => {
       const bodyObject = parse(Buffer.concat(bodyParts).toString());
       userName = bodyObject.userName;
       const {
-        password, rootID, op, takerName, parentID, taskNameString, testFolderID, testSetID
+        password,
+        rootID,
+        op,
+        takerName,
+        parentID,
+        taskNameString,
+        testFolderID,
+        testSetID,
+        copyTasks
       } = bodyObject;
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
@@ -1364,7 +1373,8 @@ const requestHandler = (request, res) => {
                                     );
                                   }
                                   else {
-                                    // Copy the user story and give it the specified parent.
+                                    // Copy the tree and give it the specified parent.
+                                    copyIncludesTasks = copyTasks;
                                     serveCopyReport();
                                   }
                                 },
