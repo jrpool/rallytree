@@ -104,7 +104,10 @@
               </p>
               <p><label>
                 <input id="op-copy" type="radio" name="op" value="copy">
-                <span class="label">Copy to (ID of parent user story)</span>
+                <span class="label">Copy</span>
+              </label>
+              <label>
+                <span class="label">to parent</span>
                 <input
                   id="parentID"
                   name="parentID"
@@ -112,7 +115,12 @@
                   maxwidth="12"
                   placeholder="US"
                 >
-              </label></p>
+              </label>
+              <label>
+                <input type="checkbox" id="copyTasks" name="copyTasks">
+                <span class="label">with tasks</span>
+              </label>
+            </p>
             </fieldset>
           </section>
           <section class="odd">

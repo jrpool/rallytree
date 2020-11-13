@@ -739,17 +739,60 @@ const caseTree = storyRefs => {
     return Promise.resolve('');
   }
 };
-// Recursively copies a tree or subtrees of user stories.
-const copyTree = (storyData, copyParentRef) => {
-  if (storyData.length && ! isError) {
-    // Identify the reference on the first user story.
-    const firstData = storyData[0];
-    // Identify and shorten the reference to that user story.
-    const firstRef = shorten('userstory', 'hierarchicalrequirement', firstData[0]);
+// Sequentially copies an array of tasks.
+const copyTasks = (taskRefs, copyParentRef) => {
+  if (taskRefs.length && ! isError) {
+    // Identify and shorten a reference to the first task.
+    const firstRef = shorten('task', 'task', taskRefs[0]);
     if (! isError) {
-      // Get data on the first user story of the specified array.
+      // Get data on the first task.
+      return getData(firstRef, ['Name', 'Description', 'Owner', 'DragAndDropRank'])
+      .then(
+        // When the data arrive:
+        taskResult => {
+          const taskObj = taskResult.Object;
+          const name = taskObj.Name;
+          const description = taskObj.Description;
+          const owner = taskObj.Owner;
+          const rank = taskObj.DragAndDropRank;
+          // Copy the task and give it the specified parent.
+          return restAPI.create({
+            type: 'task',
+            fetch: ['_ref'],
+            data: {
+              Name: name,
+              Description: description,
+              Owner: owner,
+              DragAndDropRank: rank,
+              Parent: copyParentRef
+            }
+          })
+          .then(
+            // When the task has been copied:
+            () => {
+              // Copy the remaining tasks in the specified array.
+              return copyTasks(taskRefs.slice(1), copyParentRef);
+            },
+            error => err(error, 'copying task')
+          );
+        },
+        error => err(error, 'getting data on task')
+      );
+    }
+  }
+  else {
+    return Promise.resolve('');
+  }
+};
+// Recursively copies a tree or subtrees of user stories.
+const copyTree = (storyRefs, copyParentRef) => {
+  if (storyRefs.length && ! isError) {
+    // Identify and shorten the reference to the first user story.
+    const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
+    if (! isError) {
+      // Get data on the first user story.
       return getData(
-        firstRef, ['Name', 'Description', 'Owner', 'DragAndDropRank', 'Children']
+        firstRef, ['Name', 'Description', 'Owner', 'DragAndDropRank', 'Tasks', 'Children']
       )
       .then(
         storyResult => {
@@ -759,13 +802,11 @@ const copyTree = (storyData, copyParentRef) => {
           const description = storyObj.Description;
           const owner = storyObj.Owner;
           const rank = storyObj.DragAndDropRank;
+          const tasksSummary = storyObj.Tasks;
           const childrenSummary = storyObj.Children;
           // If the user story is the specified parent of the tree copy:
           if (firstRef === treeCopyParentRef) {
-            /*
-              Quit and report the precondition violation. The parent of
-              the copy must be outside the original tree.
-            */
+            // Quit and report this as a precondition violation.
             err('Attempt to copy to itself', 'copying tree');
             return '';
           }
@@ -784,38 +825,65 @@ const copyTree = (storyData, copyParentRef) => {
               }
             })
             .then(
-              // When the user story has been copied and linked:
+              // When the user story has been copied:
               copy => {
-                upTotal('total');
-                // If the original has any child user stories:
-                if (childrenSummary.Count) {
-                  const copyRef = copy.Object._ref;
-                  // Get data on them.
-                  return getData(childrenSummary._ref, ['_ref', 'DragAndDropRank'])
-                  .then(
-                    // When the data arrive, process the children sequentially.
-                    childrenResult => {
-                      const childData = childrenResult.Object.Results.map(
-                        child => [child._ref, child.DragAndDropRank]
-                      );
-                      return copyTree(childData, copyRef)
-                      .then(
-                        () => copyTree(storyData.slice(1), copyParentRef),
-                        error => err(error, 'copying child user stories')
-                      );
-                    },
-                    error => err(
-                      error, 'getting data on child user stories for copying'
-                    )
-                  );
-                }
-                // Otherwise:
-                else {
-                  /*
-                    Process the rest of the specified user stories
-                    sequentially to prevent concurrency errors.
-                  */
-                  return copyTree(storyData.slice(1), copyParentRef);
+                // Identify and shorten a reference to the copy.
+                const copyRef = shorten('userstory', 'hierarchicalrequirement', copy.Object._ref);
+                if (! isError) {
+                  // If the original has any tasks:
+                  if (tasksSummary.Count) {
+                    // Get data on them.
+                    return getData(tasksSummary._ref, ['_ref'])
+                    .then(
+                      // When the data arrive:
+                      tasksResult => {
+                        // Copy the tasks.
+                        const taskRefs = tasksResult.Object.Results.map(task => task._ref);
+                        return copyTasks(taskRefs, copyRef)
+                        .then(
+                          // When the tasks have been copied:
+                          () => {
+                            upTotal('total');
+                            // Process the remaining user stories.
+                            return copyTree(storyRefs.slice(1), copyParentRef);
+                          },
+                          error => err(error, 'copying tasks')
+                        );
+                      },
+                      error => err(error, 'getting data on user-story tasks')
+                    );
+                  }
+                  // Otherwise, if the original has any child user stories:
+                  else if (childrenSummary.Count) {
+                    upTotal('total');
+                    // Get data on them.
+                    return getData(childrenSummary._ref, ['_ref'])
+                    .then(
+                      // When the data arrive:
+                      childrenResult => {
+                        // Copy the child user stories.
+                        const childRefs = childrenResult.Object.Results.map(
+                          child => child._ref
+                        );
+                        return copyTree(childRefs, copyRef)
+                        .then(
+                          // When the child user stories have been copied:
+                          () => {
+                            upTotal('total');
+                            // Process the remaining user stories.
+                            return copyTree(storyRefs.slice(1), copyParentRef);
+                          },
+                          error => err(error, 'copying child user stories')
+                        );
+                      }
+                    );
+                  }
+                  // Otherwise, i.e. if the original has no tasks or child user stories:
+                  else {
+                    upTotal('total');
+                    // Process the remaining user stories.
+                    return copyTree(storyRefs.slice(1), copyParentRef);
+                  }
                 }
               },
               error => err(error, 'copying user story')

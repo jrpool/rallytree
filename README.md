@@ -23,7 +23,7 @@ This feature adds tasks to each of a tree&rsquo;s user stories that have no chil
 This feature adds a test case to each of a tree&rsquo;s user stories that have no child user stories. The new test case is given the same name, description, and owner as its user story. You can also specify a test folder and/or a test set that the test cases will all belong to.
 
 ## Tree-copy creation
-This feature copies a tree. You designate an existing user story as the parent of the root user story of the new tree. That parent must not have any tasks and must not be in the tree that you are copying. Only user stories are copied, not tasks, test cases, or defects. In a copy of a user story, the name, owner, and description are copied from the original.
+This feature copies a tree. You designate an existing user story as the parent of the root user story of the new tree. That parent must not have any tasks and must not be in the tree that you are copying. User stories are copied and, optionally, their tasks. Test cases and defects are not copied. In a copy of a user story or task, the name, owner, and description are copied from the original.
 
 # Architecture
 RallyTree is a `node.js` application that can be installed locally. It creates a web server running on `localhost:3000`.
