@@ -186,43 +186,54 @@ const getRefOf = (type, formattedID, context) => {
     return Promise.resolve('');
   }
 };
+// Returns an event-stream message.
+const eventMsg = (eventName, addCount = 1) => {
+  totals[totalsProp] += addCount;
+  return `event: ${eventName}\ndata: ${totals[eventName]}\n\n`;
+};
 // Increments a total count and sends the new count as an event.
-const upTotal = event => {
-  response.write(`event: ${event}\ndata: ${++totals[event]}\n\n`);
+const upTotal = eventName => {
+  response.write(eventMsg(eventName));
 };
 /*
   Increments the total count and the change count and sends
   the counts as events.
 */
 const upTotals = changeCount => {
-  const totalMsg = `event: total\ndata: ${++totals.total}\n\n`;
-  totals.changes += changeCount;
-  const changeMsg = changeCount
-    ? `event: changes\ndata: ${totals.changes}\n\n`
-    : '';
+  const totalMsg = eventMsg('total');
+  const changeMsg = changeCount ? eventMsg('changes') : '';
   response.write(`${totalMsg}${changeMsg}`);
+};
+// Increments the counts for ownership changes and sends the counts as events.
+const upTakes = (itemType, isChange) => {
+  const totalMsg = eventMsg('total');
+  const subtotalMsg = eventMsg(`${itemType}Total`);
+  let changeMsg = '';
+  let subChangeMsg = '';
+  if (isChange) {
+    changeMsg = eventMsg('changes', true);
+    subChangeMsg = eventMsg(`${itemType}Changes`);
+  }
+  response.write(`${totalMsg}${subtotalMsg}${changeMsg}${subChangeMsg}`);
 };
 /*
   Increments the total count and the applicable verdict count
   and sends the counts as events.
 */
-const upVerdicts = isPass=> {
-  const totalMsg = `event: total\ndata: ${++totals.total}\n\n`;
+const upVerdicts = isPass => {
+  const totalMsg = eventMsg('total');
   let changeMsg;
   if (isPass) {
-    totals.passes++;
-    changeMsg = `event: passes\ndata: ${totals.passes}\n\n`;
+    changeMsg = eventMsg('passes');
   }
   else {
-    totals.fails++;
-    changeMsg = `event: fails\ndata: ${totals.fails}\n\n`;
+    changeMsg = eventMsg('fails');
   }
   response.write(`${totalMsg}${changeMsg}`);
 };
 // Increments the defect count.
 const upDefects = count => {
-  totals.defects += count;
-  response.write(`event: defects\ndata: ${totals.defects}\n\n`);
+  response.write(eventMsg('defects', count));
 };
 // Gets data on a work item.
 const getData = (ref, fetch) => {
@@ -411,7 +422,7 @@ const verdictTree = storyRef => {
     )
   );
 };
-// Change the ownership of a task.
+// Ensure the ownership of a task.
 const takeTask = taskObj => {
   if (! isError) {
     const taskRef = shorten('task', 'task', taskObj._ref);
@@ -419,20 +430,22 @@ const takeTask = taskObj => {
       const taskOwner = taskObj.Owner;
       const ownerRef = taskOwner ? shorten('user', 'user', taskOwner._ref) : '';
       if (! isError) {
+        // If the current owner is not the intended owner:
         if (ownerRef !== takerRef) {
+          // Change the owner.
           restAPI.update({
             ref: taskRef,
             data: {Owner: takerRef}
           })
           .then(
             () => {
-              upTotals(1);
+              upTakes('task', true);
             },
             error => err(error, 'changing the owner')
           );
         }
         else {
-          upTotals(0);
+          upTakes('task', false);
         }
       }
     }
@@ -452,16 +465,16 @@ const takeTree = storyRef => {
       const taskCount = tasksSummary.Count;
       const childrenSummary = storyObj.Children;
       const childCount = childrenSummary.Count;
-      const changeCount = ownerRef === takerRef ? 0 : 1;
+      const isChange = ownerRef !== takerRef;
       // Ensure that the specified user owns the user story.
       restAPI.update({
         ref: storyRef,
-        data: changeCount ? {Owner: takerRef} : {}
+        data: isChange ? {Owner: takerRef} : {}
       })
       // When the ownership change is complete:
       .then(
         () => {
-          upTotals(changeCount);
+          upTakes('story', isChange);
           // If the user story has any tasks and no child user stories:
           if (taskCount && ! childCount) {
             // Get the data on the tasks.

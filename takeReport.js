@@ -2,33 +2,33 @@
   takeReport.js
   Server-side event client script.
 
-  This script makes the web page subscribe to server-side events
-  and update one of its elements whenever it receives an event.
+  Makes the web page subscribe to server-side events and update
+  one of its elements whenever it receives an event.
 */
 
-let eventSource;
+const eventSource = new EventSource('/taketotals');
 let lastEventTime;
 // Handles a message event.
-const messageHandler = (event, type) => {
+const handleMessage = (event, type) => {
   const data = event.data;
   if (data) {
     document.getElementById(type).innerHTML = data;
     lastEventTime = Date.now();
   }
 };
+// Listens for message events.
+const listenForMessages = eventIDs => {
+  eventIDs.forEach(eventID => {
+    eventSource.addEventListener(eventID, event => {
+      handleMessage(event, eventID);
+    });
+  });
+};
 document.addEventListener('DOMContentLoaded', () => {
-  // Request an event stream.
-  eventSource = new EventSource('/taketotals');
-  // Listen for message events.
-  eventSource.addEventListener('total', event => {
-    messageHandler(event, 'total');
-  });
-  eventSource.addEventListener('changes', event => {
-    messageHandler(event, 'changes');
-  });
-  eventSource.addEventListener('error', event => {
-    messageHandler(event, 'error');
-  });
+  // Request an event stream and listen for messages on it.
+  listenForMessages(
+    'total', 'storyTotal', 'taskTotal', 'changes', 'storyChanges', 'taskChanges', 'error'
+  );
   // Stop listening after 10 idle seconds, assuming the job complete.
   const poller = setInterval(
     () => {

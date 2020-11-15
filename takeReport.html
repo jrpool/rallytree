@@ -14,10 +14,14 @@
       <section class="flex">
         <section class="even">
           <h2>Results</h2>
-          <p>Work items processed: <span id="total" role="status">0</span></p>
-          <p class="more">
-            Ownerships changed: <span id="changes" role="status">0</span>
-          </p>
+          <h3>Work items processed</h3>
+          <p>Total: <span id="total" role="status">0</span></p>
+          <p>User stories: <span id="stories" role="status">0</span></p>
+          <p>Tasks: <span id="tasks" role="status">0</span></p>
+          <h3>Ownerships changed</h3>
+          <p>Total: <span id="changes" role="status">0</span></p>
+          <p>User stories: <span id="storyChanges" role="status">0</span>
+          <p>Tasks: <span id="taskChanges" role="status">0</span></p>
           <div id="error" class="error" role="alert"></div>
         </section>
         <section class="odd">
@@ -27,7 +31,7 @@
         </section>
         <section class="even">
           <h2>New owner</h2>
-          <p>The new owner of all work items in the tree is</p>
+          <p>The new owner of all user stories and tasks in the tree is</p>
           <pre>__takerName__</pre>
           <p class="more">
             The new owner&rsquo;s Rally user reference is
