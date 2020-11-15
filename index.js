@@ -45,6 +45,10 @@ let copyIncludesTasks = false;
 let totals = {
   total: 0,
   changes: 0,
+  storyTotal: 0,
+  taskTotal: 0,
+  storyChanges: 0,
+  taskChanges: 0,
   passes: 0,
   fails: 0,
   defects: 0,
@@ -78,6 +82,10 @@ const reinit = () => {
   totals = {
     total: 0,
     changes: 0,
+    storyTotal: 0,
+    taskTotal: 0,
+    storyChanges: 0,
+    taskChanges: 0,
     passes: 0,
     fails: 0,
     defects: 0,
@@ -187,10 +195,9 @@ const getRefOf = (type, formattedID, context) => {
   }
 };
 // Returns an event-stream message.
-const eventMsg = (eventName, addCount = 1) => {
-  totals[totalsProp] += addCount;
-  return `event: ${eventName}\ndata: ${totals[eventName]}\n\n`;
-};
+const eventMsg = (
+  eventName, addCount = 1
+) => `event: ${eventName}\ndata: ${totals[eventName] += addCount}\n\n`;
 // Increments a total count and sends the new count as an event.
 const upTotal = eventName => {
   response.write(eventMsg(eventName));
@@ -471,7 +478,7 @@ const takeTree = storyRef => {
         ref: storyRef,
         data: isChange ? {Owner: takerRef} : {}
       })
-      // When the ownership change is complete:
+      // When the ownership is ensured:
       .then(
         () => {
           upTakes('story', isChange);

@@ -6,7 +6,7 @@
   one of its elements whenever it receives an event.
 */
 
-const eventSource = new EventSource('/taketotals');
+let eventSource;
 let lastEventTime;
 // Handles a message event.
 const handleMessage = (event, type) => {
@@ -17,17 +17,20 @@ const handleMessage = (event, type) => {
   }
 };
 // Listens for message events.
-const listenForMessages = eventIDs => {
+const listenForMessages = (source, eventIDs) => {
   eventIDs.forEach(eventID => {
-    eventSource.addEventListener(eventID, event => {
+    source.addEventListener(eventID, event => {
       handleMessage(event, eventID);
     });
   });
 };
+// After the DOM has loaded:
 document.addEventListener('DOMContentLoaded', () => {
   // Request an event stream and listen for messages on it.
+  eventSource = new EventSource('/taketotals');
   listenForMessages(
-    'total', 'storyTotal', 'taskTotal', 'changes', 'storyChanges', 'taskChanges', 'error'
+    eventSource,
+    ['total', 'storyTotal', 'taskTotal', 'changes', 'storyChanges', 'taskChanges', 'error']
   );
   // Stop listening after 10 idle seconds, assuming the job complete.
   const poller = setInterval(
