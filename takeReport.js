@@ -30,7 +30,17 @@ document.addEventListener('DOMContentLoaded', () => {
   eventSource = new EventSource('/taketotals');
   listenForMessages(
     eventSource,
-    ['total', 'storyTotal', 'taskTotal', 'changes', 'storyChanges', 'taskChanges', 'error']
+    [
+      'total',
+      'storyTotal',
+      'taskTotal',
+      'caseTotal',
+      'changes',
+      'storyChanges',
+      'taskChanges',
+      'caseChanges',
+      'error'
+    ]
   );
   // Stop listening after 10 idle seconds, assuming the job complete.
   const poller = setInterval(

@@ -47,8 +47,10 @@ let totals = {
   changes: 0,
   storyTotal: 0,
   taskTotal: 0,
+  caseTotal: 0,
   storyChanges: 0,
   taskChanges: 0,
+  caseChanges: 0,
   passes: 0,
   fails: 0,
   defects: 0,
@@ -84,8 +86,10 @@ const reinit = () => {
     changes: 0,
     storyTotal: 0,
     taskTotal: 0,
+    caseTotal: 0,
     storyChanges: 0,
     taskChanges: 0,
+    caseChanges: 0,
     passes: 0,
     fails: 0,
     defects: 0,
@@ -211,18 +215,6 @@ const upTotals = changeCount => {
   const changeMsg = changeCount ? eventMsg('changes') : '';
   response.write(`${totalMsg}${changeMsg}`);
 };
-// Increments the counts for ownership changes and sends the counts as events.
-const upTakes = (itemType, isChange) => {
-  const totalMsg = eventMsg('total');
-  const subtotalMsg = eventMsg(`${itemType}Total`);
-  let changeMsg = '';
-  let subChangeMsg = '';
-  if (isChange) {
-    changeMsg = eventMsg('changes', true);
-    subChangeMsg = eventMsg(`${itemType}Changes`);
-  }
-  response.write(`${totalMsg}${subtotalMsg}${changeMsg}${subChangeMsg}`);
-};
 /*
   Increments the total count and the applicable verdict count
   and sends the counts as events.
@@ -248,6 +240,18 @@ const getData = (ref, fetch) => {
     ref,
     fetch
   });
+};
+// Increments the counts for ownership changes and sends the counts as events.
+const upTakes = (itemType, isChange) => {
+  const totalMsg = eventMsg('total');
+  const subtotalMsg = eventMsg(`${itemType}Total`);
+  let changeMsg = '';
+  let subChangeMsg = '';
+  if (isChange) {
+    changeMsg = eventMsg('changes', true);
+    subChangeMsg = eventMsg(`${itemType}Changes`);
+  }
+  response.write(`${totalMsg}${subtotalMsg}${changeMsg}${subChangeMsg}`);
 };
 // Sends the tree documentation as an event.
 const outDoc = () => {
@@ -434,30 +438,31 @@ const verdictTree = storyRef => {
     )
   );
 };
-// Ensure the ownership of a task.
-const takeTask = taskObj => {
+// Ensure the ownership of a task or test case.
+const takeTaskOrCase = (itemType, itemObj) => {
   if (! isError) {
-    const taskRef = shorten('task', 'task', taskObj._ref);
+    const workItemType = itemType === 'case' ? 'testcase' : 'task';
+    const itemRef = shorten(workItemType, workItemType, itemObj._ref);
     if (! isError) {
-      const taskOwner = taskObj.Owner;
-      const ownerRef = taskOwner ? shorten('user', 'user', taskOwner._ref) : '';
+      const itemOwner = itemObj.Owner;
+      const ownerRef = itemOwner ? shorten('user', 'user', itemOwner._ref) : '';
       if (! isError) {
         // If the current owner is not the intended owner:
         if (ownerRef !== takerRef) {
           // Change the owner.
           restAPI.update({
-            ref: taskRef,
+            ref: itemRef,
             data: {Owner: takerRef}
           })
           .then(
             () => {
-              upTakes('task', true);
+              upTakes(itemType, true);
             },
-            error => err(error, 'changing the owner')
+            error => err(error, `changing ${itemType} owner`)
           );
         }
         else {
-          upTakes('task', false);
+          upTakes(itemType, false);
         }
       }
     }
@@ -466,7 +471,7 @@ const takeTask = taskObj => {
 // Recursively changes ownerships in a tree of user stories.
 const takeTree = storyRef => {
   // Get data on the user story.
-  getData(storyRef, ['Owner', 'Children', 'Tasks'])
+  getData(storyRef, ['Owner', 'Children', 'Tasks', 'TestCases'])
   .then(
     // When the data arrive:
     storyResult => {
@@ -475,6 +480,8 @@ const takeTree = storyRef => {
       const ownerRef = owner ? shorten('user', 'user', storyObj.Owner._ref) : '';
       const tasksSummary = storyObj.Tasks;
       const taskCount = tasksSummary.Count;
+      const casesSummary = storyObj.TestCases;
+      const caseCount = casesSummary.Count;
       const childrenSummary = storyObj.Children;
       const childCount = childrenSummary.Count;
       const isChange = ownerRef !== takerRef;
@@ -487,27 +494,8 @@ const takeTree = storyRef => {
       .then(
         () => {
           upTakes('story', isChange);
-          // If the user story has any tasks and no child user stories:
-          if (taskCount && ! childCount) {
-            // Get the data on the tasks.
-            getData(tasksSummary._ref, ['_ref', 'Owner'])
-            .then(
-              // When the data arrive:
-              tasksObj => {
-                const tasks = tasksObj.Object.Results;
-                // Process the tasks in parallel.
-                tasks.forEach(taskObj => {
-                  takeTask(taskObj);
-                });
-              },
-              error => err(error, 'getting data on tasks')
-            );
-          }
-          /*
-            Otherwise, if the user story has any child user stories and
-            no tasks:
-          */
-          else if (childCount && ! taskCount) {
+          // If the user story has any child user stories and no tasks or test cases:
+          if (childCount && ! taskCount && ! caseCount) {
             // Get data on its child user stories.
             getData(childrenSummary._ref, ['_ref'])
             .then(
@@ -533,14 +521,56 @@ const takeTree = storyRef => {
               )
             );
           }
-          /*
-            Otherwise, if the user story has both child user stories
-            and tasks:
-          */
-          else if (childCount && taskCount) {
+          // Otherwise, if the user story has any tasks and no test cases or child user stories:
+          else if (taskCount && ! (caseCount || childCount)) {
+            // Get the data on the tasks.
+            getData(tasksSummary._ref, ['_ref', 'Owner'])
+            .then(
+              // When the data arrive:
+              tasksObj => {
+                const tasks = tasksObj.Object.Results;
+                // Process the tasks in parallel.
+                tasks.forEach(taskObj => {
+                  takeTaskOrCase('task', taskObj);
+                });
+              },
+              error => err(error, 'getting data on tasks')
+            );
+          }
+          // Otherwise, if the user story has any tasks and test cases and no child user stories:
+          else if (taskCount && caseCount && ! childCount) {
+            // Get the data on the tasks.
+            getData(tasksSummary._ref, ['_ref', 'Owner'])
+            .then(
+              // When the data arrive:
+              tasksObj => {
+                const tasks = tasksObj.Object.Results;
+                // Process the tasks in parallel.
+                tasks.forEach(taskObj => {
+                  takeTaskOrCase('task', taskObj);
+                });
+                // Get the data on the test cases.
+                getData(casesSummary._ref, ['_ref', 'Owner'])
+                .then(
+                  // When the data arrive:
+                  casesObj => {
+                    const cases = casesObj.Object.Results;
+                    // Process the test cases in parallel.
+                    cases.forEach(caseObj => {
+                      takeTaskOrCase('case', caseObj);
+                    });
+                  },
+                  error => err(error, 'getting data on test cases')
+                );
+              },
+              error => err(error, 'getting data on tasks')
+            );
+          }
+          // Otherwise if the user story has an invalid combination of descendants:
+          else if ((childCount && (taskCount || caseCount)) || caseCount && ! taskCount) {
             // Stop and report this as a precondition violation.
             err(
-              'User story with both children and tasks',
+              'User story with invalid descendant combination',
               'ownership changes'
             );
           }
