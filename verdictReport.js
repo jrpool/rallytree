@@ -2,45 +2,35 @@
   verdictReport.js
   Server-side event client script.
 
-  This script makes the web page subscribe to server-side events
-  and update one of its elements whenever it receives an event.
+  Makes the web page subscribe to server-side events and update
+  one of its elements whenever it receives an event.
 */
 
 let eventSource;
 let lastEventTime;
 // Handles a message event.
-const messageHandler = (event, type) => {
+const handleMessage = (event, type) => {
   const data = event.data;
   if (data) {
     document.getElementById(type).innerHTML = data;
     lastEventTime = Date.now();
   }
 };
+// Listens for message events.
+const listenForMessages = (source, eventIDs) => {
+  eventIDs.forEach(eventID => {
+    source.addEventListener(eventID, event => {
+      handleMessage(event, eventID);
+    });
+  });
+};
+// After the DOM has loaded:
 document.addEventListener('DOMContentLoaded', () => {
-  // Request an event stream.
+  // Request an event stream and listen for messages on it.
   eventSource = new EventSource('/verdicttotals');
-  // Listen for message events.
-  eventSource.addEventListener('total', event => {
-    messageHandler(event, 'total');
-  });
-  eventSource.addEventListener('passes', event => {
-    messageHandler(event, 'passed');
-  });
-  eventSource.addEventListener('fails', event => {
-    messageHandler(event, 'failed');
-  });
-  eventSource.addEventListener('defects', event => {
-    messageHandler(event, 'defects');
-  });
-  eventSource.addEventListener('major', event => {
-    messageHandler(event, 'major');
-  });
-  eventSource.addEventListener('minor', event => {
-    messageHandler(event, 'minor');
-  });
-  eventSource.addEventListener('error', event => {
-    messageHandler(event, 'error');
-  });
+  listenForMessages(
+    eventSource, ['total', 'passes', 'fails', 'defects', 'major', 'minor', 'error']
+  );
   // Stop listening after 10 idle seconds, assuming the job complete.
   const poller = setInterval(
     () => {
