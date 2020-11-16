@@ -267,7 +267,7 @@ const outDoc = () => {
 // Recursively documents a tree or subtree of user stories.
 const docTree = (storyRef, storyArray, index, ancestors) => {
   // Get data on the root user story.
-  getData(storyRef, ['Name', 'DragAndDropRank', 'Children', 'TestCases'])
+  getData(storyRef, ['Name', 'DragAndDropRank', 'Children', 'Tasks', 'TestCases'])
   .then(
     storyResult => {
       // When the data arrive:
@@ -275,13 +275,16 @@ const docTree = (storyRef, storyArray, index, ancestors) => {
       const name = storyObj.Name;
       const childrenSummary = storyObj.Children;
       const childCount = childrenSummary.Count;
+      const tasksSummary = storyObj.Tasks;
+      let ownTaskCount = tasksSummary.Count;
       const casesSummary = storyObj.TestCases;
       let ownCaseCount = casesSummary.Count;
-      // If the user story has any child user stories (and therefore no test cases):
+      // If the user story has any child user stories (and therefore no tasks or test cases):
       if (childCount) {
         // Document the user story as an object with initialized data.
         storyArray[index] = {
           name,
+          taskCount: 0,
           caseCount: 0,
           children: []
         };
@@ -290,7 +293,7 @@ const docTree = (storyRef, storyArray, index, ancestors) => {
         .then(
           // When the data arrive:
           childrenObj => {
-            // Create an array of the children in rank order.
+            // Document the children in rank order.
             const children = Array.from(childrenObj.Object.Results);
             children.sort((a, b) => a.DragAndDropRank < b.DragAndDropRank ? -1 : 1);
             const childArray = storyArray[index].children;
@@ -315,10 +318,12 @@ const docTree = (storyRef, storyArray, index, ancestors) => {
         // Document the user story as an object without a children array.
         storyArray[index] = {
           name,
+          taskCount: ownTaskCount,
           caseCount: ownCaseCount
         };
-        // Add the user story’s test-case count to its ancestors’.
+        // Add the user story’s task and test-case counts to its ancestors’.
         ancestors.forEach(ancestor => {
+          ancestor.taskCount += ownTaskCount;
           ancestor.caseCount += ownCaseCount;
         });
         // Send the documentation to the client if apparently complete.
