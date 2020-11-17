@@ -207,12 +207,12 @@ const upTotal = eventName => {
   response.write(eventMsg(eventName));
 };
 /*
-  Increments the total count and the change count and sends
+  Increments the total count by 1 and the change count by a specified amount and sends
   the counts as events.
 */
 const upTotals = changeCount => {
   const totalMsg = eventMsg('total');
-  const changeMsg = changeCount ? eventMsg('changes') : '';
+  const changeMsg = changeCount ? eventMsg('changes', changeCount) : '';
   response.write(`${totalMsg}${changeMsg}`);
 };
 /*
@@ -837,8 +837,8 @@ const caseTree = storyRefs => {
               .then(
                 // When it has been created:
                 () => {
-                  // Process the remaining user stories.
                   upTotals(1);
+                  // Process the remaining user stories.
                   return caseTree(storyRefs.slice(1));
                 },
                 error => err(error, 'creating and linking test case')
@@ -856,8 +856,8 @@ const caseTree = storyRefs => {
                   .then(
                     // When it has been created and linked:
                     () => {
+                      upTotals(2);
                       // Process the remaining user stories.
-                      upTotals(1);
                       return caseTree(storyRefs.slice(1));
                     },
                     error => err(error, 'creating and linking second test case')
