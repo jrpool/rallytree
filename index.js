@@ -682,6 +682,109 @@ const taskTree = storyRefs => {
     return Promise.resolve('');
   }
 };
+// Data for test-case creation.
+const caseData = {
+  'Contrast - Minimum (1.4.3) - MAJOR': [
+    'Contrast - Minimum (1.4.3.a) - MAJOR',
+    'Contrast - Minimum (1.4.3.b) - MAJOR'
+  ],
+  'Use of Color (1.4.1) - MAJOR':[
+    'Use of Color (1.4.1.a) - MAJOR',
+    'Use of Color (1.4.1.b) - MAJOR'
+  ],
+  'Media Player Accessibility - MAJOR': [
+    'Media Player Accessibility (Keyboard) - MAJOR',
+    'Media Player Accessibility (Screen Reader) - MAJOR'
+  ],
+  'Bypass Blocks (2.4.1) - MAJOR': [
+    'Bypass Blocks (2.4.1.a) - MAJOR',
+    'Bypass Blocks (2.4.1.b) - MAJOR'
+  ],
+  'Sensory Characteristics (1.3.3) - MINOR': [
+    'Sensory Characteristics (1.3.3.a) - MINOR',
+    'Sensory Characteristics (1.3.3.b) - MINOR'
+  ],
+  'Headings and Labels (2.4.6) - MINOR': [
+    'Headings and Labels (2.4.6.a) - MINOR',
+    'Headings and Labels (2.4.6.b) - MINOR'
+  ],
+  'Pause, Stop, Hide (2.2.2) - MINOR': [
+    'Pause, Stop, Hide (2.2.2.a) - MINOR',
+    'Pause, Stop, Hide (2.2.2.b) - MINOR'
+  ],
+  'JAWS User Flow': [
+    'JAWS User Flow (Firefox)',
+    'JAWS User Flow (Chrome)'
+  ],
+  'NVDA User Flow': [
+    'NVDA User Flow (Firefox)',
+    'NVDA User Flow (Chrome)'
+  ],
+  'VoiceOver User Flow': [
+    'VoiceOver User Flow (Safari)',
+    'VoiceOver User Flow (Chrome)'
+  ],
+  'VoiceOver (iOS)': [
+    'VoiceOver (iOS - Native)',
+    'VoiceOver (iOS - Safari)'
+  ],
+  'TalkBack User Flow': [
+    'TalkBack User Flow (Native)',
+    'TalkBack User Flow (RWD)'
+  ]
+};
+// Creates a test case.
+const createCase = (name, description, owner, storyRef) => {
+  // Create a test case.
+  return restAPI.create({
+    type: 'testcase',
+    fetch: ['_ref'],
+    data: {
+      Name: name,
+      Description: description,
+      Owner: owner,
+      TestFolder: testFolderRef || null
+    }
+  })
+  .then(
+    // After it is created:
+    newCase => {
+      // Link it to the specified user story.
+      const caseRef = shorten('testcase', 'testcase', newCase.Object._ref);
+      if (! isError) {
+        return restAPI.add({
+          ref: storyRef,
+          collection: 'TestCases',
+          data: [{_ref: caseRef}],
+          fetch: ['_ref']
+        })
+        .then(
+          // After it is linked:
+          () => {
+            // If a test set was specified:
+            if (testSetRef) {
+              // Link the test case to it.
+              return restAPI.add({
+                ref: caseRef,
+                collection: 'TestSets',
+                data: [{_ref: testSetRef}],
+                fetch: ['_ref']
+              });
+            }
+            else {
+              return '';
+            }
+          },
+          error => err(error, 'linking test case to user story')
+        );
+      }
+      else {
+        return '';
+      }
+    },
+    error => err(error, 'creating test case')
+  );
+};
 // Recursively creates test cases for a tree or subtrees of user stories.
 const caseTree = storyRefs => {
   if (storyRefs.length && ! isError) {
@@ -697,9 +800,10 @@ const caseTree = storyRefs => {
           const description = storyObj.Description;
           const owner = storyObj.Owner;
           const childrenSummary = storyObj.Children;
+          const caseNames = caseData[name] || [name];
           /*
             If the user story has any child user stories, it does not
-            need a test case, so:
+            need test cases, so:
           */
           if (childrenSummary.Count) {
             upTotals(0);
@@ -724,72 +828,51 @@ const caseTree = storyRefs => {
               )
             );
           }
-          // Otherwise the user story needs a test case, so:
+          // Otherwise the user story needs test cases, so:
           else {
-            // Create a test case. (Its test-set link cannot be made here.)
-            return restAPI.create({
-              type: 'testcase',
-              fetch: ['_ref'],
-              data: {
-                Name: name,
-                Description: description,
-                Owner: owner,
-                TestFolder: testFolderRef || null
-              }
-            })
-            .then(
-              // After it is created:
-              newCase => {
-                // Link it to the user story.
-                const caseRef = shorten('testcase', 'testcase', newCase.Object._ref);
-                if (! isError) {
-                  return restAPI.add({
-                    ref: firstRef,
-                    collection: 'TestCases',
-                    data: [{_ref: caseRef}],
-                    fetch: ['_ref']
-                  })
+            // If only 1 test case is to be created:
+            if (caseNames.length === 1) {
+              // Create and link it.
+              return createCase(caseNames[0], description, owner, firstRef)
+              .then(
+                // When it has been created:
+                () => {
+                  // Process the remaining user stories.
+                  upTotals(1);
+                  return caseTree(storyRefs.slice(1));
+                },
+                error => err(error, 'creating and linking test case')
+              );
+            }
+            // Otherwise, if 2 test cases are to be created:
+            else if (caseNames.length === 2) {
+              // Create and link the first test case.
+              return createCase(caseNames[0], description, owner, firstRef)
+              .then(
+                // When it has been created and linked:
+                () => {
+                  // Create and link the second test case.
+                  return createCase(caseNames[1], description, owner, firstRef)
                   .then(
-                    // After it is linked:
+                    // When it has been created and linked:
                     () => {
-                      // If a test set was specified:
-                      if (testSetRef) {
-                        // Link the test case to it.
-                        return restAPI.add({
-                          ref: caseRef,
-                          collection: 'TestSets',
-                          data: [{_ref: testSetRef}],
-                          fetch: ['_ref']
-                        })
-                        .then(
-                          // After it is linked:
-                          () => {
-                            // Process the remaining siblings of the user story.
-                            upTotals(1);
-                            return caseTree(storyRefs.slice(1));
-                          },
-                          error => err(error, 'linking test case to test set')
-                        );
-                      }
-                      // Otherwise, i.e. if no test set was specified:
-                      else {
-                        upTotals(1);
-                        // Process the remaining siblings of the user story.
-                        return caseTree(storyRefs.slice(1));
-                      }
+                      // Process the remaining user stories.
+                      upTotals(1);
+                      return caseTree(storyRefs.slice(1));
                     },
-                    error => err(error, 'adding test case to user story')
+                    error => err(error, 'creating and linking second test case')
                   );
-                }
-              },
-              error => err(error, 'creating test case')
-            );
+                },
+                error => err(error, 'creating and linking first test case')
+              );
+            }
           }
         },
-        error => err(
-          error, 'getting data on user story for test-case creation'
-        )
+        error => err(error, 'getting data on user story')
       );
+    }
+    else {
+      return Promise.resolve('');
     }
   }
   else {
