@@ -907,6 +907,7 @@ const copyTree = (storyRefs, copyParentRef) => {
             .then(
               // When the user story has been copied:
               copy => {
+                upCopies('stories');
                 // Identify and shorten a reference to the copy.
                 const copyRef = shorten('userstory', 'hierarchicalrequirement', copy.Object._ref);
                 if (! isError) {
@@ -921,17 +922,9 @@ const copyTree = (storyRefs, copyParentRef) => {
                         const childRefs = childrenResult.Object.Results.map(
                           child => child._ref
                         );
-                        return copyTree(childRefs, copyRef)
-                        .then(
-                          // When the child user stories have been copied:
-                          () => {
-                            upCopies('stories');
-                            // Process the remaining user stories.
-                            return copyTree(storyRefs.slice(1), copyParentRef);
-                          },
-                          error => err(error, 'copying child user stories')
-                        );
-                      }
+                        return copyTree(childRefs, copyRef);
+                      },
+                      error => err(error, 'getting data on child user stories')
                     );
                   }
                   /*
@@ -965,10 +958,10 @@ const copyTree = (storyRefs, copyParentRef) => {
                             );
                           },
                           error => err(error, 'copying task')
-                        )
+                        );
                       },
                       error => err(error, 'getting data on tasks')
-                    )
+                    );
                   }
                   /*
                     Otherwise, if the original has no child user stories and has tasks and they
@@ -993,7 +986,7 @@ const copyTree = (storyRefs, copyParentRef) => {
                     return Promise.resolve('');
                   }
                 }
-                // Copy the remaining user stories in the specified array.
+                // Process the remaining user stories.
                 return copyTree(storyRefs.slice(1), copyParentRef);
               },
               error => err(error, 'copying user story')
