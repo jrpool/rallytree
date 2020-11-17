@@ -829,11 +829,11 @@ const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
             .then(
               // When the item has been copied:
               () => {
-                upCopies(['tasks', 'cases'][['task', 'case'].indexOf(itemType)]);
+                upCopies(['taskTotal', 'caseTotal'][['task', 'case'].indexOf(itemType)]);
                 // Copy the remaining items in the specified array.
                 return copyTasksOrCases(itemType, itemRefs.slice(1), copyStoryRef);
               },
-              error => err(error, `copying ${itemType}`)
+              error => err(error, `copying ${itemType} ${firstRef}`)
             );
           },
           error => err(error, `getting data on ${itemType}`)
@@ -886,8 +886,14 @@ const copyTree = (storyRefs, copyParentRef) => {
           const childCount = childrenSummary.Count;
           // If the user story is the specified parent of the tree copy:
           if (firstRef === treeCopyParentRef) {
-            // Quit and report this as a precondition violation.
+            // Quit and report this.
             err('Attempt to copy to itself', 'copying tree');
+            return '';
+          }
+          // Otherwise, if the original has an invalid descendant combination:
+          else if (childCount && (taskCount || caseCount) || (caseCount && ! taskCount)) {
+            // Quit and report this.
+            err(`Invalid user story ${firstRef}`, 'copying tree');
             return '';
           }
           // Otherwise:
@@ -907,7 +913,7 @@ const copyTree = (storyRefs, copyParentRef) => {
             .then(
               // When the user story has been copied:
               copy => {
-                upCopies('stories');
+                upCopies('storyTotal');
                 // Identify and shorten a reference to the copy.
                 const copyRef = shorten('userstory', 'hierarchicalrequirement', copy.Object._ref);
                 if (! isError) {
@@ -922,7 +928,15 @@ const copyTree = (storyRefs, copyParentRef) => {
                         const childRefs = childrenResult.Object.Results.map(
                           child => child._ref
                         );
-                        return copyTree(childRefs, copyRef);
+                        copyTree(childRefs, copyRef)
+                        .then(
+                          // When the child user stories have been copied:
+                          () => {
+                            // Process the remaining user stories.
+                            return copyTree(storyRefs.slice(1), copyParentRef);
+                          },
+                          error => err(error, 'copying child user stories')
+                        );
                       },
                       error => err(error, 'getting data on child user stories')
                     );
@@ -952,7 +966,15 @@ const copyTree = (storyRefs, copyParentRef) => {
                                 const caseRefs = casesResult.Object.Results.map(
                                   testCase => testCase._ref
                                 );
-                                return copyTasksOrCases('case', caseRefs, copyRef);
+                                return copyTasksOrCases('case', caseRefs, copyRef)
+                                .then(
+                                  // When the test cases have been copied:
+                                  () => {
+                                    // Process the remaining user stories.
+                                    return copyTree(storyRefs.slice(1), copyParentRef);
+                                  },
+                                  error => err(error, 'copying test case')
+                                );
                               },
                               error => err(error, 'getting data on test cases')
                             );
@@ -975,30 +997,28 @@ const copyTree = (storyRefs, copyParentRef) => {
                       tasksResult => {
                         // Copy the tasks.
                         const taskRefs = tasksResult.Object.Results.map(task => task._ref);
-                        return copyTasksOrCases('task', taskRefs, copyRef);
+                        return copyTasksOrCases('task', taskRefs, copyRef)
+                        .then(
+                          // When the test cases have been copied:
+                          () => {
+                            // Process the remaining user stories.
+                            return copyTree(storyRefs.slice(1), copyParentRef);
+                          },
+                          error => err(error, 'copying task')
+                        );
                       },
                       error => err(error, 'getting data on tasks')
                     );
                   }
-                  // Otherwise, if the original has an invalid descendant combination:
-                  else if (childCount && (taskCount || caseCount) || (caseCount && ! taskCount)) {
-                    err(`invalid user story ${firstRef}`, 'copying tree');
-                    return Promise.resolve('');
-                  }
                 }
-                // Process the remaining user stories.
-                return copyTree(storyRefs.slice(1), copyParentRef);
               },
-              error => err(error, 'copying user story')
+              error => err(error, `copying user story ${firstRef}`)
             );
           }
         },
         error => err(error, 'getting data on user story')
       );
     }
-  }
-  else {
-    return Promise.resolve('');
   }
 };
 // Gets a short reference to a user.
