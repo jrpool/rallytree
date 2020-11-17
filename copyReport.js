@@ -28,7 +28,7 @@ const listenForMessages = (source, eventIDs) => {
 document.addEventListener('DOMContentLoaded', () => {
   // Request an event stream and listen for messages on it.
   eventSource = new EventSource('/copytotals');
-  listenForMessages(eventSource, ['total', 'error']);
+  listenForMessages(eventSource, ['total', 'stories', 'tasks', 'cases', 'error']);
   // Stop listening after 10 idle seconds, assuming the job complete.
   const poller = setInterval(
     () => {

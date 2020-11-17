@@ -41,7 +41,7 @@ let rootRef = '';
 let treeCopyParentRef = '';
 let testFolderRef = '';
 let testSetRef = '';
-let copyIncludesTasks = false;
+let copyWhat = 'both';
 let totals = {
   total: 0,
   changes: 0,
@@ -80,7 +80,7 @@ const reinit = () => {
   treeCopyParentRef = '';
   testFolderRef = '';
   testSetRef = '';
-  copyIncludesTasks = false;
+  copyWhat = 'both';
   totals = {
     total: 0,
     changes: 0,
@@ -796,50 +796,68 @@ const caseTree = storyRefs => {
     return Promise.resolve('');
   }
 };
-// Sequentially copies an array of tasks.
-const copyTasks = (taskRefs, copyStoryRef) => {
-  if (taskRefs.length && ! isError) {
-    // Identify and shorten a reference to the first task.
-    const firstRef = shorten('task', 'task', taskRefs[0]);
-    if (! isError) {
-      // Get data on the first task.
-      return getData(firstRef, ['Name', 'Description', 'Owner', 'DragAndDropRank'])
-      .then(
-        // When the data arrive:
-        taskResult => {
-          const taskObj = taskResult.Object;
-          const name = taskObj.Name;
-          const description = taskObj.Description;
-          const owner = taskObj.Owner;
-          const rank = taskObj.DragAndDropRank;
-          // Copy the task and give it the specified parent.
-          return restAPI.create({
-            type: 'task',
-            fetch: ['_ref'],
-            data: {
-              Name: name,
-              Description: description,
-              Owner: owner,
-              DragAndDropRank: rank,
-              WorkProduct: copyStoryRef
-            }
-          })
-          .then(
-            // When the task has been copied:
-            () => {
-              // Copy the remaining tasks in the specified array.
-              return copyTasks(taskRefs.slice(1), copyStoryRef);
-            },
-            error => err(error, 'copying task')
-          );
-        },
-        error => err(error, 'getting data on task')
-      );
+// Sequentially copies an array of tasks or test cases.
+const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
+  if (itemRefs.length && ! isError) {
+    // Identify and shorten a reference to the first item.
+    const workItemType = ['task', 'testcase'][['task', 'case'].indexOf(itemType)];
+    if (workItemType) {
+      const firstRef = shorten(workItemType, workItemType, itemRefs[0]);
+      if (! isError) {
+        // Get data on the first item.
+        return getData(firstRef, ['Name', 'Description', 'Owner', 'DragAndDropRank'])
+        .then(
+          // When the data arrive:
+          itemResult => {
+            const itemObj = itemResult.Object;
+            const name = itemObj.Name;
+            const description = itemObj.Description;
+            const owner = itemObj.Owner;
+            const rank = itemObj.DragAndDropRank;
+            // Copy the item and give it the specified parent.
+            return restAPI.create({
+              type: workItemType,
+              fetch: ['_ref'],
+              data: {
+                Name: name,
+                Description: description,
+                Owner: owner,
+                DragAndDropRank: rank,
+                WorkProduct: copyStoryRef
+              }
+            })
+            .then(
+              // When the item has been copied:
+              () => {
+                upCopies(['tasks', 'cases'][['task', 'case'].indexOf(itemType)]);
+                // Copy the remaining items in the specified array.
+                return copyTasksOrCases(itemType, itemRefs.slice(1), copyStoryRef);
+              },
+              error => err(error, `copying ${itemType}`)
+            );
+          },
+          error => err(error, `getting data on ${itemType}`)
+        );
+      }
+      else {
+        return Promise.resolve('');
+      }
+    }
+    else {
+      err('invalid item type', 'copying task or test case');
+      return Promise.resolve('');
     }
   }
   else {
     return Promise.resolve('');
   }
+};
+/*
+  Increments the total copy count and the specified item-type count and sends
+  the counts as events.
+*/
+const upCopies = itemType => {
+  response.write(`${eventMsg('total')}${eventMsg(itemType)}`);
 };
 // Recursively copies a tree or subtrees of user stories.
 const copyTree = (storyRefs, copyParentRef) => {
@@ -849,7 +867,8 @@ const copyTree = (storyRefs, copyParentRef) => {
     if (! isError) {
       // Get data on the first user story.
       return getData(
-        firstRef, ['Name', 'Description', 'Owner', 'DragAndDropRank', 'Tasks', 'Children']
+        firstRef,
+        ['Name', 'Description', 'Owner', 'DragAndDropRank', 'Tasks', 'TestCases', 'Children']
       )
       .then(
         storyResult => {
@@ -860,7 +879,11 @@ const copyTree = (storyRefs, copyParentRef) => {
           const owner = storyObj.Owner;
           const rank = storyObj.DragAndDropRank;
           const tasksSummary = storyObj.Tasks;
+          const taskCount = tasksSummary.Count;
+          const casesSummary = storyObj.TestCases;
+          const caseCount = casesSummary.Count;
           const childrenSummary = storyObj.Children;
+          const childCount = childrenSummary.Count;
           // If the user story is the specified parent of the tree copy:
           if (firstRef === treeCopyParentRef) {
             // Quit and report this as a precondition violation.
@@ -887,32 +910,9 @@ const copyTree = (storyRefs, copyParentRef) => {
                 // Identify and shorten a reference to the copy.
                 const copyRef = shorten('userstory', 'hierarchicalrequirement', copy.Object._ref);
                 if (! isError) {
-                  // If tasks are to be copied and the original has any tasks:
-                  if (copyIncludesTasks && tasksSummary.Count) {
-                    // Get data on them.
-                    return getData(tasksSummary._ref, ['_ref'])
-                    .then(
-                      // When the data arrive:
-                      tasksResult => {
-                        // Copy the tasks.
-                        const taskRefs = tasksResult.Object.Results.map(task => task._ref);
-                        return copyTasks(taskRefs, copyRef)
-                        .then(
-                          // When the tasks have been copied:
-                          () => {
-                            upTotal('total');
-                            // Process the remaining user stories.
-                            return copyTree(storyRefs.slice(1), copyParentRef);
-                          },
-                          error => err(error, 'copying tasks')
-                        );
-                      },
-                      error => err(error, 'getting data on user-story tasks')
-                    );
-                  }
-                  // Otherwise, if the original has any child user stories:
-                  else if (childrenSummary.Count) {
-                    // Get data on them.
+                  // If the original has any child user stories and neither tasks nor test cases:
+                  if (childCount && ! (taskCount || caseCount)) {
+                    // Get data on the child user stories.
                     return getData(childrenSummary._ref, ['_ref'])
                     .then(
                       // When the data arrive:
@@ -925,7 +925,7 @@ const copyTree = (storyRefs, copyParentRef) => {
                         .then(
                           // When the child user stories have been copied:
                           () => {
-                            upTotal('total');
+                            upCopies('stories');
                             // Process the remaining user stories.
                             return copyTree(storyRefs.slice(1), copyParentRef);
                           },
@@ -934,19 +934,73 @@ const copyTree = (storyRefs, copyParentRef) => {
                       }
                     );
                   }
-                  // Otherwise, i.e. if the original has no copiable tasks or child user stories:
-                  else {
-                    upTotal('total');
-                    // Process the remaining user stories.
-                    return copyTree(storyRefs.slice(1), copyParentRef);
+                  /*
+                    Otherwise, if the original has no child user stories and has tasks and
+                    test cases and they are to be copied:
+                  */
+                  else if (taskCount && caseCount && copyWhat === 'both' && ! childCount) {
+                    // Get data on the tasks.
+                    return getData(tasksSummary._ref, ['_ref'])
+                    .then(
+                      // When the data arrive:
+                      tasksResult => {
+                        // Copy the tasks.
+                        const taskRefs = tasksResult.Object.Results.map(task => task._ref);
+                        return copyTasksOrCases('task', taskRefs, copyRef)
+                        .then(
+                          // When the tasks have been copied:
+                          () => {
+                            // Get data on the test cases.
+                            return getData(casesSummary._ref, ['_ref'])
+                            .then(
+                              // When the data arrive:
+                              casesResult => {
+                                // Copy the test cases.
+                                const caseRefs = casesResult.Object.Results.map(
+                                  testCase => testCase._ref
+                                );
+                                return copyTasksOrCases('case', caseRefs, copyRef);
+                              },
+                              error => err(error, 'getting data on test cases')
+                            );
+                          },
+                          error => err(error, 'copying task')
+                        )
+                      },
+                      error => err(error, 'getting data on tasks')
+                    )
+                  }
+                  /*
+                    Otherwise, if the original has no child user stories and has tasks and they
+                    are to be copied:
+                  */
+                  else if (taskCount && ['tasks', 'both'].includes(copyWhat) && ! childCount) {
+                    // Get data on the tasks.
+                    return getData(tasksSummary._ref, ['_ref'])
+                    .then(
+                      // When the data arrive:
+                      tasksResult => {
+                        // Copy the tasks.
+                        const taskRefs = tasksResult.Object.Results.map(task => task._ref);
+                        return copyTasksOrCases('task', taskRefs, copyRef);
+                      },
+                      error => err(error, 'getting data on tasks')
+                    );
+                  }
+                  // Otherwise, if the original has an invalid descendant combination:
+                  else if (childCount && (taskCount || caseCount) || (caseCount && ! taskCount)) {
+                    err(`invalid user story ${firstRef}`, 'copying tree');
+                    return Promise.resolve('');
                   }
                 }
+                // Copy the remaining user stories in the specified array.
+                return copyTree(storyRefs.slice(1), copyParentRef);
               },
               error => err(error, 'copying user story')
             );
           }
         },
-        error => err(error, 'getting data on user story to copy')
+        error => err(error, 'getting data on user story')
       );
     }
   }
@@ -1283,9 +1337,9 @@ const requestHandler = (request, res) => {
         parentID,
         taskNameString,
         testFolderID,
-        testSetID,
-        copyTasks
+        testSetID
       } = bodyObject;
+      copyWhat = bodyObject.copyWhat;
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
       // Create and configure a Rally API client.
@@ -1429,7 +1483,6 @@ const requestHandler = (request, res) => {
                                   }
                                   else {
                                     // Copy the tree and give it the specified parent.
-                                    copyIncludesTasks = copyTasks;
                                     serveCopyReport();
                                   }
                                 },

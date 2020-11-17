@@ -106,6 +106,11 @@
                 <input id="op-copy" type="radio" name="op" value="copy">
                 <span class="label">Copy</span>
               </label>
+              <select id="copyWhat" name="copyWhat">
+                <option value="both" selected>user stories, tasks, and test cases</option>
+                <option value="tasks">user stories and tasks</option>
+                <option value="neither">user stories</option>
+              </select>
               <label>
                 <span class="label">to parent</span>
                 <input
@@ -115,10 +120,6 @@
                   maxwidth="12"
                   placeholder="US"
                 >
-              </label>
-              <label>
-                <input type="checkbox" id="copyTasks" name="copyTasks">
-                <span class="label">with tasks</span>
               </label>
             </p>
             </fieldset>
