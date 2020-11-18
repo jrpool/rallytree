@@ -10,8 +10,13 @@ const fs = require('fs').promises;
 // Module to keep secrets local.
 require('dotenv').config();
 // Module to specify custom test-case creation.
-const caseModule = require('./data/caseData');
-const caseData = caseModule ? caseModule.caseData : null;
+let caseData;
+try {
+  caseData = require('./data/caseData').caseData;
+}
+catch (error) {
+  caseData = {}
+}
 // Module to create a web server.
 const http = require('http');
 // Module to parse request bodies.
@@ -752,7 +757,7 @@ const caseTree = storyRefs => {
           const description = storyObj.Description;
           const owner = storyObj.Owner;
           const childrenSummary = storyObj.Children;
-          const caseNames = caseData ? caseData[name] : [name];
+          const caseNames = caseData ? caseData[name] || [name] : [name];
           /*
             If the user story has any child user stories, it does not
             need test cases, so:
