@@ -40,9 +40,10 @@ exports.caseData = {
   'User story name 1':[
     'Test case name 1'
   ]
+};
 ```
 
-The `caseData` object can have any user-story names as property keys. For each such key, you may specify 1 or more test-case names. If any user story has that name and is eligible for test-case creation (i.e. has no child user stories), RallyTree will create test cases with those names for that user story. For any u/dcdm/u user story whose name is not in `caseData`, RallyTree will create only 1 test case, and it will have the same name as the user story.
+The `caseData` object can have any user-story names as property keys. For each such key, you may specify 1 or more test-case names. If any user story has that name and is eligible for test-case creation (i.e. has no child user stories), RallyTree will create test cases with those names for that user story. For any eligible user story whose name is not in `caseData`, RallyTree will create only 1 test case, and it will have the same name as the user story.
 
 # Architecture
 RallyTree is a `node.js` application that can be installed locally. It creates a web server running on `localhost:3000`.
