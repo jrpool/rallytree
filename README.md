@@ -20,7 +20,7 @@ This feature ensures that each user story, task, and test case in a tree has the
 This feature adds tasks to each of a tree&rsquo;s user stories that have no child user stories. You can choose how many tasks to add to each user story and give a name to each task.
 
 ## Test-case creation
-This feature adds a test case to each of a tree&rsquo;s user stories that have no child user stories. The new test case is given the same name, description, and owner as its user story. You can also specify a test folder and/or a test set that the test cases will all belong to.
+This feature adds test cases to a tree&rsquo;s user stories that have no child user stories. Generally, each such user story acquires one test case, to which it gives its name, description, and owner. However, there is a list of exceptional user-story names; any user story with one of the listed names gets two test cases, with names specified in the list. You can also specify a test folder and/or a test set that the test cases will all belong to.
 
 ## Tree-copy creation
 This feature copies a tree. You designate an existing user story as the parent of the root user story of the new tree. That parent must not have any tasks and must not be in the tree that you are copying. User stories and, optionally, their tasks, or tasks and test cases, are copied. Defects are not copied. In a copy of a user story task, or test case, the name, owner, and description are copied from the original.
