@@ -20,10 +20,29 @@ This feature ensures that each user story, task, and test case in a tree has the
 This feature adds tasks to each of a tree&rsquo;s user stories that have no child user stories. You can choose how many tasks to add to each user story and give a name to each task.
 
 ## Test-case creation
-This feature adds test cases to a tree&rsquo;s user stories that have no child user stories. Generally, each such user story acquires one test case, to which it gives its name, description, and owner. However, there is a list of exceptional user-story names; any user story with one of the listed names gets two test cases, with names specified in the list. You can also specify a test folder and/or a test set that the test cases will all belong to.
+This feature adds test cases to a tree&rsquo;s user stories that have no child user stories. Generally, each such user story acquires one test case, to which it gives its name, description, and owner. However, you can customize the counts and names of created test cases. You can also specify a test folder and/or a test set that the test cases will all belong to.
 
 ## Tree-copy creation
 This feature copies a tree. You designate an existing user story as the parent of the root user story of the new tree. That parent must not have any tasks and must not be in the tree that you are copying. User stories and, optionally, their tasks, or tasks and test cases, are copied. Defects are not copied. In a copy of a user story task, or test case, the name, owner, and description are copied from the original.
+
+# Customization
+
+## Test-case creation
+To customize test-case creation, maintain a file named `caseData.js` in a top-level directory named `data` in your local repository. In that file, define a variable named `caseData` as follows:
+
+```javascript
+exports.caseData = {
+  'User story name 0': [
+    'Test case name 0',
+    'Test case name 1',
+    'Test case name 2'
+  ],
+  'User story name 1':[
+    'Test case name 1'
+  ]
+```
+
+The `caseData` object can have any user-story names as property keys. For each such key, you may specify 1 or more test-case names. If any user story has that name and is eligible for test-case creation (i.e. has no child user stories), RallyTree will create test cases with those names for that user story. For any u/dcdm/u user story whose name is not in `caseData`, RallyTree will create only 1 test case, and it will have the same name as the user story.
 
 # Architecture
 RallyTree is a `node.js` application that can be installed locally. It creates a web server running on `localhost:3000`.
