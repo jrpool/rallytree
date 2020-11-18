@@ -9,6 +9,9 @@
 const fs = require('fs').promises;
 // Module to keep secrets local.
 require('dotenv').config();
+// Module to specify custom test-case creation.
+const caseModule = require('./data/caseData');
+const caseData = caseModule ? caseModule.caseData : null;
 // Module to create a web server.
 const http = require('http');
 // Module to parse request bodies.
@@ -682,57 +685,6 @@ const taskTree = storyRefs => {
     return Promise.resolve('');
   }
 };
-// Data for test-case creation.
-const caseData = {
-  'Contrast - Minimum (1.4.3) - MAJOR': [
-    'Contrast - Minimum (1.4.3.a) - MAJOR',
-    'Contrast - Minimum (1.4.3.b) - MAJOR'
-  ],
-  'Use of Color (1.4.1) - MAJOR':[
-    'Use of Color (1.4.1.a) - MAJOR',
-    'Use of Color (1.4.1.b) - MAJOR'
-  ],
-  'Media Player Accessibility - MAJOR': [
-    'Media Player Accessibility (Keyboard) - MAJOR',
-    'Media Player Accessibility (Screen Reader) - MAJOR'
-  ],
-  'Bypass Blocks (2.4.1) - MAJOR': [
-    'Bypass Blocks (2.4.1.a) - MAJOR',
-    'Bypass Blocks (2.4.1.b) - MAJOR'
-  ],
-  'Sensory Characteristics (1.3.3) - MINOR': [
-    'Sensory Characteristics (1.3.3.a) - MINOR',
-    'Sensory Characteristics (1.3.3.b) - MINOR'
-  ],
-  'Headings and Labels (2.4.6) - MINOR': [
-    'Headings and Labels (2.4.6.a) - MINOR',
-    'Headings and Labels (2.4.6.b) - MINOR'
-  ],
-  'Pause, Stop, Hide (2.2.2) - MINOR': [
-    'Pause, Stop, Hide (2.2.2.a) - MINOR',
-    'Pause, Stop, Hide (2.2.2.b) - MINOR'
-  ],
-  'JAWS User Flow': [
-    'JAWS User Flow (Firefox)',
-    'JAWS User Flow (Chrome)'
-  ],
-  'NVDA User Flow': [
-    'NVDA User Flow (Firefox)',
-    'NVDA User Flow (Chrome)'
-  ],
-  'VoiceOver User Flow': [
-    'VoiceOver User Flow (Safari)',
-    'VoiceOver User Flow (Chrome)'
-  ],
-  'VoiceOver (iOS)': [
-    'VoiceOver (iOS - Native)',
-    'VoiceOver (iOS - Safari)'
-  ],
-  'TalkBack User Flow': [
-    'TalkBack User Flow (Native)',
-    'TalkBack User Flow (RWD)'
-  ]
-};
 // Creates a test case.
 const createCase = (name, description, owner, storyRef) => {
   // Create a test case.
@@ -800,7 +752,7 @@ const caseTree = storyRefs => {
           const description = storyObj.Description;
           const owner = storyObj.Owner;
           const childrenSummary = storyObj.Children;
-          const caseNames = caseData[name] || [name];
+          const caseNames = caseData ? caseData[name] : [name];
           /*
             If the user story has any child user stories, it does not
             need test cases, so:
