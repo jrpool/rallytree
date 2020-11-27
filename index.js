@@ -38,32 +38,34 @@ const requestOptions = {
     process.env.RALLYINTEGRATIONVERSION || '1.0.4'
   }
 };
+let build = '';
+let copyWhat = 'both';
 let isError = false;
-let restAPI = {};
+let note = '';
 let response = {};
-let userName = '';
-let userRef = '';
+let restAPI = {};
+let rootRef = '';
 let takerRef = '';
 let taskNames = [];
-let rootRef = '';
-let treeCopyParentRef = '';
 let testFolderRef = '';
 let testSetRef = '';
-let copyWhat = 'both';
+let treeCopyParentRef = '';
+let userName = '';
+let userRef = '';
 let totals = {
-  total: 0,
-  changes: 0,
-  storyTotal: 0,
-  taskTotal: 0,
-  caseTotal: 0,
-  storyChanges: 0,
-  taskChanges: 0,
   caseChanges: 0,
-  passes: 0,
-  fails: 0,
+  caseTotal: 0,
+  changes: 0,
   defects: 0,
+  fails: 0,
   major: 0,
-  minor: 0
+  minor: 0,
+  passes: 0,
+  storyChanges: 0,
+  storyTotal: 0,
+  taskChanges: 0,
+  taskTotal: 0,
+  total: 0
 };
 let doc = [];
 let docTimeout = 0;
@@ -78,31 +80,33 @@ const docWait = 1500;
 
 // Reinitialize the global variables, except response.
 const reinit = () => {
+  build = '';
+  copyWhat = 'both';
   isError = false;
+  note = '';
   restAPI = {};
-  userName = '';
-  userRef = '';
+  rootRef = '';
   takerRef = '';
   taskNames = [];
-  rootRef = '';
-  treeCopyParentRef = '';
   testFolderRef = '';
   testSetRef = '';
-  copyWhat = 'both';
+  treeCopyParentRef = '';
+  userName = '';
+  userRef = '';
   totals = {
-    total: 0,
-    changes: 0,
-    storyTotal: 0,
-    taskTotal: 0,
-    caseTotal: 0,
-    storyChanges: 0,
-    taskChanges: 0,
     caseChanges: 0,
-    passes: 0,
-    fails: 0,
+    caseTotal: 0,
+    changes: 0,
     defects: 0,
+    fails: 0,
     major: 0,
-    minor: 0
+    minor: 0,
+    passes: 0,
+    storyChanges: 0,
+    storyTotal: 0,
+    taskChanges: 0,
+    taskTotal: 0,
+    total: 0
   };
   doc = [];
   docTimeout = 0;
@@ -242,13 +246,6 @@ const upVerdicts = isPass => {
 const upDefects = count => {
   response.write(eventMsg('defects', count));
 };
-// Gets data on a work item.
-const getData = (ref, fetch) => {
-  return restAPI.get({
-    ref,
-    fetch
-  });
-};
 // Increments the counts for ownership changes and sends the counts as events.
 const upTakes = (itemType, isChange) => {
   const totalMsg = eventMsg('total');
@@ -260,6 +257,13 @@ const upTakes = (itemType, isChange) => {
     subChangeMsg = eventMsg(`${itemType}Changes`);
   }
   response.write(`${totalMsg}${subtotalMsg}${changeMsg}${subChangeMsg}`);
+};
+// Gets data on a work item.
+const getData = (ref, fetch) => {
+  return restAPI.get({
+    ref,
+    fetch
+  });
 };
 // Sends the tree documentation as an event.
 const outDoc = () => {
@@ -836,6 +840,93 @@ const caseTree = storyRefs => {
     return Promise.resolve('');
   }
 };
+// Creates a test case.
+const createResult = (caseRef, build, testSet, note) => {
+  // Create a passing result.
+  restAPI.create({
+    type: 'testsetresult',
+    fetch: ['_ref'],
+    data: {
+      TestCase: caseRef,
+      Build: build,
+      Verdict: 'Pass',
+      Notes: note,
+      Date: new Date(),
+      Tester: userRef,
+      TestSet: testSet
+    }
+  });
+};
+// Recursively creates passing test-case results for a tree or subtrees of user stories.
+const resultTree = storyRefs => {
+  if (storyRefs.length && ! isError) {
+    const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
+    if (! isError) {
+      // Get data on the first user story of the specified array.
+      return getData(firstRef, ['Children', 'TestCases'])
+      .then(
+        storyResult => {
+          // When the data arrive:
+          const storyObj = storyResult.Object;
+          const childrenSummary = storyObj.Children;
+          const casesSummary = storyObj.TestCases;
+          /*
+            If the user story has any child user stories, it does not
+            have test cases, so:
+          */
+          if (childrenSummary.Count) {
+            // Get data on its child user stories.
+            return getData(childrenSummary._ref, ['_ref'])
+            .then(
+              // When the data arrive, process the children sequentially.
+              childrenResult => {
+                const childRefs = childrenResult.Object.Results.map(
+                  child => child._ref
+                );
+                return resultTree(childRefs)
+                .then(
+                  // After they are processed, process the user story’s remaining siblings.
+                  () => resultTree(storyRefs.slice(1)),
+                  error => err(error, 'creating test-case results for child user stories')
+                );
+              },
+              error => err(error,'getting data on child user stories for test-case result creation')
+            );
+          }
+          // Otherwise, if the user story has any test cases:
+          else if (casesSummary.Count) {
+            // Get data on its test cases.
+            return getData(casesSummary._ref, ['_ref', 'TestSet'])
+            .then(
+              // When the data arrive, process the children in parallel.
+              childrenResult => {
+                const childRefs = childrenResult.Object.Results.map(
+                  child => [child._ref, child.TestSet]
+                );
+                childRefs.forEach(childRef => {
+                  createResult(childRef[0], build, childRef[1], note);
+                });
+                return '';
+              },
+              error => err(error, 'getting data on test sets for test-case result creation')
+            );
+          }
+          // Otherwise, i.e. if the user story has no child user stories and no test cases:
+          else {
+            return '';
+          }
+        },
+        error => err(error, 'getting data on user story')
+      );
+    }
+    else {
+      return Promise.resolve('');
+    }
+  }
+  else {
+    return Promise.resolve('');
+  }
+};
 // Sequentially copies an array of tasks or test cases.
 const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
   if (itemRefs.length && ! isError) {
@@ -1216,6 +1307,23 @@ const serveCaseReport = () => {
     error => err(error, 'reading caseReport page')
   );
 };
+// Serves the add-test-case-result report page.
+const serveResultReport = () => {
+  fs.readFile('resultReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('resultReport.js', 'utf8')
+      .then(
+        jsContent => {
+          const newContent = reportPrep(htmlContent, jsContent);
+          servePage(newContent, true);
+        },
+        error => err(error, 'reading resultReport script')
+      );
+    },
+    error => err(error, 'reading resultReport page')
+  );
+};
 // Serves the copy report page.
 const serveCopyReport = () => {
   fs.readFile('copyReport.html', 'utf8')
@@ -1370,6 +1478,10 @@ const requestHandler = (request, res) => {
         streamInit();
         caseTree([rootRef]);
       }
+      else if (requestURL === '/resulttotals' && idle) {
+        streamInit();
+        resultTree([rootRef]);
+      }
       else if (requestURL === '/copytotals' && idle) {
         streamInit();
         copyTree([rootRef], treeCopyParentRef);
@@ -1393,6 +1505,8 @@ const requestHandler = (request, res) => {
         testSetID
       } = bodyObject;
       copyWhat = bodyObject.copyWhat;
+      build = bodyObject.build;
+      note = bodyObject.note;
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
       // Create and configure a Rally API client.
@@ -1511,6 +1625,11 @@ const requestHandler = (request, res) => {
                         // Serve a report on test-case creation.
                         serveCaseReport();
                       }
+                    }
+                    // Otherwise, if the operation is test-case result creation:
+                    else if (op === 'result') {
+                      // Serve a report on test-case result creation.
+                      serveResultReport();
                     }
                     // Otherwise, if the operation is tree copying:
                     else if (op === 'copy') {
