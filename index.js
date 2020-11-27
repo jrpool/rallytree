@@ -844,7 +844,7 @@ const caseTree = storyRefs => {
 const createResult = (caseRef, build, testSet, note) => {
   // Create a passing result.
   restAPI.create({
-    type: 'testsetresult',
+    type: 'testcaseresult',
     fetch: ['_ref'],
     data: {
       TestCase: caseRef,
@@ -861,6 +861,7 @@ const createResult = (caseRef, build, testSet, note) => {
 const resultTree = storyRefs => {
   if (storyRefs.length && ! isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
+    console.log(`About to check ${firstRef}`);
     if (! isError) {
       // Get data on the first user story of the specified array.
       return getData(firstRef, ['Children', 'TestCases'])
@@ -898,13 +899,14 @@ const resultTree = storyRefs => {
             // Get data on its test cases.
             return getData(casesSummary._ref, ['_ref', 'TestSet'])
             .then(
-              // When the data arrive, process the children in parallel.
-              childrenResult => {
-                const childRefs = childrenResult.Object.Results.map(
-                  child => [child._ref, child.TestSet]
+              // When the data arrive, process the test cases in parallel.
+              casesResult => {
+                const caseRefs = casesResult.Object.Results.map(
+                  testCase => [testCase._ref, testCase.TestSet]
                 );
-                childRefs.forEach(childRef => {
-                  createResult(childRef[0], build, childRef[1], note);
+                caseRefs.forEach(caseRef => {
+                  console.log(`About to create a result for ${caseRef[0]}`);
+                  createResult(caseRef[0], build, caseRef[1], note);
                 });
                 return '';
               },
