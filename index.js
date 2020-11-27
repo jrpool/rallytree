@@ -218,13 +218,10 @@ const eventMsg = (
 const upTotal = eventName => {
   response.write(eventMsg(eventName));
 };
-/*
-  Increments the total count by 1 and the change count by a specified amount and sends
-  the counts as events.
-*/
-const upTotals = changeCount => {
-  const totalMsg = eventMsg('total');
-  const changeMsg = changeCount ? eventMsg('changes', changeCount) : '';
+// Increments the total and the change counts and sends the counts as events.
+const upTotals = (changes, totalAddition = 1) => {
+  const totalMsg = eventMsg('total', totalAddition);
+  const changeMsg = changes ? eventMsg('changes', changes) : '';
   response.write(`${totalMsg}${changeMsg}`);
 };
 /*
@@ -840,10 +837,10 @@ const caseTree = storyRefs => {
     return Promise.resolve('');
   }
 };
-// Creates a test case.
+// Creates a passing test-case result.
 const createResult = (caseRef, build, testSet, note) => {
   // Create a passing result.
-  restAPI.create({
+  return restAPI.create({
     type: 'testcaseresult',
     fetch: ['_ref'],
     data: {
@@ -857,11 +854,31 @@ const createResult = (caseRef, build, testSet, note) => {
     }
   });
 };
+// Creates passing results for an array of test cases.
+const passCases = (caseData, build, note) => {
+  if (caseData.length && ! isError) {
+    const firstCase = caseData[0];
+    const firstRef = shorten('testcase', 'testcase', firstCase[0]);
+    if (! isError) {
+      // Create a result for the first test case of the specified array.
+      return createResult(firstRef, build, firstCase, note)
+      .then(
+        () => {
+          upTotals(1, 0);
+          return passCases(caseData.slice(1), build, note);
+        },
+        error => err(error, 'creating result for test case')
+      );
+    }
+    else {
+      return Promise.resolve('');
+    }
+  }
+};
 // Recursively creates passing test-case results for a tree or subtrees of user stories.
 const resultTree = storyRefs => {
   if (storyRefs.length && ! isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
-    console.log(`About to check ${firstRef}`);
     if (! isError) {
       // Get data on the first user story of the specified array.
       return getData(firstRef, ['Children', 'TestCases'])
@@ -871,11 +888,10 @@ const resultTree = storyRefs => {
           const storyObj = storyResult.Object;
           const childrenSummary = storyObj.Children;
           const casesSummary = storyObj.TestCases;
-          /*
-            If the user story has any child user stories, it does not
-            have test cases, so:
-          */
-          if (childrenSummary.Count) {
+          const childCount = childrenSummary.Count;
+          const caseCount = casesSummary.Count;
+          // If the user story has any child user stories and no test cases:
+          if (childCount && ! caseCount) {
             // Get data on its child user stories.
             return getData(childrenSummary._ref, ['_ref'])
             .then(
@@ -894,21 +910,19 @@ const resultTree = storyRefs => {
               error => err(error,'getting data on child user stories for test-case result creation')
             );
           }
-          // Otherwise, if the user story has any test cases:
-          else if (casesSummary.Count) {
+          // Otherwise, if the user story has any test cases and no child user stories:
+          else if (caseCount && ! childCount) {
             // Get data on its test cases.
-            return getData(casesSummary._ref, ['_ref', 'TestSet'])
+            return getData(casesSummary._ref, ['_ref', 'Results', 'TestSet'])
             .then(
-              // When the data arrive, process the test cases in parallel.
+              // When the data arrive, process the test cases sequentially.
               casesResult => {
-                const caseRefs = casesResult.Object.Results.map(
-                  testCase => [testCase._ref, testCase.TestSet]
-                );
-                caseRefs.forEach(caseRef => {
-                  console.log(`About to create a result for ${caseRef[0]}`);
-                  createResult(caseRef[0], build, caseRef[1], note);
-                });
-                return '';
+                const caseResults = casesResult.Object.Results;
+                const caseData = caseResults
+                .filter(caseResult => caseResult.Results.Count)
+                .map(caseResult => [caseResult._ref, caseResult.TestCase]);
+                upTotals(0, caseCount);
+                return passCases(caseData, build, note);
               },
               error => err(error, 'getting data on test sets for test-case result creation')
             );
