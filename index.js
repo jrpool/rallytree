@@ -958,7 +958,7 @@ const resultTree = storyRefs => {
                 );
                 return resultTree(childRefs)
                 .then(
-                  // After they are processed, process the user story’s remaining siblings.
+                  // After they are processed, process the remaining user stories.
                   () => resultTree(storyRefs.slice(1)),
                   error => err(error, 'creating test-case results for child user stories')
                 );
@@ -974,13 +974,19 @@ const resultTree = storyRefs => {
               // When the data arrive, process the test cases sequentially.
               casesResult => {
                 const caseRefs = casesResult.Object.Results.map(testCase => testCase._ref);
-                return passCases(caseRefs, build, note);
+                return passCases(caseRefs, build, note)
+                .then(
+                  // After they are processed, process the remaining user stories.
+                  () => resultTree(storyRefs.slice(1)),
+                  error => err(error, 'creating results for test cases')
+                );
               },
               error => err(error, 'getting data on test cases for result creation')
             );
           }
           // Otherwise, i.e. if the user story has no child user stories and no test cases:
           else {
+            // Skip it.
             return '';
           }
         },
