@@ -15,7 +15,7 @@ try {
   caseData = require('./data/caseData').caseData;
 }
 catch (error) {
-  caseData = {}
+  caseData = {};
 }
 // Module to create a web server.
 const http = require('http');
