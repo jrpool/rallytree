@@ -886,7 +886,7 @@ const passCases = (caseRefs, build, note) => {
                   );
                   if (! isError) {
                     // Create a passing result for the test case in its first test set.
-                    return createResult(firstRef, build, setRef)
+                    return createResult(firstRef, build, setRef,note)
                     .then(
                       // When the result has been created:
                       () => {
