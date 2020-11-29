@@ -855,24 +855,80 @@ const createResult = (caseRef, build, testSet, note) => {
   });
 };
 // Creates passing results for an array of test cases.
-const passCases = (caseData, build, note) => {
-  if (caseData.length && ! isError) {
-    const firstCase = caseData[0];
-    const firstRef = shorten('testcase', 'testcase', firstCase[0]);
+const passCases = (caseRefs, build, note) => {
+  if (caseRefs.length && ! isError) {
+    const firstRef = shorten('testcase', 'testcase', caseRefs[0]);
     if (! isError) {
-      // Create a result for the first test case of the specified array.
-      return createResult(firstRef, build, firstCase, note)
+      // Get data on the first test case of the specified array.
+      return getData(firstRef, ['Results', 'TestSets'])
       .then(
-        () => {
-          upTotals(1, 0);
-          return passCases(caseData.slice(1), build, note);
+        // When the data arrive:
+        caseResult => {
+          const caseObj = caseResult.Object;
+          // If the test case already has results:
+          if (caseObj.Results.Count) {
+            // Do not create one.
+            upTotals(0);
+            return '';
+          }
+          // Otherwise, i.e. if the test case has no results yet:
+          else {
+            const setsSummary = caseObj.TestSets;
+            // If the test case is in any test sets:
+            if (setsSummary.Count) {
+              // Get data on the test sets.
+              return getData(setsSummary._ref, ['_ref'])
+              .then(
+                // When the data arrive:
+                setsResult => {
+                  const setRef = shorten(
+                    'testset', 'testset', setsResult.Object.Results[0]._ref
+                  );
+                  if (! isError) {
+                    // Create a passing result for the test case in its first test set.
+                    return createResult(firstRef, build, setRef)
+                    .then(
+                      // When the result has been created:
+                      () => {
+                        upTotals(1);
+                        // Process the remaining test cases.
+                        return passCases(caseRefs.slice(1), build, note);
+                      },
+                      error => err(error, 'creating result in test set')
+                    );
+                  }
+                  else {
+                    return '';
+                  }
+                },
+                error => err(error, 'getting data on test sets')
+              );
+            }
+            // Otherwise, i.e. if the test case is not in any test set:
+            else {
+              // Create a passing result for the test case.
+              return createResult(firstRef, build, null)
+              .then(
+                // When the result has been created:
+                () => {
+                  upTotals(1);
+                  // Process the remaining test cases.
+                  return passCases(caseRefs.slice(1), build, note);
+                },
+                error => err(error, 'creating result in no test set')
+              );
+            }
+          }
         },
-        error => err(error, 'creating result for test case')
+        error => err(error, 'getting data on test case for result creation')
       );
     }
     else {
       return Promise.resolve('');
     }
+  }
+  else {
+    return Promise.resolve('');
   }
 };
 // Recursively creates passing test-case results for a tree or subtrees of user stories.
@@ -913,18 +969,14 @@ const resultTree = storyRefs => {
           // Otherwise, if the user story has any test cases and no child user stories:
           else if (caseCount && ! childCount) {
             // Get data on its test cases.
-            return getData(casesSummary._ref, ['_ref', 'Results', 'TestSet'])
+            return getData(casesSummary._ref, ['_ref'])
             .then(
               // When the data arrive, process the test cases sequentially.
               casesResult => {
-                const caseResults = casesResult.Object.Results;
-                const caseData = caseResults
-                .filter(caseResult => caseResult.Results.Count)
-                .map(caseResult => [caseResult._ref, caseResult.TestCase]);
-                upTotals(0, caseCount);
-                return passCases(caseData, build, note);
+                const caseRefs = casesResult.Object.Results.map(testCase => testCase._ref);
+                return passCases(caseRefs, build, note);
               },
-              error => err(error, 'getting data on test sets for test-case result creation')
+              error => err(error, 'getting data on test cases for result creation')
             );
           }
           // Otherwise, i.e. if the user story has no child user stories and no test cases:
