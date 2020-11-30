@@ -277,23 +277,32 @@ const outDoc = () => {
     docWait
   );
 };
+// Creates an object of data about an item.
+const dataOn = (result, properties, countables) => {
+  const data = {
+    obj: result.Object
+  };
+  properties.forEach(property => {
+    data[property.toLowerCase()] = data.obj[property];
+  });
+  countables.forEach(countable => {
+    const countableLC = `${countable[0].toLowerCase()}${countable.slice(1)}`;
+    const summaryKey = `${countableLC}Summary`;
+    data[summaryKey] = data.obj[countable];
+    data[`${countableLC}Count`] = data[summaryKey].Count;
+  });
+  return data;
+};
 // Recursively documents a tree or subtree of user stories.
 const docTree = (storyRef, storyArray, index, ancestors) => {
   // Get data on the root user story.
-  getData(storyRef, ['Name', 'DragAndDropRank', 'Children', 'Tasks', 'TestCases'])
+  getData(storyRef, ['Name', 'Children', 'Tasks', 'TestCases'])
   .then(
     storyResult => {
       // When the data arrive:
-      const storyObj = storyResult.Object;
-      const name = storyObj.Name;
-      const childrenSummary = storyObj.Children;
-      const childCount = childrenSummary.Count;
-      const tasksSummary = storyObj.Tasks;
-      let ownTaskCount = tasksSummary.Count;
-      const casesSummary = storyObj.TestCases;
-      let ownCaseCount = casesSummary.Count;
+      const data = dataOn(storyResult, ['Name'], ['Children', 'Tasks', 'TestCases']);
       // If the user story has any child user stories (and therefore no tasks or test cases):
-      if (childCount) {
+      if (data.childrenCount) {
         // Document the user story as an object with initialized data.
         storyArray[index] = {
           name,
@@ -302,7 +311,7 @@ const docTree = (storyRef, storyArray, index, ancestors) => {
           children: []
         };
         // Get data on its child user stories.
-        getData(childrenSummary._ref, ['_ref', 'DragAndDropRank'])
+        getData(data.childrenSummary._ref, ['_ref', 'DragAndDropRank'])
         .then(
           // When the data arrive:
           childrenObj => {
@@ -331,13 +340,13 @@ const docTree = (storyRef, storyArray, index, ancestors) => {
         // Document the user story as an object without a children array.
         storyArray[index] = {
           name,
-          taskCount: ownTaskCount,
-          caseCount: ownCaseCount
+          taskCount: data.tasksCount,
+          caseCount: data.testCasesCount
         };
         // Add the user story’s task and test-case counts to its ancestors’.
         ancestors.forEach(ancestor => {
-          ancestor.taskCount += ownTaskCount;
-          ancestor.caseCount += ownCaseCount;
+          ancestor.taskCount += data.tasksCount;
+          ancestor.caseCount += data.testCasesCount;
         });
         // Send the documentation to the client if apparently complete.
         outDoc();
@@ -353,17 +362,11 @@ const verdictTree = storyRef => {
   .then(
     storyResult => {
       // When the data arrive:
-      const storyObj = storyResult.Object;
-      const caseSummary = storyObj.TestCases;
-      const caseCount = caseSummary.Count;
-      const defectSummary = storyObj.Defects;
-      const defectCount = defectSummary.Count;
-      const childrenSummary = storyObj.Children;
-      const childCount = childrenSummary.Count;
+      const data = dataOn(storyResult, [], ['Children', 'TestCases', 'Defects']);
       // If the user story has any test cases and no child user stories:
-      if (caseCount && ! childCount) {
+      if (data.testCasesCount && ! data.childrenCount) {
         // Get the data on the test cases.
-        getData(caseSummary._ref, ['_ref', 'LastVerdict'])
+        getData(data.testCasesSummary._ref, ['_ref', 'LastVerdict'])
         .then(
           // When the data arrive:
           casesObj => {
@@ -382,9 +385,9 @@ const verdictTree = storyRef => {
           error => err(error, 'getting data on test cases')
         );
         // Add the user story’s defect count to the defect count.
-        upDefects(defectCount);
+        upDefects(data.defectsCount);
         // Get data on the defects.
-        getData(defectSummary._ref, ['Severity'])
+        getData(data.defectsSummary._ref, ['Severity'])
         .then(
           // When the data arrive, report the severities of the defects.
           defectsObj => {
@@ -406,9 +409,9 @@ const verdictTree = storyRef => {
         Otherwise, if the user story has any child user stories and
         no test cases (and therefore also no defects):
       */
-      else if (childCount && ! caseCount) {
+      else if (data.childrenCount && ! data.testCasesCount) {
         // Get data on its child user stories.
-        getData(childrenSummary._ref, ['_ref'])
+        getData(data.childrenSummary._ref, ['_ref'])
         .then(
           // When the data arrive, process the children in parallel.
           childrenObj => {
@@ -434,7 +437,7 @@ const verdictTree = storyRef => {
         Otherwise, if the user story has both child user stories
         and test cases:
       */
-      else if (childCount && caseCount) {
+      else if (data.childrenCount && data.testCasesCount) {
         // Stop and report this as a precondition violation.
         err(
           'User story with both children and test cases',
@@ -484,15 +487,8 @@ const takeTree = storyRef => {
   .then(
     // When the data arrive:
     storyResult => {
-      const storyObj = storyResult.Object;
-      const owner = storyObj.Owner;
-      const ownerRef = owner ? shorten('user', 'user', storyObj.Owner._ref) : '';
-      const tasksSummary = storyObj.Tasks;
-      const taskCount = tasksSummary.Count;
-      const casesSummary = storyObj.TestCases;
-      const caseCount = casesSummary.Count;
-      const childrenSummary = storyObj.Children;
-      const childCount = childrenSummary.Count;
+      const data = dataOn(storyResult, ['Owner'], ['Children', 'Tasks', 'TestCases']);
+      const ownerRef = data.owner ? shorten('user', 'user', data.owner._ref) : '';
       const isChange = ownerRef !== takerRef;
       // Ensure that the specified user owns the user story.
       restAPI.update({
@@ -504,9 +500,9 @@ const takeTree = storyRef => {
         () => {
           upTakes('story', isChange);
           // If the user story has any child user stories and no tasks or test cases:
-          if (childCount && ! taskCount && ! caseCount) {
+          if (data.childrenCount && ! data.tasksCount && ! data.testCasesCount) {
             // Get data on its child user stories.
-            getData(childrenSummary._ref, ['_ref'])
+            getData(data.childrenSummary._ref, ['_ref'])
             .then(
               // When the data arrive, process the children in parallel.
               childrenObj => {
@@ -531,9 +527,9 @@ const takeTree = storyRef => {
             );
           }
           // Otherwise, if the user story has any tasks and no test cases or child user stories:
-          else if (taskCount && ! (caseCount || childCount)) {
+          else if (data.tasksCount && ! (data.testCasesCount || data.childrenCount)) {
             // Get the data on the tasks.
-            getData(tasksSummary._ref, ['_ref', 'Owner'])
+            getData(data.tasksSummary._ref, ['_ref', 'Owner'])
             .then(
               // When the data arrive:
               tasksObj => {
@@ -547,9 +543,9 @@ const takeTree = storyRef => {
             );
           }
           // Otherwise, if the user story has any tasks and test cases and no child user stories:
-          else if (taskCount && caseCount && ! childCount) {
+          else if (data.tasksCount && data.testCasesCount && ! data.childrenCount) {
             // Get the data on the tasks.
-            getData(tasksSummary._ref, ['_ref', 'Owner'])
+            getData(data.tasksSummary._ref, ['_ref', 'Owner'])
             .then(
               // When the data arrive:
               tasksObj => {
@@ -559,7 +555,7 @@ const takeTree = storyRef => {
                   takeTaskOrCase('task', taskObj);
                 });
                 // Get the data on the test cases.
-                getData(casesSummary._ref, ['_ref', 'Owner'])
+                getData(data.testCasesSummary._ref, ['_ref', 'Owner'])
                 .then(
                   // When the data arrive:
                   casesObj => {
@@ -576,7 +572,10 @@ const takeTree = storyRef => {
             );
           }
           // Otherwise if the user story has an invalid combination of descendants:
-          else if ((childCount && (taskCount || caseCount)) || caseCount && ! taskCount) {
+          else if (
+            (data.childrenCount && (data.tasksCount || data.testCasesCount))
+            || data.testCasesCount && ! data.tasksCount
+          ) {
             // Stop and report this as a precondition violation.
             err(
               'User story with invalid descendant combination',
@@ -623,17 +622,15 @@ const taskTree = storyRefs => {
       .then(
         storyResult => {
           // When the data arrive:
-          const storyObj = storyResult.Object;
-          const owner = storyObj.Owner;
-          const childrenSummary = storyObj.Children;
+          const data = dataOn(storyResult, ['Owner'], ['Children']);
           /*
             If the user story has any child user stories, it does not
             need tasks, so:
           */
-          if (childrenSummary.Count) {
+          if (data.childrenCount) {
             upTotals(0);
             // Get data on its child user stories.
-            return getData(childrenSummary._ref, ['_ref'])
+            return getData(data.childrenSummary._ref, ['_ref'])
             .then(
               /*
                 When the data arrive, process the children sequentially
@@ -664,7 +661,7 @@ const taskTree = storyRefs => {
           // Otherwise the user story needs tasks, so:
           else {
             // Create them sequentially to prevent concurrency errors.
-            return createTasks(firstRef, owner, taskNames)
+            return createTasks(firstRef, data.owner, taskNames)
             // When they have been created:
             .then(
               () => {
@@ -753,20 +750,14 @@ const caseTree = storyRefs => {
       .then(
         storyResult => {
           // When the data arrive:
-          const storyObj = storyResult.Object;
-          const name = storyObj.Name;
-          const description = storyObj.Description;
-          const owner = storyObj.Owner;
-          const childrenSummary = storyObj.Children;
+          const data = dataOn(storyResult, ['Name', 'Description', 'Owner'], ['Children']);
+          const name = data.name;
           const caseNames = caseData ? caseData[name] || [name] : [name];
-          /*
-            If the user story has any child user stories, it does not
-            need test cases, so:
-          */
-          if (childrenSummary.Count) {
+          // If the user story has any child user stories, it does not need test cases, so:
+          if (data.childrenCount) {
             upTotals(0);
             // Get data on its child user stories.
-            return getData(childrenSummary._ref, ['_ref'])
+            return getData(data.childrenSummary._ref, ['_ref'])
             .then(
               // When the data arrive, process the children sequentially.
               childrenResult => {
@@ -791,7 +782,7 @@ const caseTree = storyRefs => {
             // If only 1 test case is to be created:
             if (caseNames.length === 1) {
               // Create and link it.
-              return createCase(caseNames[0], description, owner, firstRef)
+              return createCase(caseNames[0], data.description, data.owner, firstRef)
               .then(
                 // When it has been created:
                 () => {
@@ -805,12 +796,12 @@ const caseTree = storyRefs => {
             // Otherwise, if 2 test cases are to be created:
             else if (caseNames.length === 2) {
               // Create and link the first test case.
-              return createCase(caseNames[0], description, owner, firstRef)
+              return createCase(caseNames[0], data.description, data.owner, firstRef)
               .then(
                 // When it has been created and linked:
                 () => {
                   // Create and link the second test case.
-                  return createCase(caseNames[1], description, owner, firstRef)
+                  return createCase(caseNames[1], data.description, data.owner, firstRef)
                   .then(
                     // When it has been created and linked:
                     () => {
@@ -941,15 +932,11 @@ const resultTree = storyRefs => {
       .then(
         storyResult => {
           // When the data arrive:
-          const storyObj = storyResult.Object;
-          const childrenSummary = storyObj.Children;
-          const casesSummary = storyObj.TestCases;
-          const childCount = childrenSummary.Count;
-          const caseCount = casesSummary.Count;
+          const data = dataOn(storyResult, [], ['Children', 'TestCases']);
           // If the user story has any child user stories and no test cases:
-          if (childCount && ! caseCount) {
+          if (data.childrenCount && ! data.testCasesCount) {
             // Get data on its child user stories.
-            return getData(childrenSummary._ref, ['_ref'])
+            return getData(data.childrenSummary._ref, ['_ref'])
             .then(
               // When the data arrive, process the children sequentially.
               childrenResult => {
@@ -967,9 +954,9 @@ const resultTree = storyRefs => {
             );
           }
           // Otherwise, if the user story has any test cases and no child user stories:
-          else if (caseCount && ! childCount) {
+          else if (data.testCasesCount && ! data.childrenCount) {
             // Get data on its test cases.
-            return getData(casesSummary._ref, ['_ref'])
+            return getData(data.testCasesSummary._ref, ['_ref'])
             .then(
               // When the data arrive, process the test cases sequentially.
               casesResult => {
@@ -1014,20 +1001,16 @@ const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
         .then(
           // When the data arrive:
           itemResult => {
-            const itemObj = itemResult.Object;
-            const name = itemObj.Name;
-            const description = itemObj.Description;
-            const owner = itemObj.Owner;
-            const rank = itemObj.DragAndDropRank;
+            const data = dataOn(itemResult, ['Name', 'Description', 'Owner', 'DragAndDropRank']);
             // Copy the item and give it the specified parent.
             return restAPI.create({
               type: workItemType,
               fetch: ['_ref'],
               data: {
                 Name: name,
-                Description: description,
-                Owner: owner,
-                DragAndDropRank: rank,
+                Description: data.description,
+                Owner: data.owner,
+                DragAndDropRank: data.dragAndDropRank,
                 WorkProduct: copyStoryRef
               }
             })
@@ -1078,17 +1061,11 @@ const copyTree = (storyRefs, copyParentRef) => {
       .then(
         storyResult => {
           // When the data arrive:
-          const storyObj = storyResult.Object;
-          const name = storyObj.Name;
-          const description = storyObj.Description;
-          const owner = storyObj.Owner;
-          const rank = storyObj.DragAndDropRank;
-          const tasksSummary = storyObj.Tasks;
-          const taskCount = tasksSummary.Count;
-          const casesSummary = storyObj.TestCases;
-          const caseCount = casesSummary.Count;
-          const childrenSummary = storyObj.Children;
-          const childCount = childrenSummary.Count;
+          const data = dataOn(
+            storyResult,
+            ['Name', 'Description', 'Owner', 'DragAndDropRank'],
+            ['Children', 'Tasks', 'TestCases']
+          );
           // If the user story is the specified parent of the tree copy:
           if (firstRef === treeCopyParentRef) {
             // Quit and report this.
@@ -1096,7 +1073,10 @@ const copyTree = (storyRefs, copyParentRef) => {
             return '';
           }
           // Otherwise, if the original has an invalid descendant combination:
-          else if (childCount && (taskCount || caseCount) || (caseCount && ! taskCount)) {
+          else if (
+            data.childrenCount && (data.tasksCount || data.testCasesCount)
+            || (data.testCasesCount && ! data.tasksCount)
+          ) {
             // Quit and report this.
             err(`Invalid user story ${firstRef}`, 'copying tree');
             return '';
@@ -1109,9 +1089,9 @@ const copyTree = (storyRefs, copyParentRef) => {
               fetch: ['_ref'],
               data: {
                 Name: name,
-                Description: description,
-                Owner: owner,
-                DragAndDropRank: rank,
+                Description: data.description,
+                Owner: data.owner,
+                DragAndDropRank: data.dragAndDropRank,
                 Parent: copyParentRef
               }
             })
@@ -1123,9 +1103,9 @@ const copyTree = (storyRefs, copyParentRef) => {
                 const copyRef = shorten('userstory', 'hierarchicalrequirement', copy.Object._ref);
                 if (! isError) {
                   // If the original has any child user stories and neither tasks nor test cases:
-                  if (childCount && ! (taskCount || caseCount)) {
+                  if (data.childrenCount && ! (data.tasksCount || data.testCasesCount)) {
                     // Get data on the child user stories.
-                    return getData(childrenSummary._ref, ['_ref'])
+                    return getData(data.childrenSummary._ref, ['_ref'])
                     .then(
                       // When the data arrive:
                       childrenResult => {
@@ -1150,9 +1130,14 @@ const copyTree = (storyRefs, copyParentRef) => {
                     Otherwise, if the original has no child user stories and has tasks and
                     test cases and they are to be copied:
                   */
-                  else if (taskCount && caseCount && copyWhat === 'both' && ! childCount) {
+                  else if (
+                    data.tasksCount
+                    && data.testCasesCount
+                    && copyWhat === 'both'
+                    && ! data.childrenCount
+                  ) {
                     // Get data on the tasks.
-                    return getData(tasksSummary._ref, ['_ref'])
+                    return getData(data.tasksSummary._ref, ['_ref'])
                     .then(
                       // When the data arrive:
                       tasksResult => {
@@ -1163,7 +1148,7 @@ const copyTree = (storyRefs, copyParentRef) => {
                           // When the tasks have been copied:
                           () => {
                             // Get data on the test cases.
-                            return getData(casesSummary._ref, ['_ref'])
+                            return getData(data.testCasesSummary._ref, ['_ref'])
                             .then(
                               // When the data arrive:
                               casesResult => {
@@ -1194,9 +1179,11 @@ const copyTree = (storyRefs, copyParentRef) => {
                     Otherwise, if the original has no child user stories and has tasks and they
                     are to be copied:
                   */
-                  else if (taskCount && ['tasks', 'both'].includes(copyWhat) && ! childCount) {
+                  else if (
+                    data.tasksCount && ['tasks', 'both'].includes(copyWhat) && ! data.childrenCount
+                  ) {
                     // Get data on the tasks.
-                    return getData(tasksSummary._ref, ['_ref'])
+                    return getData(data.tasksSummary._ref, ['_ref'])
                     .then(
                       // When the data arrive:
                       tasksResult => {
