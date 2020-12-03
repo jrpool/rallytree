@@ -210,50 +210,71 @@ const getRefOf = (type, formattedID, context) => {
     return Promise.resolve('');
   }
 };
-// Returns an event-stream message.
+// Returns an event-stream message reporting an incremented total.
 const eventMsg = (
   eventName, addCount = 1
 ) => `event: ${eventName}\ndata: ${totals[eventName] += addCount}\n\n`;
-// Increments a total count and sends the new count as an event.
-const upTotal = eventName => {
-  response.write(eventMsg(eventName));
+// Sends a sequence of event-stream messages reporting incremented totals.
+const report = specs => {
+  const msgs = [];
+  specs.forEach(spec => {
+    msgs.push(eventMsg(...spec));
+  });
+  response.write(msgs.join(''));
 };
-// Increments the total and the change counts and sends the counts as events.
-const upTotals = (changes, totalAddition = 1) => {
-  const totalMsg = eventMsg('total', totalAddition);
-  const changeMsg = changes ? eventMsg('changes', changes) : '';
-  response.write(`${totalMsg}${changeMsg}`);
+// Returns a string with its first character lower-cased.
+const lc0Of = string => string.length ? `${string[0].toLowerCase()}${string.slice(1)}` : '';
+// Gets data on a work item.
+const getItemData = (ref, facts, collections) => {
+  return restAPI.get({
+    ref,
+    fetch: facts.concat(collections)
+  })
+  .then(
+    item => {
+      const obj = item.Object;
+      const data = {};
+      facts.forEach(fact => {
+        data[lc0Of(fact)] = obj[fact];
+      });
+      collections.forEach(collection => {
+        data[lc0Of(collection)] = {
+          ref: obj[collection]._ref,
+          count: obj[collection].Count
+        };
+      });
+      return data;
+    },
+    error => err(error, `getting data on ${ref}`)
+  );
 };
-/*
-  Increments the total count and the applicable verdict count
-  and sends the counts as events.
-*/
-const upVerdicts = isPass => {
-  const totalMsg = eventMsg('total');
-  let changeMsg;
-  if (isPass) {
-    changeMsg = eventMsg('passes');
-  }
-  else {
-    changeMsg = eventMsg('fails');
-  }
-  response.write(`${totalMsg}${changeMsg}`);
-};
-// Increments the defect count.
-const upDefects = count => {
-  response.write(eventMsg('defects', count));
-};
-// Increments the counts for ownership changes and sends the counts as events.
-const upTakes = (itemType, isChange) => {
-  const totalMsg = eventMsg('total');
-  const subtotalMsg = eventMsg(`${itemType}Total`);
-  let changeMsg = '';
-  let subChangeMsg = '';
-  if (isChange) {
-    changeMsg = eventMsg('changes', true);
-    subChangeMsg = eventMsg(`${itemType}Changes`);
-  }
-  response.write(`${totalMsg}${subtotalMsg}${changeMsg}${subChangeMsg}`);
+// Gets data on a collection.
+const getCollectionData = (ref, facts, collections) => {
+  return restAPI.get({
+    ref,
+    fetch: facts.concat(collections)
+  })
+  .then(
+    collection => {
+      const members = collection.Object.Results;
+      const data = [];
+      members.forEach(member => {
+        const memberData = {};
+        facts.forEach(fact => {
+          memberData[lc0Of(fact)] = member[fact];
+        });
+        collections.forEach(collection => {
+          memberData[lc0Of(collection)] = {
+            ref: member[collection]._ref,
+            count: member[collection].Count
+          };
+        });
+        data.push(memberData);
+      });
+      return data;
+    },
+    error => err(error, `getting data on ${ref}`)
+  );
 };
 // Gets data on a work item.
 const getData = (ref, fetch) => {
@@ -261,6 +282,23 @@ const getData = (ref, fetch) => {
     ref,
     fetch
   });
+};
+// Returns an object of data about an item from the result of getData().
+const dataOn = (result, properties, countables) => {
+  const obj = result.Object;
+  const data = {};
+  // Add the non-summary properties.
+  properties.forEach(property => {
+    data[lc0Of(property)] = obj[property];
+  });
+  // Add the references to and counts of the summary properties.
+  countables.forEach(countable => {
+    data[lc0Of(countable)] = {
+      ref: obj[countable]._ref,
+      count: obj[countable].Count
+    };
+  });
+  return data;
 };
 // Sends the tree documentation as an event.
 const outDoc = () => {
@@ -277,57 +315,48 @@ const outDoc = () => {
     docWait
   );
 };
-// Creates an object of data about an item.
-const dataOn = (result, properties, countables) => {
-  const data = {
-    obj: result.Object
-  };
-  properties.forEach(property => {
-    data[property.toLowerCase()] = data.obj[property];
-  });
-  countables.forEach(countable => {
-    const countableLC = `${countable[0].toLowerCase()}${countable.slice(1)}`;
-    const summaryKey = `${countableLC}Summary`;
-    data[summaryKey] = data.obj[countable];
-    data[`${countableLC}Count`] = data[summaryKey].Count;
-  });
-  return data;
-};
-// Recursively documents a tree or subtree of user stories.
+/*
+  Recursively documents as an object in JSON format a tree or subtree of user stories, specifying
+  the index of the root user story’s object among its siblings’ objects and the objects of all
+  of the ancestors of the user story.
+*/
 const docTree = (storyRef, storyArray, index, ancestors) => {
-  // Get data on the root user story.
-  getData(storyRef, ['Name', 'Children', 'Tasks', 'TestCases'])
+  // Get data on the user story.
+  getItemData(storyRef, ['FormattedID', 'Name'], ['Children', 'Tasks', 'TestCases'])
   .then(
-    storyResult => {
-      // When the data arrive:
-      const data = dataOn(storyResult, ['Name'], ['Children', 'Tasks', 'TestCases']);
-      // If the user story has any child user stories (and therefore no tasks or test cases):
-      if (data.childrenCount) {
-        // Document the user story as an object with initialized data.
+    // When the data arrive:
+    data => {
+      const childCount = data.children.count;
+      const taskCount = data.tasks.count;
+      const caseCount = data.testCases.count;
+      // If the user story has any child user stories and no tasks or test cases):
+      if (childCount && ! taskCount && ! caseCount) {
+        // Initialize the user story’s object.
         storyArray[index] = {
-          name,
+          formattedID: data.formattedID,
+          name: data.name,
           taskCount: 0,
-          caseCount: 0,
+          testCaseCount: 0,
+          childCount,
           children: []
         };
         // Get data on its child user stories.
-        getData(data.childrenSummary._ref, ['_ref', 'DragAndDropRank'])
+        getCollectionData(data.children.ref, ['DragAndDropRank'], [])
         .then(
           // When the data arrive:
-          childrenObj => {
-            // Document the children in rank order.
-            const children = Array.from(childrenObj.Object.Results);
-            children.sort((a, b) => a.DragAndDropRank < b.DragAndDropRank ? -1 : 1);
+          children => {
+            // Sort them by rank.
+            children.sort((a, b) => a.dragAndDropRank < b.dragAndDropRank ? -1 : 1);
             const childArray = storyArray[index].children;
-            for (let i = 0; i < children.length; i++) {
+            const childAncestors = ancestors.concat(storyArray[index]);
+            // Process them in that order.
+            for (let i = 0; i < childCount; i++) {
               if (! isError) {
                 const childRef = shorten(
-                  'hierarchicalrequirement', 'hierarchicalrequirement', children[i]._ref
+                  'hierarchicalrequirement', 'hierarchicalrequirement', children[i].ref
                 );
                 if (! isError) {
-                  docTree(
-                    childRef, childArray, i, ancestors.concat(storyArray[index])
-                  );
+                  docTree(childRef, childArray, i, childAncestors);
                 }
               }
             }
@@ -335,18 +364,20 @@ const docTree = (storyRef, storyArray, index, ancestors) => {
           error => err(error, 'getting data on child user stories for tree documentation')
         );
       }
-      // Otherwise, i.e. if the user story has no child user stories:
-      else {
-        // Document the user story as an object without a children array.
+      // Otherwise, if the user story has no child user stories:
+      else if (! childCount) {
+        // Initialize the user story’s object.
         storyArray[index] = {
-          name,
-          taskCount: data.tasksCount,
-          caseCount: data.testCasesCount
+          formattedID: data.formattedID,
+          name: data.name,
+          taskCount,
+          testCaseCount: caseCount,
+          childCount: 0
         };
         // Add the user story’s task and test-case counts to its ancestors’.
         ancestors.forEach(ancestor => {
-          ancestor.taskCount += data.tasksCount;
-          ancestor.caseCount += data.testCasesCount;
+          ancestor.taskCount += taskCount;
+          ancestor.testCaseCount += caseCount;
         });
         // Send the documentation to the client if apparently complete.
         outDoc();
@@ -358,51 +389,60 @@ const docTree = (storyRef, storyArray, index, ancestors) => {
 // Recursively acquires test results from a tree of user stories.
 const verdictTree = storyRef => {
   // Get data on the user story.
-  getData(storyRef, ['Children', 'TestCases', 'Defects'])
+  getData(storyRef, ['Children', 'TestCases'])
   .then(
     storyResult => {
       // When the data arrive:
-      const data = dataOn(storyResult, [], ['Children', 'TestCases', 'Defects']);
+      const data = dataOn(storyResult, [], ['Children', 'TestCases']);
       // If the user story has any test cases and no child user stories:
       if (data.testCasesCount && ! data.childrenCount) {
         // Get the data on the test cases.
-        getData(data.testCasesSummary._ref, ['_ref', 'LastVerdict'])
+        getData(data.testCasesSummary._ref, ['_ref', 'LastVerdict', 'Defects'])
         .then(
           // When the data arrive:
-          casesObj => {
-            const cases = casesObj.Object.Results;
+          casesResult => {
+            const cases = casesResult.Object.Results;
             // Process the test cases in parallel.
             cases.forEach(caseObj => {
               const verdict = caseObj.LastVerdict;
+              const defectsSummary = caseObj.Defects;
+              const defectCount = defectsSummary.Count;
               if (verdict === 'Pass'){
-                upVerdicts(true);
+                report(['total'], ['passes']);
               }
               else if (verdict === 'Fail') {
-                upVerdicts(false);
+                report([['total'], ['fails']]);
+              }
+              else {
+                report([['total']]);
+              }
+              // If the test case has any defects:
+              if (defectCount) {
+                // Get data on the defects.
+                getData(defectsSummary._ref, ['Severity'])
+                .then(
+                  // When the data arrive:
+                  defectsResult => {
+                    // Process their severities.
+                    const defects = defectsResult.Object.Results;
+                    const severities = defects
+                    .map(defect => defect.Severity)
+                    .reduce((tally, verdict) => {
+                      tally[verdict]++;
+                    }, {
+                      'Minor Issue': 0,
+                      'Major Issue': 0
+                    });
+                    report(
+                      [['major', severities['Major Problem'], ['minor', severities['Minor Problem']]]]
+                    );
+                  },
+                  error => err(error, 'getting data on defects')
+                );
               }
             });
           },
           error => err(error, 'getting data on test cases')
-        );
-        // Add the user story’s defect count to the defect count.
-        upDefects(data.defectsCount);
-        // Get data on the defects.
-        getData(data.defectsSummary._ref, ['Severity'])
-        .then(
-          // When the data arrive, report the severities of the defects.
-          defectsObj => {
-            const defects = defectsObj.Object.Results;
-            defects.forEach(defect => {
-              const severity = defect.Severity;
-              if (severity === 'Major Problem') {
-                upTotal('major');
-              }
-              else if (severity === 'Minor Problem') {
-                upTotal('minor');
-              }
-            });
-          },
-          error => err(error, 'getting data on defects')
         );
       }
       /*
@@ -468,13 +508,13 @@ const takeTaskOrCase = (itemType, itemObj) => {
           })
           .then(
             () => {
-              upTakes(itemType, true);
+              report([['total'], [itemType], ['totalChanges'], [`${itemType}Changes`]]);
             },
             error => err(error, `changing ${itemType} owner`)
           );
         }
         else {
-          upTakes(itemType, false);
+          report([['total'], [itemType]]);
         }
       }
     }
@@ -498,7 +538,12 @@ const takeTree = storyRef => {
       // When the ownership is ensured:
       .then(
         () => {
-          upTakes('story', isChange);
+          if (isChange) {
+            report([['total'], ['changes'], ['story'], ['storyChanges']]);
+          }
+          else {
+            report([['total'], ['story']]);
+          }
           // If the user story has any child user stories and no tasks or test cases:
           if (data.childrenCount && ! data.tasksCount && ! data.testCasesCount) {
             // Get data on its child user stories.
@@ -628,7 +673,7 @@ const taskTree = storyRefs => {
             need tasks, so:
           */
           if (data.childrenCount) {
-            upTotals(0);
+            report([['total']]);
             // Get data on its child user stories.
             return getData(data.childrenSummary._ref, ['_ref'])
             .then(
@@ -666,7 +711,7 @@ const taskTree = storyRefs => {
             .then(
               () => {
                 if (! isError) {
-                  upTotals(taskNames.length);
+                  report([['total'], ['changes', taskNames.length]]);
                   /*
                     Process the rest of the specified user stories
                     sequentially to prevent concurrency errors.
@@ -755,7 +800,7 @@ const caseTree = storyRefs => {
           const caseNames = caseData ? caseData[name] || [name] : [name];
           // If the user story has any child user stories, it does not need test cases, so:
           if (data.childrenCount) {
-            upTotals(0);
+            report([['total']]);
             // Get data on its child user stories.
             return getData(data.childrenSummary._ref, ['_ref'])
             .then(
@@ -786,7 +831,7 @@ const caseTree = storyRefs => {
               .then(
                 // When it has been created:
                 () => {
-                  upTotals(1);
+                  report([['total'], ['changes']]);
                   // Process the remaining user stories.
                   return caseTree(storyRefs.slice(1));
                 },
@@ -805,7 +850,7 @@ const caseTree = storyRefs => {
                   .then(
                     // When it has been created and linked:
                     () => {
-                      upTotals(2);
+                      report([['total'], ['changes', 2]]);
                       // Process the remaining user stories.
                       return caseTree(storyRefs.slice(1));
                     },
@@ -859,7 +904,7 @@ const passCases = (caseRefs, build, note) => {
           // If the test case already has results:
           if (caseObj.Results.Count) {
             // Do not create one.
-            upTotals(0);
+            report(['total']);
             return '';
           }
           // Otherwise, i.e. if the test case has no results yet:
@@ -881,7 +926,7 @@ const passCases = (caseRefs, build, note) => {
                     .then(
                       // When the result has been created:
                       () => {
-                        upTotals(1);
+                        report(['total'], ['changes']);
                         // Process the remaining test cases.
                         return passCases(caseRefs.slice(1), build, note);
                       },
@@ -902,7 +947,7 @@ const passCases = (caseRefs, build, note) => {
               .then(
                 // When the result has been created:
                 () => {
-                  upTotals(1);
+                  report(['total'], ['changes']);
                   // Process the remaining test cases.
                   return passCases(caseRefs.slice(1), build, note);
                 },
@@ -988,7 +1033,7 @@ const resultTree = storyRefs => {
     return Promise.resolve('');
   }
 };
-// Sequentially copies an array of tasks or test cases.
+// Sequentially copies an array of tasks or an array of test cases.
 const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
   if (itemRefs.length && ! isError) {
     // Identify and shorten a reference to the first item.
@@ -1017,7 +1062,7 @@ const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
             .then(
               // When the item has been copied:
               () => {
-                upCopies(['taskTotal', 'caseTotal'][['task', 'case'].indexOf(itemType)]);
+                report(['total'], ['taskTotal', 'caseTotal'][['task', 'case'].indexOf(itemType)]);
                 // Copy the remaining items in the specified array.
                 return copyTasksOrCases(itemType, itemRefs.slice(1), copyStoryRef);
               },
@@ -1039,13 +1084,6 @@ const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
   else {
     return Promise.resolve('');
   }
-};
-/*
-  Increments the total copy count and the specified item-type count and sends
-  the counts as events.
-*/
-const upCopies = itemType => {
-  response.write(`${eventMsg('total')}${eventMsg(itemType)}`);
 };
 // Recursively copies a tree or subtrees of user stories.
 const copyTree = (storyRefs, copyParentRef) => {
@@ -1098,7 +1136,7 @@ const copyTree = (storyRefs, copyParentRef) => {
             .then(
               // When the user story has been copied:
               copy => {
-                upCopies('storyTotal');
+                report(['total'], ['storyTotal']);
                 // Identify and shorten a reference to the copy.
                 const copyRef = shorten('userstory', 'hierarchicalrequirement', copy.Object._ref);
                 if (! isError) {
