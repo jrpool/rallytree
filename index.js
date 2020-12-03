@@ -260,7 +260,9 @@ const getCollectionData = (ref, facts, collections) => {
       const members = collection.Object.Results;
       const data = [];
       members.forEach(member => {
-        const memberData = {};
+        const memberData = {
+          ref: member._ref
+        };
         facts.forEach(fact => {
           memberData[lc0Of(fact)] = member[fact];
         });
@@ -396,56 +398,59 @@ const docTree = (storyRef, storyArray, index, ancestors) => {
 // Recursively acquires test results from a tree of user stories.
 const verdictTree = storyRef => {
   // Get data on the user story.
-  getData(storyRef, ['Children', 'TestCases'])
+  getItemData(storyRef, [], ['Children', 'TestCases'])
   .then(
-    storyResult => {
-      // When the data arrive:
-      const data = dataOn(storyResult, [], ['Children', 'TestCases']);
+    // When the data arrive:
+    data => {
+      const childCount = data.children.count;
+      const caseCount = data.testCases.count;
       // If the user story has any test cases and no child user stories:
-      if (data.testCasesCount && ! data.childrenCount) {
-        // Get the data on the test cases.
-        getData(data.testCasesSummary._ref, ['_ref', 'LastVerdict', 'Defects'])
+      if (caseCount && ! childCount) {
+        // Get data on the test cases.
+        getCollectionData(data.testCases.ref, ['LastVerdict'], ['Defects'])
         .then(
           // When the data arrive:
-          casesResult => {
-            const cases = casesResult.Object.Results;
+          cases => {
             // Process the test cases in parallel.
-            cases.forEach(caseObj => {
-              const verdict = caseObj.LastVerdict;
-              const defectsSummary = caseObj.Defects;
-              const defectCount = defectsSummary.Count;
-              if (verdict === 'Pass'){
-                report(['total'], ['passes']);
-              }
-              else if (verdict === 'Fail') {
-                report([['total'], ['fails']]);
-              }
-              else {
-                report([['total']]);
-              }
-              // If the test case has any defects:
-              if (defectCount) {
-                // Get data on the defects.
-                getData(defectsSummary._ref, ['Severity'])
-                .then(
-                  // When the data arrive:
-                  defectsResult => {
-                    // Process their severities.
-                    const defects = defectsResult.Object.Results;
-                    const severities = defects
-                    .map(defect => defect.Severity)
-                    .reduce((tally, verdict) => {
-                      tally[verdict]++;
-                    }, {
-                      'Minor Issue': 0,
-                      'Major Issue': 0
-                    });
-                    report(
-                      [['major', severities['Major Problem'], ['minor', severities['Minor Problem']]]]
-                    );
-                  },
-                  error => err(error, 'getting data on defects')
-                );
+            cases.forEach(testCase => {
+              if (! isError) {
+                const verdict = testCase.lastVerdict;
+                const defectsCollection = testCase.defects;
+                if (verdict === 'Pass'){
+                  report([['total'], ['passes']]);
+                }
+                else if (verdict === 'Fail') {
+                  report([['total'], ['fails']]);
+                }
+                else if (verdict !== null) {
+                  report([['total']]);
+                }
+                // If the test case has any defects:
+                if (defectsCollection.count) {
+                  // Get data on the defects.
+                  getCollectionData(defectsCollection.ref, ['Severity'], [])
+                  .then(
+                    // When the data arrive:
+                    defects => {
+                      report([['defects', defects.length]]);
+                      // Process their severities.
+                      const severities = defects
+                      .map(defect => defect.severity)
+                      .reduce((tally, verdict) => {
+                        tally[verdict]++;
+                        return tally;
+                      }, {
+                        'Minor Problem': 0,
+                        'Major Problem': 0
+                      });
+                      report([
+                        ['major', severities['Major Problem']],
+                        ['minor', severities['Minor Problem']]
+                      ]);
+                    },
+                    error => err(error, 'getting data on defects')
+                  );
+                }
               }
             });
           },
@@ -456,17 +461,17 @@ const verdictTree = storyRef => {
         Otherwise, if the user story has any child user stories and
         no test cases (and therefore also no defects):
       */
-      else if (data.childrenCount && ! data.testCasesCount) {
+      else if (childCount && ! caseCount) {
         // Get data on its child user stories.
-        getData(data.childrenSummary._ref, ['_ref'])
+        getCollectionData(data.children.ref, [], [])
         .then(
-          // When the data arrive, process the children in parallel.
-          childrenObj => {
-            const children = childrenObj.Object.Results;
+          // When the data arrive:
+          children => {
+            // Process the children in parallel.
             children.forEach(child => {
               if (! isError) {
                 const childRef = shorten(
-                  'hierarchicalrequirement', 'hierarchicalrequirement', child._ref
+                  'hierarchicalrequirement', 'hierarchicalrequirement', child.ref
                 );
                 if (! isError) {
                   verdictTree(childRef);
@@ -484,8 +489,7 @@ const verdictTree = storyRef => {
         Otherwise, if the user story has both child user stories
         and test cases:
       */
-      else if (data.childrenCount && data.testCasesCount) {
-        // Stop and report this as a precondition violation.
+      else if (childCount && caseCount) {
         err(
           'User story with both children and test cases',
           'test-result acquisition'
