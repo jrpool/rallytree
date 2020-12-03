@@ -155,6 +155,7 @@ const err = (error, context) => {
       }
     );
   }
+  return Promise.reject('');
 };
 // Shortens a long reference.
 const shorten = (readType, writeType, longRef) => {
@@ -317,74 +318,80 @@ const outDoc = () => {
 };
 /*
   Recursively documents as an object in JSON format a tree or subtree of user stories, specifying
-  the index of the root user story’s object among its siblings’ objects and the objects of all
-  of the ancestors of the user story.
+  the array of the objects of the root user story and its siblings, the index of the root user
+  story’s object in that array, and an array of the objects of the ancestors of the user story.
 */
 const docTree = (storyRef, storyArray, index, ancestors) => {
-  // Get data on the user story.
-  getItemData(storyRef, ['FormattedID', 'Name'], ['Children', 'Tasks', 'TestCases'])
-  .then(
-    // When the data arrive:
-    data => {
-      const childCount = data.children.count;
-      const taskCount = data.tasks.count;
-      const caseCount = data.testCases.count;
-      // If the user story has any child user stories and no tasks or test cases):
-      if (childCount && ! taskCount && ! caseCount) {
-        // Initialize the user story’s object.
-        storyArray[index] = {
-          formattedID: data.formattedID,
-          name: data.name,
-          taskCount: 0,
-          testCaseCount: 0,
-          childCount,
-          children: []
-        };
-        // Get data on its child user stories.
-        getCollectionData(data.children.ref, ['DragAndDropRank'], [])
-        .then(
-          // When the data arrive:
-          children => {
-            // Sort them by rank.
-            children.sort((a, b) => a.dragAndDropRank < b.dragAndDropRank ? -1 : 1);
-            const childArray = storyArray[index].children;
-            const childAncestors = ancestors.concat(storyArray[index]);
-            // Process them in that order.
-            for (let i = 0; i < childCount; i++) {
-              if (! isError) {
-                const childRef = shorten(
-                  'hierarchicalrequirement', 'hierarchicalrequirement', children[i].ref
-                );
+  if (! isError) {
+    // Get data on the user story.
+    getItemData(storyRef, ['FormattedID', 'Name'], ['Children', 'Tasks', 'TestCases'])
+    .then(
+      // When the data arrive:
+      data => {
+        const childCount = data.children.count;
+        const taskCount = data.tasks.count;
+        const caseCount = data.testCases.count;
+        // If the user story has any child user stories and no tasks or test cases):
+        if (childCount && ! taskCount && ! caseCount) {
+          // Initialize the user story’s object.
+          storyArray[index] = {
+            formattedID: data.formattedID,
+            name: data.name,
+            taskCount: 0,
+            testCaseCount: 0,
+            childCount,
+            children: []
+          };
+          // Get data on its child user stories.
+          getCollectionData(data.children.ref, ['DragAndDropRank'], [])
+          .then(
+            // When the data arrive:
+            children => {
+              // Sort them by rank.
+              children.sort((a, b) => a.dragAndDropRank < b.dragAndDropRank ? -1 : 1);
+              const childArray = storyArray[index].children;
+              const childAncestors = ancestors.concat(storyArray[index]);
+              // Process them in that order.
+              for (let i = 0; i < childCount; i++) {
                 if (! isError) {
-                  docTree(childRef, childArray, i, childAncestors);
+                  const childRef = shorten(
+                    'hierarchicalrequirement', 'hierarchicalrequirement', children[i].ref
+                  );
+                  if (! isError) {
+                    docTree(childRef, childArray, i, childAncestors);
+                  }
                 }
               }
-            }
-          },
-          error => err(error, 'getting data on child user stories for tree documentation')
-        );
-      }
-      // Otherwise, if the user story has no child user stories:
-      else if (! childCount) {
-        // Initialize the user story’s object.
-        storyArray[index] = {
-          formattedID: data.formattedID,
-          name: data.name,
-          taskCount,
-          testCaseCount: caseCount,
-          childCount: 0
-        };
-        // Add the user story’s task and test-case counts to its ancestors’.
-        ancestors.forEach(ancestor => {
-          ancestor.taskCount += taskCount;
-          ancestor.testCaseCount += caseCount;
-        });
-        // Send the documentation to the client if apparently complete.
-        outDoc();
-      }
-    },
-    error => err(error, 'getting data on user story for tree documentation')
-  );
+            },
+            error => err(error, 'getting data on child user stories for tree documentation')
+          );
+        }
+        // Otherwise, if the user story has no child user stories:
+        else if (! childCount) {
+          // Initialize the user story’s object.
+          storyArray[index] = {
+            formattedID: data.formattedID,
+            name: data.name,
+            taskCount,
+            testCaseCount: caseCount,
+            childCount: 0
+          };
+          // Add the user story’s task and test-case counts to its ancestors’.
+          ancestors.forEach(ancestor => {
+            ancestor.taskCount += taskCount;
+            ancestor.testCaseCount += caseCount;
+          });
+          // Send the documentation to the client if apparently complete.
+          outDoc();
+        }
+        // Otherwise, i.e. if the user story has child user stories and also tasks or test cases:
+        else {
+          err('Invalid user story', 'documenting user-story tree');
+        }
+      },
+      error => err(error, 'getting data on user story for tree documentation')
+    );
+  }
 };
 // Recursively acquires test results from a tree of user stories.
 const verdictTree = storyRef => {
