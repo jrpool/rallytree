@@ -155,7 +155,6 @@ const err = (error, context) => {
       }
     );
   }
-  return Promise.reject('');
 };
 // Shortens a long reference.
 const shorten = (readType, writeType, longRef) => {
@@ -681,11 +680,8 @@ const taskTree = storyRefs => {
                 // Process the children sequentially.
                 return taskTree(children.map(child => child.ref))
                 .then(
-                  // After the children are processed:
-                  () => {
-                    // Process the remaining user stories sequentially.
-                    return taskTree(storyRefs.slice(1));
-                  },
+                  // After they are processed, process the remaining user stories.
+                  () => taskTree(storyRefs.slice(1)),
                   error => err(error, 'creating tasks for child user stories')
                 );
               },
@@ -780,27 +776,22 @@ const caseTree = storyRefs => {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
       // Get data on the first user story of the specified array.
-      return getData(firstRef, ['Name', 'Description', 'Owner', 'Children'])
+      return getItemData(firstRef, ['Name', 'Description', 'Owner'], ['Children'])
       .then(
-        storyResult => {
-          // When the data arrive:
-          const data = dataOn(storyResult, ['Name', 'Description', 'Owner'], ['Children']);
-          const name = data.name;
-          const caseNames = caseData ? caseData[name] || [name] : [name];
+        // When the data arrive:
+        data => {
           // If the user story has any child user stories, it does not need test cases, so:
-          if (data.childrenCount) {
+          if (data.children.count) {
             report([['total']]);
             // Get data on its child user stories.
-            return getData(data.childrenSummary._ref, ['_ref'])
+            return getCollectionData(data.children.ref, [], [])
             .then(
-              // When the data arrive, process the children sequentially.
-              childrenResult => {
-                const childRefs = childrenResult.Object.Results.map(
-                  child => child._ref
-                );
-                return caseTree(childRefs)
+              // When the data arrive:
+              children => {
+                // Process the children sequentially.
+                return caseTree(children.map(child => child.ref))
                 .then(
-                  // After they are processed, process the user story’s remaining siblings.
+                  // After they are processed, process the remaining user stories.
                   () => caseTree(storyRefs.slice(1)),
                   error => err(error, 'creating test cases for child user stories')
                 );
@@ -813,6 +804,8 @@ const caseTree = storyRefs => {
           }
           // Otherwise the user story needs test cases, so:
           else {
+            // Determine whether to create 1 test case with the user-story name or customize.
+            const caseNames = caseData ? caseData[data.name] || [data.name] : [data.name];
             // If only 1 test case is to be created:
             if (caseNames.length === 1) {
               // Create and link it.
@@ -962,22 +955,18 @@ const resultTree = storyRefs => {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
       // Get data on the first user story of the specified array.
-      return getData(firstRef, ['Children', 'TestCases'])
+      return getItemData(firstRef, [], ['Children', 'TestCases'])
       .then(
-        storyResult => {
-          // When the data arrive:
-          const data = dataOn(storyResult, [], ['Children', 'TestCases']);
+        // When the data arrive:
+        data => {
           // If the user story has any child user stories and no test cases:
-          if (data.childrenCount && ! data.testCasesCount) {
+          if (data.children.count && ! data.testCases.count) {
             // Get data on its child user stories.
-            return getData(data.childrenSummary._ref, ['_ref'])
+            return getCollectionData(data.children.ref, [], [])
             .then(
               // When the data arrive, process the children sequentially.
-              childrenResult => {
-                const childRefs = childrenResult.Object.Results.map(
-                  child => child._ref
-                );
-                return resultTree(childRefs)
+              children => {
+                return resultTree(children.map(child => child.ref))
                 .then(
                   // After they are processed, process the remaining user stories.
                   () => resultTree(storyRefs.slice(1)),
@@ -988,14 +977,14 @@ const resultTree = storyRefs => {
             );
           }
           // Otherwise, if the user story has any test cases and no child user stories:
-          else if (data.testCasesCount && ! data.childrenCount) {
+          else if (data.testCases.count && ! data.children.count) {
             // Get data on its test cases.
-            return getData(data.testCasesSummary._ref, ['_ref'])
+            return getCollectionData(data.testCases.ref, [], [])
             .then(
-              // When the data arrive, process the test cases sequentially.
-              casesResult => {
-                const caseRefs = casesResult.Object.Results.map(testCase => testCase._ref);
-                return passCases(caseRefs, build, note)
+              // When the data arrive:
+              cases => {
+                // Process the test cases sequentially.
+                return passCases(cases.map(testCase => testCase.ref), build, note)
                 .then(
                   // After they are processed, process the remaining user stories.
                   () => resultTree(storyRefs.slice(1)),
@@ -1005,9 +994,14 @@ const resultTree = storyRefs => {
               error => err(error, 'getting data on test cases for result creation')
             );
           }
-          // Otherwise, i.e. if the user story has no child user stories and no test cases:
-          else {
+          // Otherwise, if the user story has no child user stories and no test cases:
+          else if (! data.children.count && ! data.testCases.count) {
             // Skip it.
+            return '';
+          }
+          // Otherwise, i.e. if the user story has both child user stories and test cases:
+          else {
+            err('Invalid user story', 'creating test-case results');
             return '';
           }
         },
