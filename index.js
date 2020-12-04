@@ -265,7 +265,7 @@ const getCollectionData = (ref, facts, collections) => {
           ref: member._ref
         };
         facts.forEach(fact => {
-          memberData[lc0Of(fact)] = typeof member[fact] === 'object'
+          memberData[lc0Of(fact)] = member[fact] !== null && typeof member[fact] === 'object'
             ? member[fact]._ref
             : member[fact];
         });
@@ -433,7 +433,7 @@ const verdictTree = storyRef => {
               }
             });
           },
-          error => err(error, 'getting data on test cases')
+          error => err(error, `getting data on test cases ${data.testCases.ref} for verdicts`)
         );
       }
       /*
