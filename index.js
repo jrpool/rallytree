@@ -876,50 +876,42 @@ const createResult = (caseRef, build, testSet, note) => {
 const passCases = (caseRefs, build, note) => {
   if (caseRefs.length && ! isError) {
     const firstRef = shorten('testcase', 'testcase', caseRefs[0]);
+    console.log(`Processing ${firstRef}`);
     if (! isError) {
       // Get data on the first test case of the specified array.
-      return getData(firstRef, ['Results', 'TestSets'])
+      return getItemData(firstRef, [], ['Results', 'TestSets'])
       .then(
         // When the data arrive:
-        caseResult => {
+        data => {
           const caseObj = caseResult.Object;
           // If the test case already has results:
-          if (caseObj.Results.Count) {
+          if (data.results.count) {
             // Do not create one.
-            report(['total']);
+            report([['total']]);
             return '';
           }
           // Otherwise, i.e. if the test case has no results yet:
           else {
-            const setsSummary = caseObj.TestSets;
             // If the test case is in any test sets:
-            if (setsSummary.Count) {
+            if (data.testSets.count) {
               // Get data on the test sets.
-              return getData(setsSummary._ref, ['_ref'])
+              return getCollectionData(data.testSets.ref, [], [])
               .then(
                 // When the data arrive:
-                setsResult => {
-                  const setRef = shorten(
-                    'testset', 'testset', setsResult.Object.Results[0]._ref
+                testSets => {
+                  // Create a passing result for the test case in its first test set.
+                  return createResult(firstRef, build, testSets[0].ref, note)
+                  .then(
+                    // When the result has been created:
+                    () => {
+                      report([['total'], ['changes']]);
+                      // Process the remaining test cases.
+                      return passCases(caseRefs.slice(1), build, note);
+                    },
+                    error => err(error, 'creating result in test set')
                   );
-                  if (! isError) {
-                    // Create a passing result for the test case in its first test set.
-                    return createResult(firstRef, build, setRef,note)
-                    .then(
-                      // When the result has been created:
-                      () => {
-                        report(['total'], ['changes']);
-                        // Process the remaining test cases.
-                        return passCases(caseRefs.slice(1), build, note);
-                      },
-                      error => err(error, 'creating result in test set')
-                    );
-                  }
-                  else {
-                    return '';
-                  }
                 },
-                error => err(error, 'getting data on test sets')
+                error => err(error, 'getting data on test sets for result creation')
               );
             }
             // Otherwise, i.e. if the test case is not in any test set:
