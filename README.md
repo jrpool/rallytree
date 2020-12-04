@@ -109,7 +109,7 @@ The `retry` branch of this project implements the error-trapping adaptation as a
 
 RallyTree does not yet implement the single-host accommodation.
 
-Concurrency errors have not occurred in the first three operations (documentation, test-result acquisition, and ownership change), so they are performed in parallel whenever possible.
+Concurrency errors have not occurred in the first two operations (documentation and test-result acquisition), so they are performed in parallel whenever possible. Concurrency errors in the ownership-change operation were never encountered during initial development, so it, too, is performed in parallel. However, during later development occasional concurrency errors occurred in the ownership-change operation. If you encounter them, you can rerun the operation and it will finished processing any items not processed because of the error. This operation may be made sequential in a future version.
 
 # Installation and usage
 To install and use RallyTree:
