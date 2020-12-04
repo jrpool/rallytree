@@ -481,13 +481,12 @@ const verdictTree = storyRef => {
   );
 };
 // Ensure the ownership of a task or test case.
-const takeTaskOrCase = (itemType, itemObj) => {
+const takeTaskOrCase = (itemType, item) => {
   if (! isError) {
     const workItemType = itemType === 'case' ? 'testcase' : 'task';
-    const itemRef = shorten(workItemType, workItemType, itemObj._ref);
+    const itemRef = shorten(workItemType, workItemType, item.ref);
     if (! isError) {
-      const itemOwner = itemObj.Owner;
-      const ownerRef = itemOwner ? shorten('user', 'user', itemOwner._ref) : '';
+      const ownerRef = item.owner ? shorten('user', 'user', item.owner) : '';
       if (! isError) {
         // If the current owner is not the intended owner:
         if (ownerRef !== takerRef) {
@@ -498,13 +497,13 @@ const takeTaskOrCase = (itemType, itemObj) => {
           })
           .then(
             () => {
-              report([['total'], [itemType], ['totalChanges'], [`${itemType}Changes`]]);
+              report([['total'], [`${itemType}Total`], ['changes'], [`${itemType}Changes`]]);
             },
             error => err(error, `changing ${itemType} owner`)
           );
         }
         else {
-          report([['total'], [itemType]]);
+          report([['total'], [`${itemType}Total`]]);
         }
       }
     }
@@ -523,7 +522,9 @@ const takeDescendants = (callback, data) => {
           // Process the user stories in parallel.
           children.forEach(child => {
             if (! isError) {
-              const childRef = shorten('hierarchicalrequirement', 'hierarchicalrequirement', child.ref);
+              const childRef = shorten(
+                'hierarchicalrequirement', 'hierarchicalrequirement', child.ref
+              );
               if (! isError) {
                 callback(childRef);
               }
@@ -553,7 +554,7 @@ const takeDescendants = (callback, data) => {
               cases => {
                 // Process the test cases in parallel.
                 cases.forEach(testCase => {
-                  takeTaskOrCase('testcase', testCase);
+                  takeTaskOrCase('case', testCase);
                 });
               },
               error => err(error, 'getting data on test cases for ownership change')
@@ -1085,7 +1086,7 @@ const copyTree = (storyRefs, copyParentRef) => {
                 // Identify and shorten a reference to the copy.
                 const copyRef = shorten('userstory', 'hierarchicalrequirement', copy.Object._ref);
                 if (! isError) {
-                  // If the original has any child user stories and neither tasks nor test cases:
+                  // If the original has children and no tasks or test cases:
                   if (data.children.count && ! data.tasks.count && ! data.testCases.count) {
                     // Get data on the child user stories.
                     return getCollectionData(data.children.ref, [], [])
@@ -1180,6 +1181,11 @@ const copyTree = (storyRefs, copyParentRef) => {
                       },
                       error => err(error, 'getting data on tasks')
                     );
+                  }
+                  // Otherwise, i.e. if the original has nothing other than itself to be copied:
+                  else {
+                    // Process the remaining user stories.
+                    return copyTree(storyRefs.slice(1), copyParentRef);
                   }
                 }
               },
