@@ -1011,7 +1011,7 @@ const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
             .then(
               // When the item has been copied:
               () => {
-                report([['total'], ['taskTotal', 'caseTotal'][['task', 'case'].indexOf(itemType)]]);
+                report([['total'], [`${itemType}Total`]]);
                 // Copy the remaining items in the specified array.
                 return copyTasksOrCases(itemType, itemRefs.slice(1), copyStoryRef);
               },
