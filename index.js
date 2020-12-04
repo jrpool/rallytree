@@ -896,7 +896,7 @@ const passCases = (caseRefs, build, note) => {
               .then(
                 // When the result has been created:
                 () => {
-                  report(['total'], ['changes']);
+                  report([['total'], ['changes']]);
                   // Process the remaining test cases.
                   return passCases(caseRefs.slice(1), build, note);
                 },
@@ -1001,7 +1001,7 @@ const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
               type: workItemType,
               fetch: ['_ref'],
               data: {
-                Name: name,
+                Name: data.name,
                 Description: data.description,
                 Owner: data.owner,
                 DragAndDropRank: data.dragAndDropRank,
@@ -1011,7 +1011,7 @@ const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
             .then(
               // When the item has been copied:
               () => {
-                report(['total'], ['taskTotal', 'caseTotal'][['task', 'case'].indexOf(itemType)]);
+                report([['total'], ['taskTotal', 'caseTotal'][['task', 'case'].indexOf(itemType)]]);
                 // Copy the remaining items in the specified array.
                 return copyTasksOrCases(itemType, itemRefs.slice(1), copyStoryRef);
               },
@@ -1043,7 +1043,8 @@ const copyTree = (storyRefs, copyParentRef) => {
       // Get data on the first user story.
       return getItemData(
         firstRef,
-        ['Name', 'Description', 'Owner', 'DragAndDropRank'], ['Children', 'Tasks', 'TestCases']
+        ['Name', 'Description', 'Owner', 'DragAndDropRank'],
+        ['Children', 'Tasks', 'TestCases']
       )
       .then(
         // When the data arrive:
@@ -1070,7 +1071,7 @@ const copyTree = (storyRefs, copyParentRef) => {
               type: 'hierarchicalrequirement',
               fetch: ['_ref'],
               data: {
-                Name: name,
+                Name: data.name,
                 Description: data.description,
                 Owner: data.owner,
                 DragAndDropRank: data.dragAndDropRank,
@@ -1080,7 +1081,7 @@ const copyTree = (storyRefs, copyParentRef) => {
             .then(
               // When the user story has been copied:
               copy => {
-                report(['total'], ['storyTotal']);
+                report([['total'], ['storyTotal']]);
                 // Identify and shorten a reference to the copy.
                 const copyRef = shorten('userstory', 'hierarchicalrequirement', copy.Object._ref);
                 if (! isError) {
