@@ -282,30 +282,6 @@ const getCollectionData = (ref, facts, collections) => {
     error => err(error, `getting data on ${ref}`)
   );
 };
-// Gets data on a work item.
-const getData = (ref, fetch) => {
-  return restAPI.get({
-    ref,
-    fetch
-  });
-};
-// Returns an object of data about an item from the result of getData().
-const dataOn = (result, properties, countables) => {
-  const obj = result.Object;
-  const data = {};
-  // Add the non-summary properties.
-  properties.forEach(property => {
-    data[lc0Of(property)] = obj[property];
-  });
-  // Add the references to and counts of the summary properties.
-  countables.forEach(countable => {
-    data[lc0Of(countable)] = {
-      ref: obj[countable]._ref,
-      count: obj[countable].Count
-    };
-  });
-  return data;
-};
 // Sends the tree documentation as an event.
 const outDoc = () => {
   if (docTimeout) {
@@ -876,19 +852,18 @@ const createResult = (caseRef, build, testSet, note) => {
 const passCases = (caseRefs, build, note) => {
   if (caseRefs.length && ! isError) {
     const firstRef = shorten('testcase', 'testcase', caseRefs[0]);
-    console.log(`Processing ${firstRef}`);
     if (! isError) {
       // Get data on the first test case of the specified array.
       return getItemData(firstRef, [], ['Results', 'TestSets'])
       .then(
         // When the data arrive:
         data => {
-          const caseObj = caseResult.Object;
           // If the test case already has results:
           if (data.results.count) {
             // Do not create one.
             report([['total']]);
-            return '';
+            // Process the remaining test cases.
+            return passCases(caseRefs.slice(1), build, note);
           }
           // Otherwise, i.e. if the test case has no results yet:
           else {
@@ -1017,11 +992,10 @@ const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
       const firstRef = shorten(workItemType, workItemType, itemRefs[0]);
       if (! isError) {
         // Get data on the first item.
-        return getData(firstRef, ['Name', 'Description', 'Owner', 'DragAndDropRank'])
+        return getItemData(firstRef, ['Name', 'Description', 'Owner', 'DragAndDropRank'], [])
         .then(
           // When the data arrive:
-          itemResult => {
-            const data = dataOn(itemResult, ['Name', 'Description', 'Owner', 'DragAndDropRank']);
+          data => {
             // Copy the item and give it the specified parent.
             return restAPI.create({
               type: workItemType,
@@ -1067,18 +1041,13 @@ const copyTree = (storyRefs, copyParentRef) => {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
       // Get data on the first user story.
-      return getData(
+      return getItemData(
         firstRef,
-        ['Name', 'Description', 'Owner', 'DragAndDropRank', 'Tasks', 'TestCases', 'Children']
+        ['Name', 'Description', 'Owner', 'DragAndDropRank'], ['Children', 'Tasks', 'TestCases']
       )
       .then(
-        storyResult => {
-          // When the data arrive:
-          const data = dataOn(
-            storyResult,
-            ['Name', 'Description', 'Owner', 'DragAndDropRank'],
-            ['Children', 'Tasks', 'TestCases']
-          );
+        // When the data arrive:
+        data => {
           // If the user story is the specified parent of the tree copy:
           if (firstRef === treeCopyParentRef) {
             // Quit and report this.
@@ -1087,8 +1056,8 @@ const copyTree = (storyRefs, copyParentRef) => {
           }
           // Otherwise, if the original has an invalid descendant combination:
           else if (
-            data.childrenCount && (data.tasksCount || data.testCasesCount)
-            || (data.testCasesCount && ! data.tasksCount)
+            data.children.count && (data.tasks.count || data.testCases.count)
+            || (data.testCases.count && ! data.tasks.count)
           ) {
             // Quit and report this.
             err(`Invalid user story ${firstRef}`, 'copying tree');
@@ -1116,17 +1085,14 @@ const copyTree = (storyRefs, copyParentRef) => {
                 const copyRef = shorten('userstory', 'hierarchicalrequirement', copy.Object._ref);
                 if (! isError) {
                   // If the original has any child user stories and neither tasks nor test cases:
-                  if (data.childrenCount && ! (data.tasksCount || data.testCasesCount)) {
+                  if (data.children.count && ! data.tasks.count && ! data.testCases.count) {
                     // Get data on the child user stories.
-                    return getData(data.childrenSummary._ref, ['_ref'])
+                    return getCollectionData(data.children.ref, [], [])
                     .then(
                       // When the data arrive:
-                      childrenResult => {
+                      children => {
                         // Copy the child user stories.
-                        const childRefs = childrenResult.Object.Results.map(
-                          child => child._ref
-                        );
-                        copyTree(childRefs, copyRef)
+                        copyTree(children.map(child => child.ref), copyRef)
                         .then(
                           // When the child user stories have been copied:
                           () => {
@@ -1144,32 +1110,30 @@ const copyTree = (storyRefs, copyParentRef) => {
                     test cases and they are to be copied:
                   */
                   else if (
-                    data.tasksCount
-                    && data.testCasesCount
+                    data.tasks.count
+                    && data.testCases.count
                     && copyWhat === 'both'
-                    && ! data.childrenCount
+                    && ! data.children.count
                   ) {
                     // Get data on the tasks.
-                    return getData(data.tasksSummary._ref, ['_ref'])
+                    return getCollectionData(data.tasks.ref, [], [])
                     .then(
                       // When the data arrive:
-                      tasksResult => {
+                      tasks => {
                         // Copy the tasks.
-                        const taskRefs = tasksResult.Object.Results.map(task => task._ref);
-                        return copyTasksOrCases('task', taskRefs, copyRef)
+                        return copyTasksOrCases('task', tasks.map(task => task.ref), copyRef)
                         .then(
                           // When the tasks have been copied:
                           () => {
                             // Get data on the test cases.
-                            return getData(data.testCasesSummary._ref, ['_ref'])
+                            return getCollectionData(data.testCases.ref, [], [])
                             .then(
                               // When the data arrive:
-                              casesResult => {
+                              cases => {
                                 // Copy the test cases.
-                                const caseRefs = casesResult.Object.Results.map(
-                                  testCase => testCase._ref
-                                );
-                                return copyTasksOrCases('case', caseRefs, copyRef)
+                                return copyTasksOrCases(
+                                  'case', cases.map(testCase => testCase.ref), copyRef
+                                )
                                 .then(
                                   // When the test cases have been copied:
                                   () => {
@@ -1193,18 +1157,19 @@ const copyTree = (storyRefs, copyParentRef) => {
                     are to be copied:
                   */
                   else if (
-                    data.tasksCount && ['tasks', 'both'].includes(copyWhat) && ! data.childrenCount
+                    data.tasks.count
+                    && ['tasks', 'both'].includes(copyWhat)
+                    && ! data.children.count
                   ) {
                     // Get data on the tasks.
-                    return getData(data.tasksSummary._ref, ['_ref'])
+                    return getCollectionData(data.tasks.ref, [], [])
                     .then(
                       // When the data arrive:
-                      tasksResult => {
+                      tasks => {
                         // Copy the tasks.
-                        const taskRefs = tasksResult.Object.Results.map(task => task._ref);
-                        return copyTasksOrCases('task', taskRefs, copyRef)
+                        return copyTasksOrCases('task', tasks.map(task => task.ref), copyRef)
                         .then(
-                          // When the test cases have been copied:
+                          // When the tasks have been copied:
                           () => {
                             // Process the remaining user stories.
                             return copyTree(storyRefs.slice(1), copyParentRef);
@@ -1473,10 +1438,10 @@ const serveCaseIfSet = (testSetID) => {
       if (! isError) {
         testSetRef = shorten('testset', 'testset', ref);
         if (! isError) {
-          // Get data on the test set.
-          getData(testSetRef, ['_ref'])
+          // Check on the existence of the test set.
+          getItemData(testSetRef, [], [])
           .then(
-            // When the data arrive:
+            // When its existence is confirmed:
             () => {
               // Serve a report on test-case creation.
               serveCaseReport();
@@ -1666,13 +1631,13 @@ const requestHandler = (request, res) => {
                               testFolderRef = shorten('testfolder', 'testfolder', ref);
                               if (! isError) {
                                 // Get data on the test folder.
-                                getData(testFolderRef, ['_ref'])
+                                getItemData(testFolderRef, [], [])
                                 .then(
                                   // When the data arrive:
                                   () => {
-                                    // If a set set was specified:
+                                    // If a test set was specified:
                                     if (testSetID) {
-                                      // Process it and serve a report on test-case creation.
+                                      // Verify it and serve a report on test-case creation.
                                       serveCaseIfSet(testSetID);
                                     }
                                     // Otherwise, i.e. if no test set was specified:
@@ -1716,13 +1681,11 @@ const requestHandler = (request, res) => {
                             );
                             if (! isError) {
                               // Get data on the parent user story of the copy.
-                              getData(treeCopyParentRef, ['Tasks'])
+                              getItemData(treeCopyParentRef, [], ['Tasks'])
                               .then(
-                                storyResult => {
+                                data => {
                                   // When the data arrive:
-                                  const storyObj = storyResult.Object;
-                                  const tasksSummary = storyObj.Tasks;
-                                  if (tasksSummary.Count) {
+                                  if (data.tasks.count) {
                                     err(
                                       'Attempt to copy to a user story with tasks', 'copying tree'
                                     );
