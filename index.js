@@ -235,9 +235,11 @@ const getItemData = (ref, facts, collections) => {
     item => {
       const obj = item.Object;
       const data = {};
+      // Get the facts, or, if they are objects, references to them.
       facts.forEach(fact => {
-        data[lc0Of(fact)] = obj[fact];
+        data[lc0Of(fact)] = typeof obj[fact] === 'object' ? obj[fact]._ref : obj[fact];
       });
+      // Get references to, and sizes of, the collections.
       collections.forEach(collection => {
         data[lc0Of(collection)] = {
           ref: obj[collection]._ref,
@@ -264,7 +266,9 @@ const getCollectionData = (ref, facts, collections) => {
           ref: member._ref
         };
         facts.forEach(fact => {
-          memberData[lc0Of(fact)] = member[fact];
+          memberData[lc0Of(fact)] = typeof member[fact] === 'object'
+            ? member[fact]._ref
+            : member[fact];
         });
         collections.forEach(collection => {
           memberData[lc0Of(collection)] = {
@@ -533,61 +537,65 @@ const takeTaskOrCase = (itemType, itemObj) => {
 };
 // Changes ownerships of the child user stories or the tasks and test cases of a user story.
 const takeDescendants = (callback, data) => {
-  // If the user story has child user stories and no tasks or test cases:
-  if (data.children.count && ! data.tasks.count && ! data.testCases.count) {
-    // Get data on the child user stories.
-    getCollectionData(data.children.ref, [], [])
-    .then(
-      // When the data arrive:
-      children => {
-        // Process the user stories in parallel.
-        children.forEach(child => {
-          const childRef = shorten('hierarchicalrequirement', 'hierarchicalrequirement', child.ref);
-          if (! isError) {
-            callback(childRef);
+  if (! isError) {
+    // If the user story has child user stories and no tasks or test cases:
+    if (data.children.count && ! data.tasks.count && ! data.testCases.count) {
+      // Get data on the child user stories.
+      getCollectionData(data.children.ref, [], [])
+      .then(
+        // When the data arrive:
+        children => {
+          // Process the user stories in parallel.
+          children.forEach(child => {
+            if (! isError) {
+              const childRef = shorten('hierarchicalrequirement', 'hierarchicalrequirement', child.ref);
+              if (! isError) {
+                callback(childRef);
+              }
+            }
+          });
+        },
+        error => err(error, 'getting data on child user stories for ownership change')
+      );
+    }
+    // Otherwise, if the user story has tasks and no child user stories:
+    else if (data.tasks.count && ! data.children.count) {
+      // Get data on the tasks.
+      getCollectionData(data.tasks.ref, ['Owner'], [])
+      .then(
+        // When the data arrive:
+        tasks => {
+          // Process the tasks in parallel.
+          tasks.forEach(task => {
+            takeTaskOrCase('task', task);
+          });
+          // If the user story has test cases:
+          if (data.testCases.count) {
+            // Get data on the test cases.
+            getCollectionData(data.testCases.ref, ['Owner'], [])
+            .then(
+              // When the data arrive:
+              cases => {
+                // Process the test cases in parallel.
+                cases.forEach(testCase => {
+                  takeTaskOrCase('testcase', testCase);
+                });
+              },
+              error => err(error, 'getting data on test cases for ownership change')
+            );
           }
-        });
-      },
-      error => err(error, 'getting data on child user stories for ownership change')
-    );
-  }
-  // Otherwise, if the user story has tasks and no child user stories:
-  else if (data.tasks.count && ! data.children.count) {
-    // Get data on the tasks.
-    getCollectionData(data.tasks.ref, ['Owner'], [])
-    .then(
-      // When the data arrive:
-      tasks => {
-        // Process the tasks in parallel.
-        tasks.forEach(task => {
-          takeTaskOrCase('task', task);
-        });
-        // If the user story has test cases:
-        if (data.testCases.count) {
-          // Get data on the test cases.
-          getCollectionData(data.testCases.ref, ['Owner'], [])
-          .then(
-            // When the data arrive:
-            cases => {
-              // Process the test cases in parallel.
-              cases.forEach(testCase => {
-                takeTaskOrCase('testcase', testCase);
-              });
-            },
-            error => err(error, 'getting data on test cases for ownership change')
-          )
-        }
-      },
-      error => err(error, 'getting data on tasks for ownership change')
-    );
-  }
-  // Otherwise, if the user story has no child user stories, tasks, or test cases:
-  else if (! data.children.count && ! data.tasks.count && ! data.testCases.count) {
-    // Do nothing.
-  }
-  // Otherwise:
-  else {
-    err('Invalid user story', 'changing ownership');
+        },
+        error => err(error, 'getting data on tasks for ownership change')
+      );
+    }
+    // Otherwise, if the user story has no child user stories, tasks, or test cases:
+    else if (! data.children.count && ! data.tasks.count && ! data.testCases.count) {
+      // Do nothing.
+    }
+    // Otherwise:
+    else {
+      err('Invalid user story', 'changing ownership');
+    }
   }
 };
 // Recursively changes ownerships in a tree of user stories.
@@ -598,37 +606,40 @@ const takeTree = storyRef => {
     .then(
       // When the data arrive:
       data => {
-        // If the user story’s owner needs to be changed:
-        if (data.owner && data.owner._ref !== takerRef || ! data.owner) {
-          // Change it.
-          restAPI.update({
-            ref: storyRef,
-            data: {
-              Owner: takerRef
-            }
-          })
-          .then(
-            // When the owner has been changed:
-            () => {
-              report([['total'], ['changes'], ['story'], ['storyChanges']]);
-              // Process the user story’s child user stories or its tasks and test cases.
-              takeDescendants(takeTree, storyRef, data);
-            },
-            error => err(error, 'changing owner of user story')
-          );
-        }
-        // Otherwise, i.e. if the user story’s owner does not need to be changed:
-        else {
-          report([['total'], ['story']]);
-          // Process the user story’s child user stories or its tasks and test cases.
-          takeDescendants(takeTree, storyRef);
+        const ownerRef = data.owner ? shorten('user', 'user', data.owner) : '';
+        if (! isError) {
+          // If the user story has no owner or its owner is not the specified oneß:
+          if (ownerRef && ownerRef !== takerRef || ! ownerRef) {
+            // Change its owner.
+            restAPI.update({
+              ref: storyRef,
+              data: {
+                Owner: takerRef
+              }
+            })
+            .then(
+              // When the owner has been changed:
+              () => {
+                report([['total'], ['changes'], ['storyTotal'], ['storyChanges']]);
+                // Process the user story’s child user stories or its tasks and test cases.
+                takeDescendants(takeTree, data);
+              },
+              error => err(error, 'changing owner of user story')
+            );
+          }
+          // Otherwise, i.e. if the user story’s owner does not need to be changed:
+          else {
+            report([['total'], ['storyTotal']]);
+            // Process the user story’s child user stories or its tasks and test cases.
+            takeDescendants(takeTree, data);
+          }
         }
       },
       error => err(error, 'getting data on user story for ownership change')
     );
   }
 };
-// Sequentially creates tasks for a user story.
+// Sequentially creates tasks with a specified owner and names for a user story.
 const createTasks = (storyRef, owner, names) => {
   if (names.length && ! isError) {
     return restAPI.create({
@@ -655,35 +666,24 @@ const taskTree = storyRefs => {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
       // Get data on the first user story of the specified array.
-      return getData(firstRef, ['Owner', 'Children'])
+      return getItemData(firstRef, ['Owner'], ['Children'])
       .then(
-        storyResult => {
-          // When the data arrive:
-          const data = dataOn(storyResult, ['Owner'], ['Children']);
-          /*
-            If the user story has any child user stories, it does not
-            need tasks, so:
-          */
-          if (data.childrenCount) {
+        // When the data arrive:
+        data => {
+          // If the user story has any child user stories, it does not need tasks, so:
+          if (data.children.count) {
             report([['total']]);
             // Get data on its child user stories.
-            return getData(data.childrenSummary._ref, ['_ref'])
+            return getCollectionData(data.children.ref, [], [])
             .then(
-              /*
-                When the data arrive, process the children sequentially
-                to prevent concurrency errors.
-              */
-              childrenResult => {
-                const childRefs = childrenResult.Object.Results.map(
-                  child => child._ref
-                );
-                return taskTree(childRefs)
+              // When the data arrive:
+              children => {
+                // Process the children sequentially.
+                return taskTree(children.map(child => child.ref))
                 .then(
+                  // After the children are processed:
                   () => {
-                    /*
-                      Process the rest of the specified user stories
-                      sequentially to prevent concurrency errors.
-                    */
+                    // Process the remaining user stories sequentially.
                     return taskTree(storyRefs.slice(1));
                   },
                   error => err(error, 'creating tasks for child user stories')
@@ -697,17 +697,14 @@ const taskTree = storyRefs => {
           }
           // Otherwise the user story needs tasks, so:
           else {
-            // Create them sequentially to prevent concurrency errors.
+            // Create them sequentially.
             return createTasks(firstRef, data.owner, taskNames)
-            // When they have been created:
             .then(
+              // When they have been created:
               () => {
                 if (! isError) {
                   report([['total'], ['changes', taskNames.length]]);
-                  /*
-                    Process the rest of the specified user stories
-                    sequentially to prevent concurrency errors.
-                  */
+                  // Process the remaining user stories sequentially.
                   return taskTree(storyRefs.slice(1));
                 }
               },
