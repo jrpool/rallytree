@@ -105,11 +105,11 @@ In the above-cited knowledge-base article, Broadcom also suggests other adaptati
 - trapping errors and retrying operations until they succeed
 - restricting all requests to a single host in its server cluster
 
-The `retry` branch of this project implements the error-trapping adaptation as an option choosable by the user. The `pause` branch implements it with a 1-second wait between tries. In both cases, up to 30 tries are permitted. However, testing shows that this accommodation often fails. Therefore, the `master` branch does not offer this accommodation option.
+The `retry` branch of this project implements the error-trapping adaptation as an option choosable by the user. The `pause` branch implements it with a 1-second wait between tries. In both cases, up to 30 tries are permitted. However, testing shows that this accommodation often fails. Therefore, the `master` branch does not offer this accommodation option. Development on the `retry` and `pause` branches stopped as of version 1.1.0.
 
 RallyTree does not yet implement the single-host accommodation.
 
-Concurrency errors have not occurred in the first two operations (documentation and test-result acquisition), so they are performed in parallel whenever possible. Concurrency errors in the ownership-change operation were never encountered during initial development, so it, too, is performed in parallel. However, during later development occasional concurrency errors occurred in the ownership-change operation. If you encounter them, you can rerun the operation and it will finished processing any items not processed because of the error. This operation may be made sequential in a future version.
+Concurrency errors have not occurred in the first two operations (documentation and test-result acquisition), where the Rally data are read but not modified. Those operations are performed in parallel whenever possible.
 
 # Installation and usage
 To install and use RallyTree:
