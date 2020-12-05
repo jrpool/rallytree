@@ -480,24 +480,27 @@ const verdictTree = storyRef => {
     )
   );
 };
-// Ensure the ownership of a task or test case.
-const takeTaskOrCase = (itemType, item) => {
+// Sequentially ensure the ownership of an array of tasks or test cases.
+const takeTasksOrCases = (itemType, items) => {
   if (! isError) {
     const workItemType = itemType === 'case' ? 'testcase' : 'task';
-    const itemRef = shorten(workItemType, workItemType, item.ref);
+    // Get a reference to the first item.
+    const firstItemRef = shorten(workItemType, workItemType, items[0].ref);
     if (! isError) {
-      const ownerRef = item.owner ? shorten('user', 'user', item.owner) : '';
+      const firstOwnerRef = items[0].owner ? shorten('user', 'user', items[0].owner) : '';
       if (! isError) {
-        // If the current owner is not the intended owner:
-        if (ownerRef !== takerRef) {
+        // If the current owner of the first item is not the intended owner:
+        if (firstOwnerRef !== takerRef) {
           // Change the owner.
-          restAPI.update({
-            ref: itemRef,
+          return restAPI.update({
+            ref: firstItemRef,
             data: {Owner: takerRef}
           })
           .then(
+            // After the owner is changed:
             () => {
               report([['total'], [`${itemType}Total`], ['changes'], [`${itemType}Changes`]]);
+              return takeTasksOrCases(itemType, items.slice(1));
             },
             error => err(error, `changing ${itemType} owner`)
           );
@@ -515,51 +518,51 @@ const takeDescendants = (callback, data) => {
     // If the user story has child user stories and no tasks or test cases:
     if (data.children.count && ! data.tasks.count && ! data.testCases.count) {
       // Get data on the child user stories.
-      getCollectionData(data.children.ref, [], [])
+      return getCollectionData(data.children.ref, [], [])
       .then(
         // When the data arrive:
         children => {
-          // Process the user stories in parallel.
-          children.forEach(child => {
-            if (! isError) {
-              const childRef = shorten(
-                'hierarchicalrequirement', 'hierarchicalrequirement', child.ref
-              );
-              if (! isError) {
-                callback(childRef);
-              }
-            }
-          });
+          // Process them sequentially.
+          return callback(children.map(child => child.ref));
         },
         error => err(error, 'getting data on child user stories for ownership change')
       );
     }
-    // Otherwise, if the user story has tasks and no child user stories:
-    else if (data.tasks.count && ! data.children.count) {
+    // Otherwise, if the user story has tasks and test cases and no child user stories:
+    else if (data.tasks.count && data.testCases.count && ! data.children.count) {
       // Get data on the tasks.
-      getCollectionData(data.tasks.ref, ['Owner'], [])
+      return getCollectionData(data.tasks.ref, ['Owner'], [])
       .then(
         // When the data arrive:
         tasks => {
-          // Process the tasks in parallel.
-          tasks.forEach(task => {
-            takeTaskOrCase('task', task);
-          });
-          // If the user story has test cases:
-          if (data.testCases.count) {
-            // Get data on the test cases.
-            getCollectionData(data.testCases.ref, ['Owner'], [])
-            .then(
-              // When the data arrive:
-              cases => {
-                // Process the test cases in parallel.
-                cases.forEach(testCase => {
-                  takeTaskOrCase('case', testCase);
-                });
-              },
-              error => err(error, 'getting data on test cases for ownership change')
-            );
-          }
+          // Process the tasks.
+          return takeTasksOrCases('task', tasks)
+          .then(
+            // When they have been processed:
+            () => {
+              // Get data on the test cases.
+              return getCollectionData(data.testCases.ref, ['Owner'], [])
+              .then(
+                // When the data arrive:
+                cases => takeTasksOrCases('case', cases),
+                error => err(error, 'getting data on test cases for ownership change')
+              );
+            },
+            error => err(error, 'changing owners of tasks')
+          );
+        },
+        error => err(error, 'getting data on tasks before test cases for ownership change')
+      );
+    }
+    // Otherwise, if the user story has tasks and no child user stories or test cases:
+    else if (data.tasks.count && ! data.testCases.count && ! data.children.count) {
+      // Get data on the tasks.
+      return getCollectionData(data.tasks.ref, ['Owner'], [])
+      .then(
+        // When the data arrive:
+        tasks => {
+          // Process the tasks.
+          return takeTasksOrCases('task', tasks);
         },
         error => err(error, 'getting data on tasks for ownership change')
       );
@@ -567,28 +570,29 @@ const takeDescendants = (callback, data) => {
     // Otherwise, if the user story has no child user stories, tasks, or test cases:
     else if (! data.children.count && ! data.tasks.count && ! data.testCases.count) {
       // Do nothing.
+      return Promise.resolve('');
     }
-    // Otherwise:
+    // Otherwise, i.e. if the user story is invalid:
     else {
       err('Invalid user story', 'changing ownership');
     }
   }
 };
-// Recursively changes ownerships in a tree of user stories.
-const takeTree = storyRef => {
-  if (! isError) {
-    // Get data on the user story.
-    getItemData(storyRef, ['Owner'], ['Children', 'Tasks', 'TestCases'])
-    .then(
-      // When the data arrive:
-      data => {
-        const ownerRef = data.owner ? shorten('user', 'user', data.owner) : '';
-        if (! isError) {
-          // If the user story has no owner or its owner is not the specified oneß:
-          if (ownerRef && ownerRef !== takerRef || ! ownerRef) {
+// Recursively changes ownerships in a tree or subtree of user stories.
+const takeTree = storyRefs => {
+  if (storyRefs.length && ! isError) {
+    const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
+    if (! isError) {
+      // Get data on the first user story of the specified array.
+      return getItemData(firstRef, ['Owner'], ['Children', 'Tasks', 'TestCases'])
+      .then(
+        // When the data arrive:
+        data => {
+          // If the user story has no owner or its owner is not the specified one:
+          if (data.owner.ref && data.owner.ref !== takerRef || ! data.owner.ref) {
             // Change its owner.
-            restAPI.update({
-              ref: storyRef,
+            return restAPI.update({
+              ref: firstRef,
               data: {
                 Owner: takerRef
               }
@@ -598,7 +602,14 @@ const takeTree = storyRef => {
               () => {
                 report([['total'], ['changes'], ['storyTotal'], ['storyChanges']]);
                 // Process the user story’s child user stories or its tasks and test cases.
-                takeDescendants(takeTree, data);
+                return takeDescendants(takeTree, data)
+                .then(
+                  // When they have been processed, process the remaining user stories.
+                  () => takeTree(storyRefs.slice(1)),
+                  error => err(
+                    error, 'changing owner of descendants after changing user-story owner'
+                  )
+                );
               },
               error => err(error, 'changing owner of user story')
             );
@@ -607,12 +618,22 @@ const takeTree = storyRef => {
           else {
             report([['total'], ['storyTotal']]);
             // Process the user story’s child user stories or its tasks and test cases.
-            takeDescendants(takeTree, data);
+            return takeDescendants(takeTree, data)
+            .then(
+              () => takeTree(storyRefs.slice(1)),
+              error => err(error, 'changing owner of descendants without changing user-story owner')
+            )
           }
-        }
-      },
-      error => err(error, 'getting data on user story for ownership change')
-    );
+        },
+        error => err(error, 'getting data on user story for ownership change')
+      );
+    }
+    else {
+      return Promise.resolve('');
+    }
+  }
+  else {
+    return Promise.resolve('');
   }
 };
 // Sequentially creates tasks with a specified owner and names for a user story.
