@@ -480,9 +480,9 @@ const verdictTree = storyRef => {
     )
   );
 };
-// Sequentially ensure the ownership of an array of tasks or test cases.
+// Sequentially ensures the ownership of an array of tasks or test cases.
 const takeTasksOrCases = (itemType, items) => {
-  if (! isError) {
+  if (items.length && ! isError) {
     const workItemType = itemType === 'case' ? 'testcase' : 'task';
     // Get a reference to the first item.
     const firstItemRef = shorten(workItemType, workItemType, items[0].ref);
@@ -500,16 +500,29 @@ const takeTasksOrCases = (itemType, items) => {
             // After the owner is changed:
             () => {
               report([['total'], [`${itemType}Total`], ['changes'], [`${itemType}Changes`]]);
+              // Process the remaining tasks or test cases.
               return takeTasksOrCases(itemType, items.slice(1));
             },
             error => err(error, `changing ${itemType} owner`)
           );
         }
+        // Otherwise, i.e. if the current owner of the first item is the intended owner:
         else {
           report([['total'], [`${itemType}Total`]]);
+          // Process the remaining tasks or test cases.
+          return takeTasksOrCases(itemType, items.slice(1));
         }
       }
+      else {
+        return Promise.resolve('');
+      }
     }
+    else {
+      return Promise.resolve('');
+    }
+  }
+  else {
+    return Promise.resolve('');
   }
 };
 // Changes ownerships of the child user stories or the tasks and test cases of a user story.
@@ -588,41 +601,49 @@ const takeTree = storyRefs => {
       .then(
         // When the data arrive:
         data => {
-          // If the user story has no owner or its owner is not the specified one:
-          if (data.owner.ref && data.owner.ref !== takerRef || ! data.owner.ref) {
-            // Change its owner.
-            return restAPI.update({
-              ref: firstRef,
-              data: {
-                Owner: takerRef
-              }
-            })
-            .then(
-              // When the owner has been changed:
-              () => {
-                report([['total'], ['changes'], ['storyTotal'], ['storyChanges']]);
-                // Process the user story’s child user stories or its tasks and test cases.
-                return takeDescendants(takeTree, data)
-                .then(
-                  // When they have been processed, process the remaining user stories.
-                  () => takeTree(storyRefs.slice(1)),
-                  error => err(
-                    error, 'changing owner of descendants after changing user-story owner'
-                  )
-                );
-              },
-              error => err(error, 'changing owner of user story')
-            );
+          const ownerRef = shorten('user', 'user', data.owner);
+          if (! isError) {
+            // If the user story has no owner or its owner is not the specified one:
+            if (ownerRef && ownerRef !== takerRef || ! ownerRef) {
+              // Change its owner.
+              return restAPI.update({
+                ref: firstRef,
+                data: {
+                  Owner: takerRef
+                }
+              })
+              .then(
+                // When the owner has been changed:
+                () => {
+                  report([['total'], ['changes'], ['storyTotal'], ['storyChanges']]);
+                  // Process the user story’s child user stories or its tasks and test cases.
+                  return takeDescendants(takeTree, data)
+                  .then(
+                    // When they have been processed, process the remaining user stories.
+                    () => takeTree(storyRefs.slice(1)),
+                    error => err(
+                      error, 'changing owner of descendants after changing user-story owner'
+                    )
+                  );
+                },
+                error => err(error, 'changing owner of user story')
+              );
+            }
+            // Otherwise, i.e. if the user story’s owner does not need to be changed:
+            else {
+              report([['total'], ['storyTotal']]);
+              // Process the user story’s child user stories or its tasks and test cases.
+              return takeDescendants(takeTree, data)
+              .then(
+                () => takeTree(storyRefs.slice(1)),
+                error => err(
+                  error, 'changing owner of descendants without changing user-story owner'
+                )
+              );
+            }
           }
-          // Otherwise, i.e. if the user story’s owner does not need to be changed:
           else {
-            report([['total'], ['storyTotal']]);
-            // Process the user story’s child user stories or its tasks and test cases.
-            return takeDescendants(takeTree, data)
-            .then(
-              () => takeTree(storyRefs.slice(1)),
-              error => err(error, 'changing owner of descendants without changing user-story owner')
-            )
+            return '';
           }
         },
         error => err(error, 'getting data on user story for ownership change')
@@ -1535,7 +1556,7 @@ const requestHandler = (request, res) => {
       }
       else if (requestURL === '/taketotals' && idle) {
         streamInit();
-        takeTree(rootRef);
+        takeTree([rootRef]);
       }
       else if (requestURL === '/tasktotals' && idle) {
         streamInit();
