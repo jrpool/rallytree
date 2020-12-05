@@ -875,7 +875,7 @@ const caseTree = storyRefs => {
   }
 };
 // Creates a passing test-case result.
-const createResult = (caseRef, build, testSet, note) => {
+const createResult = (caseRef, tester, build, testSet, note) => {
   // Create a passing result.
   return restAPI.create({
     type: 'testcaseresult',
@@ -886,7 +886,7 @@ const createResult = (caseRef, build, testSet, note) => {
       Verdict: 'Pass',
       Notes: note,
       Date: new Date(),
-      Tester: userRef,
+      Tester: tester,
       TestSet: testSet
     }
   });
@@ -897,7 +897,7 @@ const passCases = (caseRefs, build, note) => {
     const firstRef = shorten('testcase', 'testcase', caseRefs[0]);
     if (! isError) {
       // Get data on the first test case of the specified array.
-      return getItemData(firstRef, [], ['Results', 'TestSets'])
+      return getItemData(firstRef, ['Owner'], ['Results', 'TestSets'])
       .then(
         // When the data arrive:
         data => {
@@ -918,7 +918,7 @@ const passCases = (caseRefs, build, note) => {
                 // When the data arrive:
                 testSets => {
                   // Create a passing result for the test case in its first test set.
-                  return createResult(firstRef, build, testSets[0].ref, note)
+                  return createResult(firstRef, data.owner, build, testSets[0].ref, note)
                   .then(
                     // When the result has been created:
                     () => {
@@ -935,7 +935,7 @@ const passCases = (caseRefs, build, note) => {
             // Otherwise, i.e. if the test case is not in any test set:
             else {
               // Create a passing result for the test case.
-              return createResult(firstRef, build, null)
+              return createResult(firstRef, data.owner, build, null, note)
               .then(
                 // When the result has been created:
                 () => {
