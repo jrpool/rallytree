@@ -7,6 +7,8 @@
 
 // Module to access files.
 const fs = require('fs').promises;
+// Module to spawn child processes.
+const shell = require('child_process').exec;
 // Module to keep secrets local.
 require('dotenv').config();
 // Module to specify custom test-case creation.
@@ -1277,16 +1279,6 @@ const servePage = (content, isReport) => {
     reportServed = true;
   }
 };
-// Serves the introduction page.
-const serveIntro = () => {
-  fs.readFile('index.html', 'utf8')
-  .then(
-    content => {
-      servePage(content, false);
-    },
-    error => err(error, 'reading intro page')
-  );
-};
 // Serves the request page.
 const serveDo = () => {
   fs.readFile('do.html', 'utf8')
@@ -1447,18 +1439,6 @@ const serveStyles = () => {
     error => err(error, 'reading stylesheet')
   );
 };
-// Serves an image.
-const servePNG = src => {
-  fs.readFile(src.replace(/^\//, ''))
-  .then(
-    content => {
-      response.setHeader('Content-Type', 'image/png');
-      response.write(content, 'binary');
-      response.end();
-    },
-    error =>  err(error, 'reading PNG image')
-  );
-};
 // Serves the site icon.
 const serveIcon = () => {
   fs.readFile('favicon.ico')
@@ -1508,10 +1488,7 @@ const serveCaseIfSet = (testSetID) => {
     error => err(error, 'getting reference to test set')
   );
 };
-/*
-  Handles requests, serving the home page, the request page, and the
-  acknowledgement page.
-*/
+// Handles requests, serving the request page and the acknowledgement page.
 const requestHandler = (request, res) => {
   response = res;
   const {method} = request;
@@ -1527,21 +1504,13 @@ const requestHandler = (request, res) => {
     // If the request requests a resource:
     if (method === 'GET') {
       // If the requested resource is a file, serve it.
-      if (requestURL === '/' || requestURL === '/index.html') {
-        // Serves the introduction page.
-        serveIntro();
-      }
-      else if (requestURL === '/do.html') {
+      if (requestURL === '/do.html') {
         // Serves the request page.
         serveDo();
       }
       else if (requestURL === '/style.css') {
-        // Serves the stylesheet when the home page requests it.
+        // Serves the stylesheet when a page requests it.
         serveStyles();
-      }
-      else if (requestURL.endsWith('.png')) {
-        // Serves a PNG image when a page requests it.
-        servePNG(requestURL);
       }
       else if (requestURL === '/favicon.ico') {
         // Serves the site icon when a page requests it.
@@ -1783,7 +1752,8 @@ const requestHandler = (request, res) => {
 // ########## SERVER
 
 const server = http.createServer(requestHandler);
-const port = process.env.PORT || 3000;
+const port = 3000;
 server.listen(port, () => {
-  console.log(`Use a web browser to visit localhost:${port}.`);
+  console.log(`Opening index.html. It will link to localhost:${port}.`);
+  shell('open index.html');
 });
