@@ -606,7 +606,7 @@ const takeTree = storyRefs => {
       .then(
         // When the data arrive:
         data => {
-          const ownerRef = shorten('user', 'user', data.owner);
+          const ownerRef = data.owner ? shorten('user', 'user', data.owner) : '';
           if (! isError) {
             // If the user story has no owner or its owner is not the specified one:
             if (ownerRef && ownerRef !== takerRef || ! ownerRef) {
