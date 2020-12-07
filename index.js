@@ -155,6 +155,7 @@ const err = (error, context) => {
       }
     );
   }
+  return '';
 };
 // Shortens a long reference.
 const shorten = (readType, writeType, longRef) => {
@@ -236,7 +237,9 @@ const getItemData = (ref, facts, collections) => {
       const data = {};
       // Get the facts, or, if they are objects, references to them.
       facts.forEach(fact => {
-        data[lc0Of(fact)] = typeof obj[fact] === 'object' ? obj[fact]._ref : obj[fact];
+        data[lc0Of(fact)] = obj[fact] !== null && typeof obj[fact] === 'object'
+          ? obj[fact]._ref
+          : obj[fact];
       });
       // Get references to, and sizes of, the collections.
       collections.forEach(collection => {
@@ -264,11 +267,13 @@ const getCollectionData = (ref, facts, collections) => {
         const memberData = {
           ref: member._ref
         };
+        // Get the facts, or, if they are objects, references to them.
         facts.forEach(fact => {
           memberData[lc0Of(fact)] = member[fact] !== null && typeof member[fact] === 'object'
             ? member[fact]._ref
             : member[fact];
         });
+        // Get references to, and sizes of, the collections.
         collections.forEach(collection => {
           memberData[lc0Of(collection)] = {
             ref: member[collection]._ref,
@@ -1107,7 +1112,7 @@ const copyTree = (storyRefs, copyParentRef) => {
             err(`Invalid user story ${firstRef}`, 'copying tree');
             return '';
           }
-          // Otherwise:
+          // Otherwise, i.e. if the user story is copiable:
           else {
             // Copy the user story and give it the specified parent.
             return restAPI.create({
@@ -1136,7 +1141,7 @@ const copyTree = (storyRefs, copyParentRef) => {
                       // When the data arrive:
                       children => {
                         // Copy the child user stories.
-                        copyTree(children.map(child => child.ref), copyRef)
+                        return copyTree(children.map(child => child.ref), copyRef)
                         .then(
                           // When the child user stories have been copied:
                           () => {
@@ -1235,7 +1240,7 @@ const copyTree = (storyRefs, copyParentRef) => {
             );
           }
         },
-        error => err(error, 'getting data on user story')
+        error => err(error, 'getting data on user story for copying')
       );
     }
   }
