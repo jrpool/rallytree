@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8">
+    <title>Release and iteration report | RallyTree</title>
+    <meta name="description" content="Automation of Rally tree management">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+    <script>__script__</script>
+  </head>
+  <body class="ack">
+    <main>
+      <h1>RallyTree release and iteration report</h1>
+      <section class="flex">
+        <section class="even">
+          <h2>Results</h2>
+          <h3>User stories processed</h3>
+          <p>Total: <span id="total" role="status">0</span></p>
+          <div id="error" class="error" role="alert"></div>
+        </section>
+        <section class="odd">
+          <h2>Tree</h2>
+          <p>You requested changes to the Rally tree rooted at</p>
+          <pre>__rootRef__</pre>
+        </section>
+        <section class="even">
+          <h2>Release and iteration</h2>
+          <p>The release of all user stories in the tree is</p>
+          <pre>__releaseName__</pre>
+          <p class="more">
+            The release&rsquo;s Rally reference is
+          </p>
+          <pre>__releaseRef__</pre>
+          <p>The iteration of all user stories in the tree is</p>
+          <pre>__iterationName__</pre>
+          <p class="more">
+            The iteration&rsquo;s Rally reference is
+          </p>
+          <pre>__iterationRef__</pre>
+        </section>
+        <section class="odd">
+          <h2>You</h2>
+          <p>Your Rally user name is</p>
+          <pre>__userName__</pre>
+          <p class="more">Your Rally user reference is</p>
+          <pre>__userRef__</pre>
+        </section>
+      </section>
+      <p><a href="http://localhost:3000">Use RallyTree again.</a></p>
+    </main>
+  </body>
+</html>

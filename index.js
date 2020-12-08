@@ -43,7 +43,9 @@ const requestOptions = {
 let build = '';
 let copyWhat = 'both';
 let isError = false;
+let iterationRef = '';
 let note = '';
+let releaseRef = '';
 let response = {};
 let restAPI = {};
 let rootRef = '';
@@ -85,7 +87,9 @@ const reinit = () => {
   build = '';
   copyWhat = 'both';
   isError = false;
+  iterationRef = '';
   note = '';
+  releaseRef = '';
   restAPI = {};
   rootRef = '';
   takerRef = '';
@@ -185,8 +189,8 @@ const shorten = (readType, writeType, longRef) => {
     }
   }
 };
-// Returns the long reference of a member of a collection.
-const getRefOf = (type, formattedID, context) => {
+// Returns the long reference of a member of a collection with a formatted ID.
+const getRef = (type, formattedID, context) => {
   const numericID = formattedID.replace(/^[A-Za-z]+/, '');
   if (/^\d+$/.test(numericID)) {
     return restAPI.query({
@@ -210,6 +214,32 @@ const getRefOf = (type, formattedID, context) => {
   }
   else {
     err('Invalid ID', `getting reference to ${type} for ${context}`);
+    return Promise.resolve('');
+  }
+};
+// Returns the long reference of a member of a collection with a name.
+const getNameRef = (type, name, context) => {
+  if (name.length) {
+    return restAPI.query({
+      type,
+      fetch: '_ref',
+      query: queryUtils.where('Name', '=', name)
+    })
+    .then(
+      result => {
+        const resultArray = result.Results;
+        if (resultArray.length) {
+          return resultArray[0]._ref;
+        }
+        else {
+          return err('No such name', `getting reference to ${type} for ${context}`);
+        }
+      },
+      error => err(error, `getting reference to ${type} for ${context}`)
+    );
+  }
+  else {
+    err('Empty name', `getting reference to ${type} for ${context}`);
     return Promise.resolve('');
   }
 };
@@ -654,6 +684,68 @@ const takeTree = storyRefs => {
           }
         },
         error => err(error, 'getting data on user story for ownership change')
+      );
+    }
+    else {
+      return Promise.resolve('');
+    }
+  }
+  else {
+    return Promise.resolve('');
+  }
+};
+// Recursively sets releases and iterations in a tree or subtree of user stories.
+const whenTree = storyRefs => {
+  if (storyRefs.length && ! isError) {
+    const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
+    if (! isError) {
+      // Get data on the first user story of the specified array.
+      return getItemData(firstRef, [], ['Children'])
+      .then(
+        // When the data arrive:
+        data => {
+          // Set the release and iteraton of the user story.
+          return restAPI.update({
+            ref: firstRef,
+            data: {
+              Release: releaseRef,
+              Iteration: iterationRef
+            }
+          })
+          .then(
+            // When the release and iteration have been set:
+            () => {
+              report([['total']]);
+              // If the user story has child user stories:
+              if (data.children.count) {
+                // Get data on them.
+                return getCollectionData(data.children.ref, [], [])
+                .then(
+                  // When the data arrive:
+                  children => {
+                    // Process the child user stories sequentially.
+                    return whenTree(children.map(child => child.ref))
+                    .then(
+                      // After they are processed, process the remaining user stories.
+                      () => whenTree(storyRefs.slice(1)),
+                      error => err(error, 'setting release and iteration of child user stories')
+                    );
+                  },
+                  error => err(
+                    error, 'getting data on child user stories for release and iteration'
+                  )
+                );
+              }
+              // Otherwise, i.e. if the user story has no child user stories:
+              else {
+                // Process the remaining user stories.
+                return whenTree(storyRefs.slice(1));
+              }
+            },
+            error => err(error, 'setting release and iteration of user story')
+          );
+        },
+        error => err(error, 'getting data on user story for release and iteration')
       );
     }
     else {
@@ -1353,6 +1445,27 @@ const serveTakeReport = (takerName) => {
     error => err(error, 'reading takeReport page')
   );
 };
+// Serves the release and iteration report page.
+const serveWhenReport = (releaseName, iterationName) => {
+  fs.readFile('whenReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('whenReport.js', 'utf8')
+      .then(
+        jsContent => {
+          const newContent = reportPrep(htmlContent, jsContent)
+          .replace('__releaseName__', releaseName)
+          .replace('__releaseRef__', releaseRef)
+          .replace('__iterationName__', iterationName)
+          .replace('__iterationRef__', iterationRef);
+          servePage(newContent, true);
+        },
+        error => err(error, 'reading whenReport script')
+      );
+    },
+    error => err(error, 'reading whenReport page')
+  );
+};
 // Serves the add-tasks report page.
 const serveTaskReport = () => {
   fs.readFile('taskReport.html', 'utf8')
@@ -1466,7 +1579,7 @@ const streamInit = () => {
 // Serves a test-case-creation report if a test set is specified.
 const serveCaseIfSet = (testSetID) => {
   // Get a reference to it.
-  getRefOf('testset', testSetID, 'test-case creation')
+  getRef('testset', testSetID, 'test-case creation')
   .then(
     ref => {
       if (! isError) {
@@ -1504,7 +1617,7 @@ const requestHandler = (request, res) => {
     // If the request requests a resource:
     if (method === 'GET') {
       // If the requested resource is a file, serve it.
-      if (requestURL === '/do.html') {
+      if (requestURL === '/do.html' || requestURL === '/') {
         // Serves the request page.
         serveDo();
       }
@@ -1531,6 +1644,10 @@ const requestHandler = (request, res) => {
       else if (requestURL === '/taketotals' && idle) {
         streamInit();
         takeTree([rootRef]);
+      }
+      else if (requestURL === '/whentotals' && idle) {
+        streamInit();
+        whenTree([rootRef]);
       }
       else if (requestURL === '/tasktotals' && idle) {
         streamInit();
@@ -1561,6 +1678,8 @@ const requestHandler = (request, res) => {
         rootID,
         op,
         takerName,
+        releaseName,
+        iterationName,
         parentID,
         taskNameString,
         testFolderID,
@@ -1578,7 +1697,7 @@ const requestHandler = (request, res) => {
         requestOptions
       });
       // Get a long reference to the root user story.
-      getRefOf('hierarchicalrequirement', rootID, 'tree root')
+      getRef('hierarchicalrequirement', rootID, 'tree root')
       .then(
         // When it arrives:
         ref => {
@@ -1615,9 +1734,7 @@ const requestHandler = (request, res) => {
                               serveTakeReport(takerName);
                             }
                           },
-                          error => err(
-                            error, 'getting reference to new owner'
-                          )
+                          error => err(error, 'getting reference to new owner')
                         );
                       }
                       // Otherwise, the new owner will be the user, so:
@@ -1626,6 +1743,30 @@ const requestHandler = (request, res) => {
                         // Serve a report identifying the user as new owner.
                         serveTakeReport(userName);
                       }
+                    }
+                    // Otherwise, if the operation is setting the release and iteration:
+                    else if (op === 'when') {
+                      // Serve a report identifying the release and iteration.
+                      getNameRef(iterationName)
+                      .then(
+                        ref => {
+                          if (! isError) {
+                            iterationRef = ref;
+                            const iterationName = releaseName.slice(0, 8);
+                            getNameRef(iterationName)
+                            .then(
+                              ref => {
+                                if (! isError) {
+                                  iterationRef = ref;
+                                  serveWhenReport(releaseName, iterationName);
+                                }
+                              },
+                              error => err(error, 'getting reference to iteration')
+                            );
+                          }
+                        },
+                        error => err(error, 'getting reference to release')
+                      );
                     }
                     // Otherwise, if the operation is task creaation:
                     else if (op === 'task') {
@@ -1647,7 +1788,7 @@ const requestHandler = (request, res) => {
                     else if (op === 'case') {
                       // If a test folder was specified:
                       if (testFolderID) {
-                        getRefOf('testfolder', testFolderID, 'test-case creation')
+                        getRef('testfolder', testFolderID, 'test-case creation')
                         .then(
                           ref => {
                             if (! isError) {
@@ -1695,7 +1836,7 @@ const requestHandler = (request, res) => {
                     }
                     // Otherwise, if the operation is tree copying:
                     else if (op === 'copy') {
-                      getRefOf('hierarchicalrequirement', parentID, 'parent of tree copy')
+                      getRef('hierarchicalrequirement', parentID, 'parent of tree copy')
                       .then(
                         ref => {
                           if (! isError) {
