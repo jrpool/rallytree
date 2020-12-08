@@ -16,6 +16,9 @@ This feature reports a tally of the last test-case verdicts and defects in a tre
 ## Owner change
 This feature ensures that each user story, task, and test case in a tree has the desired owner. You can choose whether to become the new owner or instead to specify another user as the new owner.
 
+## Scheduling
+This feature assignsl a release and an iteration to each eligible user story (i.e. each user story that has no child user stories).
+
 ## Task creation
 This feature adds tasks to each of a tree&rsquo;s user stories that have no child user stories. You can choose how many tasks to add to each user story and give a name to each task.
 

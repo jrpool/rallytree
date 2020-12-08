@@ -704,48 +704,48 @@ const whenTree = storyRefs => {
       .then(
         // When the data arrive:
         data => {
-          // Set the release and iteraton of the user story.
-          return restAPI.update({
-            ref: firstRef,
-            data: {
-              Release: releaseRef,
-              Iteration: iterationRef
-            }
-          })
-          .then(
-            // When the release and iteration have been set:
-            () => {
-              report([['total']]);
-              // If the user story has child user stories:
-              if (data.children.count) {
-                // Get data on them.
-                return getCollectionData(data.children.ref, [], [])
+          // If the user story has child user stories, it cannot be scheduled, so:
+          if (data.children.count) {
+            // Get data on them.
+            return getCollectionData(data.children.ref, [], [])
+            .then(
+              // When the data arrive:
+              children => {
+                // Process the child user stories sequentially.
+                return whenTree(children.map(child => child.ref))
                 .then(
-                  // When the data arrive:
-                  children => {
-                    // Process the child user stories sequentially.
-                    return whenTree(children.map(child => child.ref))
-                    .then(
-                      // After they are processed, process the remaining user stories.
-                      () => whenTree(storyRefs.slice(1)),
-                      error => err(error, 'setting release and iteration of child user stories')
-                    );
-                  },
-                  error => err(
-                    error, 'getting data on child user stories for release and iteration'
-                  )
+                  // After they are processed, process the remaining user stories.
+                  () => whenTree(storyRefs.slice(1)),
+                  error => err(error, 'scheduling child user stories')
                 );
+              },
+              error => err(
+                error, 'getting data on child user stories for scheduling'
+              )
+            );
+          }
+          // Otherwise, i.e. if the user story has no child user stories:
+          else {
+            // Schedule it.
+            return restAPI.update({
+              ref: firstRef,
+              data: {
+                Release: releaseRef,
+                Iteration: iterationRef
               }
-              // Otherwise, i.e. if the user story has no child user stories:
-              else {
+            })
+            .then(
+              // When the user story has been scheduled:
+              () => {
+                report([['total']]);
                 // Process the remaining user stories.
                 return whenTree(storyRefs.slice(1));
-              }
-            },
-            error => err(error, 'setting release and iteration of user story')
-          );
+              },
+              error => err(error, 'scheduling user story')
+            );
+          }
         },
-        error => err(error, 'getting data on user story for release and iteration')
+        error => err(error, 'getting data on user story for scheduling')
       );
     }
     else {
@@ -1744,7 +1744,7 @@ const requestHandler = (request, res) => {
                         serveTakeReport(userName);
                       }
                     }
-                    // Otherwise, if the operation is setting the release and iteration:
+                    // Otherwise, if the operation is scheduling:
                     else if (op === 'when') {
                       // Serve a report identifying the release and iteration.
                       getNameRef(releaseName)
