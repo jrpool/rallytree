@@ -1747,12 +1747,12 @@ const requestHandler = (request, res) => {
                     // Otherwise, if the operation is scheduling:
                     else if (op === 'when') {
                       // Serve a report identifying the release and iteration.
-                      getNameRef(releaseName)
+                      getNameRef('release', releaseName, 'scheduling')
                       .then(
                         ref => {
                           if (! isError) {
                             releaseRef = ref;
-                            getNameRef(iterationName)
+                            getNameRef('iteration', iterationName, 'scheduling')
                             .then(
                               ref => {
                                 if (! isError) {
