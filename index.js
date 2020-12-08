@@ -1747,12 +1747,11 @@ const requestHandler = (request, res) => {
                     // Otherwise, if the operation is setting the release and iteration:
                     else if (op === 'when') {
                       // Serve a report identifying the release and iteration.
-                      getNameRef(iterationName)
+                      getNameRef(releaseName)
                       .then(
                         ref => {
                           if (! isError) {
-                            iterationRef = ref;
-                            const iterationName = releaseName.slice(0, 8);
+                            releaseRef = ref;
                             getNameRef(iterationName)
                             .then(
                               ref => {
