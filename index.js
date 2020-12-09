@@ -49,6 +49,7 @@ let releaseRef = '';
 let response = {};
 let restAPI = {};
 let rootRef = '';
+let scheduleStateDefined = false;
 let takerRef = '';
 let taskNames = [];
 let testFolderRef = '';
@@ -92,6 +93,7 @@ const reinit = () => {
   releaseRef = '';
   restAPI = {};
   rootRef = '';
+  scheduleStateDefined = false;
   takerRef = '';
   taskNames = [];
   testFolderRef = '';
@@ -1457,7 +1459,8 @@ const serveWhenReport = (releaseName, iterationName) => {
           .replace('__releaseName__', releaseName)
           .replace('__releaseRef__', releaseRef)
           .replace('__iterationName__', iterationName)
-          .replace('__iterationRef__', iterationRef);
+          .replace('__iterationRef__', iterationRef)
+          .replace('__scheduleState__', scheduleStateDefined ? 'Defined' : 'unchanged');
           servePage(newContent, true);
         },
         error => err(error, 'reading whenReport script')
@@ -1681,6 +1684,7 @@ const requestHandler = (request, res) => {
         releaseName,
         iterationName,
         parentID,
+        defined,
         taskNameString,
         testFolderID,
         testSetID
@@ -1746,6 +1750,9 @@ const requestHandler = (request, res) => {
                     }
                     // Otherwise, if the operation is scheduling:
                     else if (op === 'when') {
+                      if (defined) {
+                        scheduleStateDefined = true;
+                      }
                       // Serve a report identifying the release and iteration.
                       getNameRef('release', releaseName, 'scheduling')
                       .then(
