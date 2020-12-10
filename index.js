@@ -729,12 +729,16 @@ const whenTree = storyRefs => {
           // Otherwise, i.e. if the user story has no child user stories:
           else {
             // Schedule it.
+            const schedule = {
+              Release: releaseRef,
+              Iteration: iterationRef
+            };
+            if (scheduleStateDefined) {
+              schedule.ScheduleState = 'Defined';
+            }
             return restAPI.update({
               ref: firstRef,
-              data: {
-                Release: releaseRef,
-                Iteration: iterationRef
-              }
+              data: schedule
             })
             .then(
               // When the user story has been scheduled:
