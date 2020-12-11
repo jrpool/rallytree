@@ -22,6 +22,7 @@
   "homepage": "https://github.com/jrpool/rallytree#readme",
   "dependencies": {
     "dotenv": "*",
+    "open": "*",
     "rally": "*"
   },
   "devDependencies": {

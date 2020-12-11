@@ -7,8 +7,8 @@
 
 // Module to access files.
 const fs = require('fs').promises;
-// Module to spawn child processes.
-const shell = require('child_process').exec;
+// Module to open files or URLs.
+const open = require('open');
 // Module to keep secrets local.
 require('dotenv').config();
 // Module to specify custom test-case creation.
@@ -1906,5 +1906,5 @@ const server = http.createServer(requestHandler);
 const port = 3000;
 server.listen(port, () => {
   console.log(`Opening index.html. It will link to localhost:${port}.`);
-  shell('open index.html');
+  open('index.html');
 });
