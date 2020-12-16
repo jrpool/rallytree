@@ -1013,8 +1013,8 @@ const passCases = (caseRefs, build, note) => {
             // Process the remaining test cases.
             return passCases(caseRefs.slice(1), build, note);
           }
-          // Otherwise, i.e. if the test case has no results yet:
-          else {
+          // Otherwise, if the test case has no results yet but has an owner:
+          else if (data.owner) {
             // If the test case is in any test sets:
             if (data.testSets.count) {
               // Get data on the test sets.
@@ -1039,7 +1039,7 @@ const passCases = (caseRefs, build, note) => {
             }
             // Otherwise, i.e. if the test case is not in any test set:
             else {
-              // Create a passing result for the test case.
+              // Create a passing result for the test case with the owner as tester.
               return createResult(firstRef, data.owner, build, null, note)
               .then(
                 // When the result has been created:
