@@ -40,14 +40,17 @@
             <h2>What to do</h2>
             <fieldset>
               <legend>Choose an operation</legend>
+              <!--OP DOCUMENTATION-->
               <p class="opodd"><label>
                 <input id="op-doc" type="radio" name="op" value="doc" checked>
                 <span class="label">Get tree documentation</span>
               </label></p>
+              <!--OP RESULTS-->
               <p><label>
                 <input id="op-verdict" type="radio" name="op" value="verdict">
                 <span class="label">Get test results</span>
               </label></p>
+              <!--OP OWNER CHANGE-->
               <p class="opodd">
                 <input
                   id="op-take"
@@ -68,6 +71,7 @@
                   aria-labelledby="change-owner new-owner"
                 >
               </p>
+              <!--OP SCHEDULE-->
               <p class="opeven">
                 <input id="op-when" type="radio" name="op" value="when" aria-labelledby="schedule">
                 <span id="schedule" class="label">Schedule</span>:
@@ -89,16 +93,13 @@
                   maxwidth="30"
                   aria-labelledby="schedule iteration"
                 >
-                <input
-                  id="defined"
-                  type="checkbox"
-                  name="defined"
-                  value="yes"
-                  class="indent"
-                  aria-labelledby="schedule defined-yn"
-                >
-                <span id="defined-yn" class="label">Defined</span>
+                <select id="sState" name="sState" class="indent" aria-label="schedule state">
+                  <option value="unchanged" selected>New Schedule State?</option>
+                  <option value="Defined">Defined</option>
+                  <option value="In-Progress">In Progress</option>
+                </select>
               </p>
+              <!--OP TASKS-->
               <p class="opodd">
                 <input id="op-task" type="radio" name="op" value="task" aria-labelledby="tasks">
                 <span id="tasks" class="label">Add tasks</span>:
@@ -114,6 +115,7 @@
                   aria-labelledby="tasks task-names"
                 >
               </p>
+              <!--OP TEST CASES-->
               <p class="opeven">
                 <input id="op-case" type="radio" name="op" value="case" aria-labelledby="cases">
                 <span id="cases" class="label">Add test cases</span>
@@ -137,6 +139,7 @@
                   aria-labelledby="cases case-options test-set"
                 >
               </p>
+              <!--OP RESULTS-->
               <p class="opodd">
                 <input
                   id="op-result"
@@ -166,6 +169,7 @@
                   aria-labelledby="results result-options note"
                 >
               </p>
+              <!--OP COPY-->
               <p class="opeven">
                 <input id="op-copy" type="radio" name="op" value="copy" area-labelledby="copy">
                 <span id="copy" class="label">Copy</span>

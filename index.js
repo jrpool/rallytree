@@ -49,7 +49,7 @@ let releaseRef = '';
 let response = {};
 let restAPI = {};
 let rootRef = '';
-let scheduleStateDefined = false;
+let scheduleState = 'unchanged';
 let takerRef = '';
 let taskNames = [];
 let testFolderRef = '';
@@ -93,7 +93,7 @@ const reinit = () => {
   releaseRef = '';
   restAPI = {};
   rootRef = '';
-  scheduleStateDefined = false;
+  scheduleState = 'unchanged';
   takerRef = '';
   taskNames = [];
   testFolderRef = '';
@@ -733,8 +733,8 @@ const whenTree = storyRefs => {
               Release: releaseRef,
               Iteration: iterationRef
             };
-            if (scheduleStateDefined) {
-              schedule.ScheduleState = 'Defined';
+            if (scheduleState !== 'unchanged') {
+              schedule.ScheduleState = scheduleState;
             }
             return restAPI.update({
               ref: firstRef,
@@ -1464,7 +1464,7 @@ const serveWhenReport = (releaseName, iterationName) => {
           .replace('__releaseRef__', releaseRef)
           .replace('__iterationName__', iterationName)
           .replace('__iterationRef__', iterationRef)
-          .replace('__scheduleState__', scheduleStateDefined ? 'Defined' : 'unchanged');
+          .replace('__scheduleState__', scheduleState);
           servePage(newContent, true);
         },
         error => err(error, 'reading whenReport script')
@@ -1688,7 +1688,7 @@ const requestHandler = (request, res) => {
         releaseName,
         iterationName,
         parentID,
-        defined,
+        sState,
         taskNameString,
         testFolderID,
         testSetID
@@ -1754,9 +1754,7 @@ const requestHandler = (request, res) => {
                     }
                     // Otherwise, if the operation is scheduling:
                     else if (op === 'when') {
-                      if (defined) {
-                        scheduleStateDefined = true;
-                      }
+                      scheduleState = sState;
                       // Serve a report identifying the release and iteration.
                       getNameRef('release', releaseName, 'scheduling')
                       .then(
