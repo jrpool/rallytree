@@ -219,32 +219,6 @@ const getRef = (type, formattedID, context) => {
     return Promise.resolve('');
   }
 };
-// Returns the long reference of a member of a collection with a name.
-const getNameRef = (type, name, context) => {
-  if (name.length) {
-    return restAPI.query({
-      type,
-      fetch: '_ref',
-      query: queryUtils.where('Name', '=', name)
-    })
-    .then(
-      result => {
-        const resultArray = result.Results;
-        if (resultArray.length) {
-          return resultArray[0]._ref;
-        }
-        else {
-          return err('No such name', `getting reference to ${type} for ${context}`);
-        }
-      },
-      error => err(error, `getting reference to ${type} for ${context}`)
-    );
-  }
-  else {
-    err('Empty name', `getting reference to ${type} for ${context}`);
-    return Promise.resolve('');
-  }
-};
 // Returns an event-stream message reporting an incremented total.
 const eventMsg = (
   eventName, addCount = 1
@@ -1608,6 +1582,43 @@ const serveCaseIfSet = (testSetID) => {
     error => err(error, 'getting reference to test set')
   );
 };
+/*
+  Returns the long reference of a member of a collection with a project-unique name.
+  Release and iteration names are project-unique, not globally unique.
+*/
+const getNameRef = (type, name, context) => {
+  if (name.length) {
+    // Identify the root user story’s project.
+    return getItemData(rootRef, ['Project'], [])
+    .then(
+      // When it has been identified, get the reference of the specified member.
+      data => restAPI.query({
+        type,
+        fetch: '_ref',
+        query: queryUtils.where('Name', '=', name).and('Project', '=', data.project)
+      }),
+      error => err(error, 'getting root user story’s project')
+    )
+    .then(
+      result => {
+        const resultArray = result.Results;
+        // If the member exists:
+        if (resultArray.length) {
+          // Return its reference.
+          return resultArray[0]._ref;
+        }
+        else {
+          return err('No such name', `getting reference to ${type} for ${context}`);
+        }
+      },
+      error => err(error, `getting reference to ${type} for ${context}`)
+    );
+  }
+  else {
+    err('Empty name', `getting reference to ${type} for ${context}`);
+    return Promise.resolve('');
+  }
+};
 // Handles requests, serving the request page and the acknowledgement page.
 const requestHandler = (request, res) => {
   response = res;
@@ -1755,17 +1766,19 @@ const requestHandler = (request, res) => {
                     // Otherwise, if the operation is scheduling:
                     else if (op === 'when') {
                       scheduleState = sState;
-                      // Serve a report identifying the release and iteration.
+                      // Get the reference of the named release.
                       getNameRef('release', releaseName, 'scheduling')
                       .then(
                         ref => {
                           if (! isError) {
                             releaseRef = ref;
+                            // Get the reference of the named iteration.
                             getNameRef('iteration', iterationName, 'scheduling')
                             .then(
                               ref => {
                                 if (! isError) {
                                   iterationRef = ref;
+                                  // Serve a report identifying the release and iteration.
                                   serveWhenReport(releaseName, iterationName);
                                 }
                               },
