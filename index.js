@@ -818,7 +818,7 @@ const taskTree = storyRefs => {
 };
 // Creates a test case.
 const createCase = (name, description, owner, storyRef) => {
-  // Create a test case.
+  // Create a test case and set its test-folder property.
   return restAPI.create({
     type: 'testcase',
     fetch: ['_ref'],
@@ -868,6 +868,24 @@ const createCase = (name, description, owner, storyRef) => {
     error => err(error, 'creating test case')
   );
 };
+// Creates test cases.
+const createCases = (names, description, owner, storyRef) => {
+  if (names.length) {
+    // Create the first test case.
+    return createCase(names[0], description, owner, storyRef)
+    .then(
+      // When it has been created, create the rest of the test cases.
+      () => {
+        report([['changes']]);
+        return createCases(names.slice(1), description, owner, storyRef);
+      },
+      error => err(error, 'creating and linking test case')
+    );
+  }
+  else {
+    return Promise.resolve('');
+  }
+};
 // Recursively creates test cases for a tree or subtrees of user stories.
 const caseTree = storyRefs => {
   if (storyRefs.length && ! isError) {
@@ -902,44 +920,19 @@ const caseTree = storyRefs => {
           }
           // Otherwise the user story needs test cases, so:
           else {
-            // Determine whether to create 1 test case with the user-story name or customize.
+            // Determine their names.
             const caseNames = caseData ? caseData[data.name] || [data.name] : [data.name];
-            // If only 1 test case is to be created:
-            if (caseNames.length === 1) {
-              // Create and link it.
-              return createCase(caseNames[0], data.description, data.owner, firstRef)
-              .then(
-                // When it has been created:
-                () => {
-                  report([['total'], ['changes']]);
-                  // Process the remaining user stories.
-                  return caseTree(storyRefs.slice(1));
-                },
-                error => err(error, 'creating and linking test case')
-              );
-            }
-            // Otherwise, if 2 test cases are to be created:
-            else if (caseNames.length === 2) {
-              // Create and link the first test case.
-              return createCase(caseNames[0], data.description, data.owner, firstRef)
-              .then(
-                // When it has been created and linked:
-                () => {
-                  // Create and link the second test case.
-                  return createCase(caseNames[1], data.description, data.owner, firstRef)
-                  .then(
-                    // When it has been created and linked:
-                    () => {
-                      report([['total'], ['changes', 2]]);
-                      // Process the remaining user stories.
-                      return caseTree(storyRefs.slice(1));
-                    },
-                    error => err(error, 'creating and linking second test case')
-                  );
-                },
-                error => err(error, 'creating and linking first test case')
-              );
-            }
+            // Create and link the test cases.
+            return createCases(caseNames, data.description, data.owner, firstRef)
+            .then(
+              // When they have been created:
+              () => {
+                report([['total']]);
+                // Process the remaining user stories.
+                return caseTree(storyRefs.slice(1));
+              },
+              error => err(error, 'creating and linking test cases')
+            );
           }
         },
         error => err(error, 'getting data on user story')
@@ -1789,7 +1782,7 @@ const requestHandler = (request, res) => {
                         error => err(error, 'getting reference to release')
                       );
                     }
-                    // Otherwise, if the operation is task creaation:
+                    // Otherwise, if the operation is task creation:
                     else if (op === 'task') {
                       if (taskNameString.length < 2) {
                         err('Task names invalid', 'creating tasks');
