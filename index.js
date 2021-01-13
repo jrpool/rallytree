@@ -45,6 +45,7 @@ let copyWhat = 'both';
 let isError = false;
 let iterationRef = '';
 let note = '';
+let projectRef = '';
 let releaseRef = '';
 let response = {};
 let restAPI = {};
@@ -90,6 +91,7 @@ const reinit = () => {
   isError = false;
   iterationRef = '';
   note = '';
+  projectRef = '';
   releaseRef = '';
   restAPI = {};
   rootRef = '';
@@ -792,9 +794,158 @@ const takeTree = storyRefs => {
     return Promise.resolve('');
   }
 };
+// Sequentially ensures the project affiliation of an array of test cases.
+const projectCases = cases => {
+  if (cases.length && ! isError) {
+    // Get a reference to the first test case.
+    const firstCaseRef = shorten('testcase', 'testcase', cases[0].ref);
+    if (! isError) {
+      const firstProjectRef = cases[0].project
+        ? shorten('testcase', 'testcase', cases[0].project)
+        : '';
+      if (! isError) {
+        // If the current project of the first test case is not the intended project:
+        if (firstProjectRef !== projectRef) {
+          // Change the project.
+          return restAPI.update({
+            ref: firstCaseRef,
+            data: {Project: projectRef}
+          })
+          .then(
+            // After the project is changed:
+            () => {
+              report([['total'], ['caseTotal'], ['changes'], ['caseChanges']]);
+              // Process the remaining test cases.
+              return projectCases(cases.slice(1));
+            },
+            error => err(error, 'changing test-case project')
+          );
+        }
+        // Otherwise, i.e. if the current owner of the first test case is the intended owner:
+        else {
+          report([['total'], ['caseTotal']]);
+          // Process the remaining test cases.
+          return projectCases(cases.slice(1));
+        }
+      }
+      else {
+        return Promise.resolve('');
+      }
+    }
+    else {
+      return Promise.resolve('');
+    }
+  }
+  else {
+    return Promise.resolve('');
+  }
+};
+// Changes project affiliations of the child user stories or the test cases of a user story.
+const projectDescendants = (callback, data) => {
+  if (! isError) {
+    // If the user story has child user stories and no test cases:
+    if (data.children.count && ! data.testCases.count) {
+      // Get data on the child user stories.
+      return getCollectionData(data.children.ref, [], [])
+      .then(
+        // When the data arrive:
+        children => {
+          // Process them sequentially.
+          return callback(children.map(child => child.ref));
+        },
+        error => err(error, 'getting data on child user stories for project change')
+      );
+    }
+    // Otherwise, if the user story has test cases and no child user stories:
+    else if (data.testCases.count && ! data.children.count) {
+      // Get data on the test cases.
+      return getCollectionData(data.testCases.ref, ['Project'], [])
+      .then(
+        // When the data arrive, process them.
+        cases =>  projectCases(cases),
+        error => err(error, 'getting data on test cases for ownership change')
+      );
+    }
+    // Otherwise, if the user story has no child user stories or test cases:
+    else if (! data.children.count && ! data.testCases.count) {
+      // Do nothing.
+      return Promise.resolve('');
+    }
+    // Otherwise, i.e. if the user story is invalid:
+    else {
+      err('Invalid user story', 'changing ownership');
+    }
+  }
+};
+// Recursively changes project affiliations in a tree or subtree of user stories.
+const projectTree = storyRefs => {
+  if (storyRefs.length && ! isError) {
+    const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
+    if (! isError) {
+      // Get data on the first user story of the specified array.
+      return getItemData(firstRef, ['Project'], ['Children', 'TestCases'])
+      .then(
+        // When the data arrive:
+        data => {
+          const oldProjectRef = data.project ? shorten('project', 'project', data.project) : '';
+          if (! isError) {
+            // If the user story has no project or its project is not the specified one:
+            if (oldProjectRef && oldProjectRef !== projectRef || ! oldProjectRef) {
+              // Change its project.
+              return restAPI.update({
+                ref: firstRef,
+                data: {
+                  Project: projectRef
+                }
+              })
+              .then(
+                // When the project has been changed:
+                () => {
+                  report([['total'], ['changes'], ['storyTotal'], ['storyChanges']]);
+                  // Process the user story’s child user stories or its test cases.
+                  return projectDescendants(projectTree, data)
+                  .then(
+                    // When they have been processed, process the remaining user stories.
+                    () => projectTree(storyRefs.slice(1)),
+                    error => err(
+                      error, 'changing project of descendants after changing user-story project'
+                    )
+                  );
+                },
+                error => err(error, 'changing project of user story')
+              );
+            }
+            // Otherwise, i.e. if the user story’s project does not need to be changed:
+            else {
+              report([['total'], ['storyTotal']]);
+              // Process the user story’s child user stories or its test cases.
+              return projectDescendants(projectTree, data)
+              .then(
+                () => projectTree(storyRefs.slice(1)),
+                error => err(
+                  error, 'changing project of descendants without changing user-story project'
+                )
+              );
+            }
+          }
+          else {
+            return '';
+          }
+        },
+        error => err(error, 'getting data on user story for project change')
+      );
+    }
+    else {
+      return Promise.resolve('');
+    }
+  }
+  else {
+    return Promise.resolve('');
+  }
+};
 // Returns the count of schedulable user stories.
 const whenableCount = storyRefs => {
-  if (storyRefs.length) {
+  if (storyRefs.length && ! isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
       // Get data on the first user story of the specified array.
@@ -1358,29 +1509,6 @@ const docTree = (storyRef, storyArray, index, ancestors) => {
     );
   }
 };
-// Gets a short reference to a user.
-const getUserRef = name => {
-  return restAPI.query({
-    type: 'user',
-    query: queryUtils.where('UserName', '=', name)
-  })
-  .then(
-    result => {
-      const resultArray = result.Results;
-      if (resultArray.length) {
-        return shorten('user', 'user', resultArray[0]._ref);
-      }
-      else {
-        err('No such user', 'getting reference to user');
-        return '';
-      }
-    },
-    error => {
-      err(error, 'getting reference to user');
-      return '';
-    }
-  );
-};
 // Serves a page.
 const servePage = (content, isReport) => {
   response.setHeader('Content-Type', 'text/html');
@@ -1446,7 +1574,7 @@ const serveVerdictReport = () => {
   );
 };
 // Serves the change-owner report page.
-const serveTakeReport = (takerName) => {
+const serveTakeReport = takerName => {
   fs.readFile('takeReport.html', 'utf8')
   .then(
     htmlContent => {
@@ -1462,6 +1590,25 @@ const serveTakeReport = (takerName) => {
       );
     },
     error => err(error, 'reading takeReport page')
+  );
+};
+// Serves the change-owner report page.
+const serveProjectReport = projectName => {
+  fs.readFile('projectReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('projectReport.js', 'utf8')
+      .then(
+        jsContent => {
+          const newContent = reportPrep(htmlContent, jsContent)
+          .replace('__projectName__', projectName)
+          .replace('__projectRef__', projectRef);
+          servePage(newContent, true);
+        },
+        error => err(error, 'reading projectReport script')
+      );
+    },
+    error => err(error, 'reading projectReport page')
   );
 };
 // Serves the release and iteration report page.
@@ -1625,7 +1772,7 @@ const serveCaseIfSet = (testSetID) => {
   Returns the long reference of a member of a collection with a project-unique name.
   Release and iteration names are project-unique, not globally unique.
 */
-const getNameRef = (type, name, context) => {
+const getProjectNameRef = (type, name, context) => {
   if (name.length) {
     // Identify the root user story’s project.
     return getItemData(rootRef, ['Project'], [])
@@ -1657,6 +1804,32 @@ const getNameRef = (type, name, context) => {
     err('Empty name', `getting reference to ${type} for ${context}`);
     return Promise.resolve('');
   }
+};
+/*
+  Returns the short reference to a member of a collection with a globally unique name.
+  User and project names are globally unique.
+*/
+const getGlobalNameRef = (name, type, key) => {
+  return restAPI.query({
+    type,
+    query: queryUtils.where(key, '=', name)
+  })
+  .then(
+    result => {
+      const resultArray = result.Results;
+      if (resultArray.length) {
+        return shorten(type, type, resultArray[0]._ref);
+      }
+      else {
+        err(`No such ${type}`, `getting reference to ${type}`);
+        return '';
+      }
+    },
+    error => {
+      err(error, `getting reference to ${type}`);
+      return '';
+    }
+  );
 };
 // Handles requests, serving the request page and the acknowledgement page.
 const requestHandler = (request, res) => {
@@ -1702,6 +1875,10 @@ const requestHandler = (request, res) => {
         streamInit();
         takeTree([rootRef]);
       }
+      else if (requestURL === '/projecttotals' && idle) {
+        streamInit();
+        projectTree([rootRef]);
+      }
       else if (requestURL === '/whentotals' && idle) {
         streamInit();
         whenableCount([rootRef]).then(() => whenTree([rootRef]));
@@ -1735,6 +1912,7 @@ const requestHandler = (request, res) => {
         rootID,
         op,
         takerName,
+        projectName,
         releaseName,
         iterationName,
         parentID,
@@ -1784,7 +1962,7 @@ const requestHandler = (request, res) => {
                       // If an owner other than the user was specified:
                       if (takerName) {
                         // Serve a report identifying the new owner.
-                        getUserRef(takerName)
+                        getGlobalNameRef(takerName, 'user', 'UserName')
                         .then(
                           ref => {
                             if (! isError) {
@@ -1802,17 +1980,31 @@ const requestHandler = (request, res) => {
                         serveTakeReport(userName);
                       }
                     }
+                    // Otherwise, if the operation is project change:
+                    else if (op === 'project') {
+                      // Serve a report identifying the new project.
+                      getProjectNameRef(projectName, 'project', 'Name')
+                      .then(
+                        ref => {
+                          if (! isError) {
+                            projectRef = ref;
+                            serveProjectReport(projectName);
+                          }
+                        },
+                        error => err(error, 'getting reference to new project')
+                      );
+                    }
                     // Otherwise, if the operation is scheduling:
                     else if (op === 'when') {
                       scheduleState = sState;
                       // Get the reference of the named release.
-                      getNameRef('release', releaseName, 'scheduling')
+                      getProjectNameRef('release', releaseName, 'scheduling')
                       .then(
                         ref => {
                           if (! isError) {
                             releaseRef = ref;
                             // Get the reference of the named iteration.
-                            getNameRef('iteration', iterationName, 'scheduling')
+                            getProjectNameRef('iteration', iterationName, 'scheduling')
                             .then(
                               ref => {
                                 if (! isError) {

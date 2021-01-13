@@ -67,12 +67,12 @@
                 >
               </p>
               <!--OP RESULTS-->
-              <p><label>
+              <p class="opodd"><label>
                 <input id="op-verdict" type="radio" name="op" value="verdict">
                 <span class="label">Get test results</span>
               </label></p>
               <!--OP OWNER CHANGE-->
-              <p class="opodd">
+              <p class="opeven">
                 <input
                   id="op-take"
                   type="radio"
@@ -90,6 +90,26 @@
                   maxwidth="60"
                   class="indent"
                   aria-labelledby="change-owner new-owner"
+                >
+              </p>
+              <!--OP PROJECT CHANGE-->
+              <p class="opodd">
+                <input
+                  id="op-project"
+                  type="radio"
+                  name="op"
+                  value="project"
+                  aria-labelledby="change-project"
+                >
+                <span id="change-project" class="label">Change project</span>
+                <span id="new-project" class="label">to</span><br>
+                <input
+                  id="projectName"
+                  name="projectName"
+                  type="text"
+                  size="60"
+                  maxwidth="60"
+                  aria-labelledby="change-project new-project"
                 >
               </p>
               <!--OP SCHEDULE-->
@@ -192,7 +212,7 @@
                 >
               </p>
               <!--OP DOCUMENTATION-->
-              <p class="opodd"><label>
+              <p class="opeven"><label>
                 <input id="op-doc" type="radio" name="op" value="doc">
                 <span class="label">Get tree documentation</span>
               </label></p>

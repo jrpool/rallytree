@@ -2,7 +2,7 @@
 <html lang="en-US">
   <head>
     <meta charset="utf-8">
-    <title>Ownership change report | RallyTree</title>
+    <title>Project change report | RallyTree</title>
     <meta name="description" content="Automation of Rally tree management">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="style.css">
@@ -10,19 +10,17 @@
   </head>
   <body class="ack">
     <main>
-      <h1>RallyTree ownership change report</h1>
+      <h1>RallyTree project change report</h1>
       <section class="flex">
         <section class="even">
           <h2>Results</h2>
           <h3>Work items processed</h3>
           <p>Total: <span id="total" role="status">0</span></p>
           <p>User stories: <span id="storyTotal" role="status">0</span></p>
-          <p>Tasks: <span id="taskTotal" role="status">0</span></p>
           <p>Test cases: <span id="caseTotal" role="status">0</span></p>
-          <h3>Ownerships changed</h3>
+          <h3>Project changes made</h3>
           <p>Total: <span id="changes" role="status">0</span></p>
           <p>User stories: <span id="storyChanges" role="status">0</span>
-          <p>Tasks: <span id="taskChanges" role="status">0</span></p>
           <p>Test cases: <span id="caseChanges" role="status">0</span></p>
           <div id="error" class="error" role="alert"></div>
         </section>
@@ -32,13 +30,13 @@
           <pre>__rootRef__</pre>
         </section>
         <section class="even">
-          <h2>New owner</h2>
-          <p>The new owner of all user stories, tasks, and test cases in the tree is</p>
-          <pre>__takerName__</pre>
+          <h2>New project</h2>
+          <p>The new project of all user stories and tasks in the tree is</p>
+          <pre>__projectName__</pre>
           <p class="more">
-            The new owner&rsquo;s Rally user reference is
+            The new project&rsquo;s Rally user reference is
           </p>
-          <pre>__takerRef__</pre>
+          <pre>__projectRef__</pre>
         </section>
         <section class="odd">
           <h2>You</h2>
