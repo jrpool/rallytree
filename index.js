@@ -794,102 +794,38 @@ const takeTree = storyRefs => {
     return Promise.resolve('');
   }
 };
-// Sequentially ensures the project affiliation of an array of test cases.
-const projectCases = cases => {
-  if (cases.length && ! isError) {
-    // Get a reference to the first test case.
-    const firstCaseRef = shorten('testcase', 'testcase', cases[0].ref);
-    if (! isError) {
-      const firstProjectRef = cases[0].project
-        ? shorten('testcase', 'testcase', cases[0].project)
-        : '';
-      if (! isError) {
-        // If the current project of the first test case is not the intended project:
-        if (firstProjectRef !== projectRef) {
-          // Change the project.
-          return restAPI.update({
-            ref: firstCaseRef,
-            data: {Project: projectRef}
-          })
-          .then(
-            // After the project is changed:
-            () => {
-              report([['total'], ['caseTotal'], ['changes'], ['caseChanges']]);
-              // Process the remaining test cases.
-              return projectCases(cases.slice(1));
-            },
-            error => err(error, 'changing test-case project')
-          );
-        }
-        // Otherwise, i.e. if the current owner of the first test case is the intended owner:
-        else {
-          report([['total'], ['caseTotal']]);
-          // Process the remaining test cases.
-          return projectCases(cases.slice(1));
-        }
-      }
-      else {
-        return Promise.resolve('');
-      }
-    }
-    else {
-      return Promise.resolve('');
-    }
-  }
-  else {
-    return Promise.resolve('');
-  }
-};
-// Changes project affiliations of the child user stories or the test cases of a user story.
-const projectDescendants = (callback, data) => {
-  if (! isError) {
-    // If the user story has child user stories and no test cases:
-    if (data.children.count && ! data.testCases.count) {
-      // Get data on the child user stories.
-      return getCollectionData(data.children.ref, [], [])
-      .then(
-        // When the data arrive:
-        children => {
-          // Process them sequentially.
-          return callback(children.map(child => child.ref));
-        },
-        error => err(error, 'getting data on child user stories for project change')
-      );
-    }
-    // Otherwise, if the user story has test cases and no child user stories:
-    else if (data.testCases.count && ! data.children.count) {
-      // Get data on the test cases.
-      return getCollectionData(data.testCases.ref, ['Project'], [])
-      .then(
-        // When the data arrive, process them.
-        cases =>  projectCases(cases),
-        error => err(error, 'getting data on test cases for ownership change')
-      );
-    }
-    // Otherwise, if the user story has no child user stories or test cases:
-    else if (! data.children.count && ! data.testCases.count) {
-      // Do nothing.
-      return Promise.resolve('');
-    }
-    // Otherwise, i.e. if the user story is invalid:
-    else {
-      err('Invalid user story', 'changing ownership');
-    }
-  }
-};
+// Sequentially changes project 
 // Recursively changes project affiliations in a tree or subtree of user stories.
 const projectTree = storyRefs => {
   if (storyRefs.length && ! isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
       // Get data on the first user story of the specified array.
-      return getItemData(firstRef, ['Project'], ['Children', 'TestCases'])
+      return getItemData(firstRef, ['Project'], ['Children'])
       .then(
         // When the data arrive:
         data => {
           const oldProjectRef = data.project ? shorten('project', 'project', data.project) : '';
           if (! isError) {
-            // If the user story has no project or its project is not the specified one:
+            // Processes the children of the user story.
+            const processMore = () => {
+              // Get data on the user story’s child user stories.
+              return getCollectionData(data.children.ref, [], [])
+              .then(
+                // When the data arrive:
+                children => {
+                  // Process the children sequentially.
+                  return projectTree(children.map(child => child.ref))
+                  .then(
+                    // When they have been processed, process the remaining user stories.
+                    () => projectTree(storyRefs.slice(1)),
+                    error => err(error, 'changing project of children of user story')
+                  );
+                },
+                error => err(error, 'getting data on children of user story')
+              );
+            };
+            // If the user story belongs to no or a non-intended project:
             if (oldProjectRef && oldProjectRef !== projectRef || ! oldProjectRef) {
               // Change its project.
               return restAPI.update({
@@ -901,31 +837,18 @@ const projectTree = storyRefs => {
               .then(
                 // When the project has been changed:
                 () => {
-                  report([['total'], ['changes'], ['storyTotal'], ['storyChanges']]);
-                  // Process the user story’s child user stories or its test cases.
-                  return projectDescendants(projectTree, data)
-                  .then(
-                    // When they have been processed, process the remaining user stories.
-                    () => projectTree(storyRefs.slice(1)),
-                    error => err(
-                      error, 'changing project of descendants after changing user-story project'
-                    )
-                  );
+                  report([['total'], ['changes']]);
+                  // Process its children and the remaining user stories.
+                  return processMore();
                 },
                 error => err(error, 'changing project of user story')
               );
             }
-            // Otherwise, i.e. if the user story’s project does not need to be changed:
+            // Otherwise, i.e. if the user story belongs to the intended project:
             else {
-              report([['total'], ['storyTotal']]);
-              // Process the user story’s child user stories or its test cases.
-              return projectDescendants(projectTree, data)
-              .then(
-                () => projectTree(storyRefs.slice(1)),
-                error => err(
-                  error, 'changing project of descendants without changing user-story project'
-                )
-              );
+              report([['total']]);
+              // Process its children and the remaining user stories.
+              return processMore();
             }
           }
           else {
@@ -1539,21 +1462,22 @@ const reportPrep = (content, jsContent) => {
   .replace('__userName__', userName)
   .replace('__userRef__', userRef);
 };
-// Serves the documentation report page.
-const serveDocReport = () => {
-  fs.readFile('docReport.html', 'utf8')
+// Serves the copy report page.
+const serveCopyReport = () => {
+  fs.readFile('copyReport.html', 'utf8')
   .then(
     htmlContent => {
-      fs.readFile('docReport.js', 'utf8')
+      fs.readFile('copyReport.js', 'utf8')
       .then(
         jsContent => {
-          const newContent = reportPrep(htmlContent, jsContent);
+          const newContent = reportPrep(htmlContent, jsContent)
+          .replace('__parentRef__', treeCopyParentRef);
           servePage(newContent, true);
         },
-        error => err(error, 'reading docReport script')
+        error => err(error, 'reading caseReport script')
       );
     },
-    error => err(error, 'reading docReport page')
+    error => err(error, 'reading caseReport page')
   );
 };
 // Serves the verdict report page.
@@ -1592,7 +1516,7 @@ const serveTakeReport = takerName => {
     error => err(error, 'reading takeReport page')
   );
 };
-// Serves the change-owner report page.
+// Serves the change-project report page.
 const serveProjectReport = projectName => {
   fs.readFile('projectReport.html', 'utf8')
   .then(
@@ -1689,22 +1613,21 @@ const serveResultReport = () => {
     error => err(error, 'reading resultReport page')
   );
 };
-// Serves the copy report page.
-const serveCopyReport = () => {
-  fs.readFile('copyReport.html', 'utf8')
+// Serves the documentation report page.
+const serveDocReport = () => {
+  fs.readFile('docReport.html', 'utf8')
   .then(
     htmlContent => {
-      fs.readFile('copyReport.js', 'utf8')
+      fs.readFile('docReport.js', 'utf8')
       .then(
         jsContent => {
-          const newContent = reportPrep(htmlContent, jsContent)
-          .replace('__parentRef__', treeCopyParentRef);
+          const newContent = reportPrep(htmlContent, jsContent);
           servePage(newContent, true);
         },
-        error => err(error, 'reading caseReport script')
+        error => err(error, 'reading docReport script')
       );
     },
-    error => err(error, 'reading caseReport page')
+    error => err(error, 'reading docReport page')
   );
 };
 // Serves the stylesheet.
@@ -1941,7 +1864,7 @@ const requestHandler = (request, res) => {
             rootRef = shorten('userstory', 'hierarchicalrequirement', ref);
             if (! isError) {
               // Get a reference to the user.
-              getUserRef(userName)
+              getGlobalNameRef(userName, 'user', 'UserName')
               .then(
                 // When it arrives:
                 ref => {
@@ -1983,7 +1906,7 @@ const requestHandler = (request, res) => {
                     // Otherwise, if the operation is project change:
                     else if (op === 'project') {
                       // Serve a report identifying the new project.
-                      getProjectNameRef(projectName, 'project', 'Name')
+                      getGlobalNameRef(projectName, 'project', 'Name')
                       .then(
                         ref => {
                           if (! isError) {

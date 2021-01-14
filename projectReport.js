@@ -32,18 +32,14 @@ document.addEventListener('DOMContentLoaded', () => {
     eventSource,
     [
       'total',
-      'storyTotal',
-      'caseTotal',
       'changes',
-      'storyChanges',
-      'caseChanges',
       'error'
     ]
   );
-  // Stop listening after 10 idle seconds, assuming the job complete.
+  // Stop listening after 20 idle seconds, assuming the job complete.
   const poller = setInterval(
     () => {
-      if (lastEventTime && Date.now() - lastEventTime > 10000) {
+      if (lastEventTime && Date.now() - lastEventTime > 20000) {
         eventSource.close();
         clearInterval(poller);
       }
