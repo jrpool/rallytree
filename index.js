@@ -41,6 +41,8 @@ const requestOptions = {
   }
 };
 let build = '';
+let copyParentProject = '';
+let copyParentRef = '';
 let copyWhat = 'both';
 let isError = false;
 let iterationRef = '';
@@ -55,7 +57,6 @@ let takerRef = '';
 let taskNames = [];
 let testFolderRef = '';
 let testSetRef = '';
-let treeCopyParentRef = '';
 let userName = '';
 let userRef = '';
 let totals = {
@@ -87,6 +88,8 @@ const docWait = 1500;
 // Reinitialize the global variables, except response.
 const reinit = () => {
   build = '';
+  copyParentProject = '';
+  copyParentRef = '';
   copyWhat = 'both';
   isError = false;
   iterationRef = '';
@@ -100,7 +103,6 @@ const reinit = () => {
   taskNames = [];
   testFolderRef = '';
   testSetRef = '';
-  treeCopyParentRef = '';
   userName = '';
   userRef = '';
   totals = {
@@ -310,17 +312,25 @@ const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
         .then(
           // When the data arrive:
           data => {
-            // Copy the item and give it the specified parent.
+            // Specify properties for the copy.
+            const config = {
+              Name: data.name,
+              Description: data.description,
+              Owner: data.owner,
+              DragAndDropRank: data.dragAndDropRank,
+              WorkProduct: copyStoryRef
+            };
+            /*
+              If the item is a test case, it will not automatically inherit the project of its
+              user story, so specify its project.
+            */
+            if (workItemType === 'testcase') {
+              config.Project = copyParentProject;
+            }
             return restAPI.create({
               type: workItemType,
               fetch: ['_ref'],
-              data: {
-                Name: data.name,
-                Description: data.description,
-                Owner: data.owner,
-                DragAndDropRank: data.dragAndDropRank,
-                WorkProduct: copyStoryRef
-              }
+              data: config
             })
             .then(
               // When the item has been copied:
@@ -349,7 +359,7 @@ const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
   }
 };
 // Recursively copies a tree or subtrees of user stories.
-const copyTree = (storyRefs, copyParentRef) => {
+const copyTree = storyRefs => {
   if (storyRefs.length && ! isError) {
     // Identify and shorten the reference to the first user story.
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
@@ -364,7 +374,7 @@ const copyTree = (storyRefs, copyParentRef) => {
         // When the data arrive:
         data => {
           // If the user story is the specified parent of the tree copy:
-          if (firstRef === treeCopyParentRef) {
+          if (firstRef === copyParentRef) {
             // Quit and report this.
             err('Attempt to copy to itself', 'copying tree');
             return '';
@@ -389,7 +399,8 @@ const copyTree = (storyRefs, copyParentRef) => {
                 Description: data.description,
                 Owner: data.owner,
                 DragAndDropRank: data.dragAndDropRank,
-                Parent: copyParentRef
+                Parent: copyParentRef,
+                Project: copyParentProject
               }
             })
             .then(
@@ -1471,7 +1482,7 @@ const serveCopyReport = () => {
       .then(
         jsContent => {
           const newContent = reportPrep(htmlContent, jsContent)
-          .replace('__parentRef__', treeCopyParentRef);
+          .replace('__parentRef__', copyParentRef);
           servePage(newContent, true);
         },
         error => err(error, 'reading caseReport script')
@@ -1820,7 +1831,7 @@ const requestHandler = (request, res) => {
       }
       else if (requestURL === '/copytotals' && idle) {
         streamInit();
-        copyTree([rootRef], treeCopyParentRef);
+        copyTree([rootRef], copyParentRef);
       }
     }
     // Otherwise, if the request submits the request form:
@@ -2015,12 +2026,12 @@ const requestHandler = (request, res) => {
                       .then(
                         ref => {
                           if (! isError) {
-                            treeCopyParentRef = shorten(
+                            copyParentRef = shorten(
                               'userstory', 'hierarchicalrequirement', ref
                             );
                             if (! isError) {
                               // Get data on the parent user story of the copy.
-                              getItemData(treeCopyParentRef, [], ['Tasks'])
+                              getItemData(copyParentRef, ['Project'], ['Tasks'])
                               .then(
                                 data => {
                                   // When the data arrive:
@@ -2030,6 +2041,7 @@ const requestHandler = (request, res) => {
                                     );
                                   }
                                   else {
+                                    copyParentProject = data.project;
                                     // Copy the tree and give it the specified parent.
                                     serveCopyReport();
                                   }
