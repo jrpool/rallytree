@@ -300,7 +300,7 @@ const getCollectionData = (ref, facts, collections) => {
   );
 };
 // Sequentially copies an array of tasks or an array of test cases.
-const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
+const copyTasksOrCases = (itemType, itemRefs, storyRef) => {
   if (itemRefs.length && ! isError) {
     // Identify and shorten a reference to the first item.
     const workItemType = ['task', 'testcase'][['task', 'case'].indexOf(itemType)];
@@ -318,7 +318,7 @@ const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
               Description: data.description,
               Owner: data.owner,
               DragAndDropRank: data.dragAndDropRank,
-              WorkProduct: copyStoryRef
+              WorkProduct: storyRef
             };
             /*
               If the item is a test case, it will not automatically inherit the project of its
@@ -337,7 +337,7 @@ const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
               () => {
                 report([['total'], [`${itemType}Total`]]);
                 // Copy the remaining items in the specified array.
-                return copyTasksOrCases(itemType, itemRefs.slice(1), copyStoryRef);
+                return copyTasksOrCases(itemType, itemRefs.slice(1), storyRef);
               },
               error => err(error, `copying ${itemType} ${firstRef}`)
             );
@@ -358,8 +358,21 @@ const copyTasksOrCases = (itemType, itemRefs, copyStoryRef) => {
     return Promise.resolve('');
   }
 };
+// Get data or tasks or test cases and copy them.
+const getAndCopyTasksOrCases = (itemType, collectionType, data, copyRef) => {
+  // Get data on the tasks or test cases.
+  return getCollectionData(data[collectionType].ref, [], [])
+  .then(
+    // When the data arrive:
+    items => {
+      // Copy the tasks or test cases.
+      return copyTasksOrCases(itemType, items.map(item => item.ref), copyRef);
+    },
+    error => err(error, `getting data on ${collectionType}`)
+  );
+};
 // Recursively copies a tree or subtrees of user stories.
-const copyTree = storyRefs => {
+const copyTree = (storyRefs, parentRef) => {
   if (storyRefs.length && ! isError) {
     // Identify and shorten the reference to the first user story.
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
@@ -399,7 +412,7 @@ const copyTree = storyRefs => {
                 Description: data.description,
                 Owner: data.owner,
                 DragAndDropRank: data.dragAndDropRank,
-                Parent: copyParentRef,
+                Parent: parentRef,
                 Project: copyParentProject
               }
             })
@@ -423,7 +436,7 @@ const copyTree = storyRefs => {
                           // When the child user stories have been copied:
                           () => {
                             // Process the remaining user stories.
-                            return copyTree(storyRefs.slice(1), copyParentRef);
+                            return copyTree(storyRefs.slice(1), parentRef);
                           },
                           error => err(error, 'copying child user stories')
                         );
@@ -441,41 +454,23 @@ const copyTree = storyRefs => {
                     && copyWhat === 'both'
                     && ! data.children.count
                   ) {
-                    // Get data on the tasks.
-                    return getCollectionData(data.tasks.ref, [], [])
+                    // Get data on the tasks and copy them.
+                    return getAndCopyTasksOrCases('task', 'tasks', data, copyRef)
                     .then(
-                      // When the data arrive:
-                      tasks => {
-                        // Copy the tasks.
-                        return copyTasksOrCases('task', tasks.map(task => task.ref), copyRef)
+                      // When the tasks have been copied:
+                      () => {
+                        // Get data on the test cases and copy them.
+                        return getAndCopyTasksOrCases('case', 'testCases', data, copyRef)
                         .then(
-                          // When the tasks have been copied:
+                          // When the test cases have been copied:
                           () => {
-                            // Get data on the test cases.
-                            return getCollectionData(data.testCases.ref, [], [])
-                            .then(
-                              // When the data arrive:
-                              cases => {
-                                // Copy the test cases.
-                                return copyTasksOrCases(
-                                  'case', cases.map(testCase => testCase.ref), copyRef
-                                )
-                                .then(
-                                  // When the test cases have been copied:
-                                  () => {
-                                    // Process the remaining user stories.
-                                    return copyTree(storyRefs.slice(1), copyParentRef);
-                                  },
-                                  error => err(error, 'copying test case')
-                                );
-                              },
-                              error => err(error, 'getting data on test cases')
-                            );
+                            // Process the remaining user stories.
+                            return copyTree(storyRefs.slice(1), parentRef);
                           },
-                          error => err(error, 'copying task')
+                          error => err(error, 'getting data on test cases and copying them')
                         );
                       },
-                      error => err(error, 'getting data on tasks')
+                      error => err(error, 'getting data on tasks and copying them')
                     );
                   }
                   /*
@@ -487,29 +482,41 @@ const copyTree = storyRefs => {
                     && ['tasks', 'both'].includes(copyWhat)
                     && ! data.children.count
                   ) {
-                    // Get data on the tasks.
-                    return getCollectionData(data.tasks.ref, [], [])
+                    // Get data on the tasks and copy them.
+                    return getAndCopyTasksOrCases('task', 'tasks', data, copyRef)
                     .then(
-                      // When the data arrive:
-                      tasks => {
-                        // Copy the tasks.
-                        return copyTasksOrCases('task', tasks.map(task => task.ref), copyRef)
-                        .then(
-                          // When the tasks have been copied:
-                          () => {
-                            // Process the remaining user stories.
-                            return copyTree(storyRefs.slice(1), copyParentRef);
-                          },
-                          error => err(error, 'copying task')
-                        );
+                      // When the tasks have been copied:
+                      () => {
+                        // Process the remaining user stories.
+                        return copyTree(storyRefs.slice(1), parentRef);
                       },
-                      error => err(error, 'getting data on tasks')
+                      error => err(error, 'getting data on tasks and copying them')
+                    );
+                  }
+                  /*
+                    Otherwise, if the original has no child user stories and has test cases and they
+                    are to be copied:
+                  */
+                  else if (
+                    data.testCases.count
+                    && ['cases', 'both'].includes(copyWhat)
+                    && ! data.children.count
+                  ) {
+                    // Get data on the test cases and copy them.
+                    return getAndCopyTasksOrCases('case', 'testCases', data, copyRef)
+                    .then(
+                      // When the test cases have been copied:
+                      () => {
+                        // Process the remaining user stories.
+                        return copyTree(storyRefs.slice(1), parentRef);
+                      },
+                      error => err(error, 'getting data on test cases and copying them')
                     );
                   }
                   // Otherwise, i.e. if the original has nothing other than itself to be copied:
                   else {
                     // Process the remaining user stories.
-                    return copyTree(storyRefs.slice(1), copyParentRef);
+                    return copyTree(storyRefs.slice(1), parentRef);
                   }
                 }
               },
@@ -1797,9 +1804,9 @@ const requestHandler = (request, res) => {
         Otherwise, if the requested resource is an event stream, start it
         and prevent any others from being started.
       */
-      else if (requestURL === '/doc' && idle) {
+      else if (requestURL === '/copytotals' && idle) {
         streamInit();
-        docTree(rootRef, doc, 0, []);
+        copyTree([rootRef], copyParentRef);
       }
       else if (requestURL === '/verdicttotals' && idle) {
         streamInit();
@@ -1829,9 +1836,9 @@ const requestHandler = (request, res) => {
         streamInit();
         resultTree([rootRef]);
       }
-      else if (requestURL === '/copytotals' && idle) {
+      else if (requestURL === '/doc' && idle) {
         streamInit();
-        copyTree([rootRef], copyParentRef);
+        docTree(rootRef, doc, 0, []);
       }
     }
     // Otherwise, if the request submits the request form:

@@ -8,7 +8,7 @@ RallyTree automates some operations on trees of work items in [Rally](https://ww
 RallyTree can perform these operations on a tree:
 
 ## Tree-copy creation
-This feature copies a tree. You designate an existing user story as the parent of the root user story of the new tree. That parent must not have any tasks and must not be in the tree that you are copying. Only user stories, optionally with their tasks or with both their tasks and their test cases, are copied, but not defects. In a copy of a user story, task, or test case, the name, owner, rank, and description are copied from the original.
+This feature copies a tree. You designate an existing user story as the parent of the root user story of the new tree. That parent must not have any tasks and must not be in the tree that you are copying. Only user stories, optionally with their tasks and/or test cases, are copied, but not defects. In a copy of a user story, task, or test case, the name, owner, rank, and description are copied from the original.
 
 ## Test-result acquisition
 This feature tallies the passing and failing results of the last runs of all the test cases, and the counts of defects, major defects, and minor defects, in a tree.
@@ -140,6 +140,8 @@ To install and use RallyTree:
 Please report bugs, comments, feature suggestions, and questions to Jonathan Pool (jonathan.pool@cvshealth.com).
 
 # Version notes
+
+Version 1.4.2 adds an option to the copy operation: copying user stories and test cases, but not tasks. This version also corrects a bug in version 1.4.1 that mislocated copied work items.
 
 Version 1.4.1 makes all user stories, tasks, and test cases in a tree copy inherit the project affiliation of the user story designated as the parent of the copy root. Previously they were affiliated with the user’s default project. This change is believed to fit the most common use cases, but, if necessary, the project affiliation of the items in the tree copy can be changed with the project-change operation.
 

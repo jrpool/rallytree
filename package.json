@@ -1,6 +1,6 @@
 {
   "name": "rallytree",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Automation of Rally tree management",
   "main": "index.html",
   "scripts": {
