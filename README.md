@@ -133,6 +133,11 @@ To install and use RallyTree:
 - Clone it.
 - Make its directory the current directory.
 - Install dependencies with `npm install`.
+- If you want your Rally username and Rally password to be automatically filled in on the request form, create a file named .env in the current directory and populate that file with these two lines (replacing the placeholders with your actual email address and password):
+
+   - RALLY_USERNAME=xxx@yyy.zzz
+   - RALLY_PASSWORD=xyzxyzxyz
+
 - Run the application with `node index`. This opens the introduction page in your default web browser.
 - Follow the instructions to specify the operation you want performed.
 
