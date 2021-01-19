@@ -743,6 +743,7 @@ const takeDescendants = (callback, data) => {
     // Otherwise, i.e. if the user story is invalid:
     else {
       err('Invalid user story', 'changing ownership');
+      return Promise.resolve('');
     }
   }
 };
