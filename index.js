@@ -713,7 +713,7 @@ const takeDescendants = (callback, data) => {
               .then(
                 // When the data arrive:
                 cases => takeTasksOrCases('case', cases),
-                error => err(error, 'getting data on test cases for ownership change')
+                error => err(error, 'getting data on test cases after tasks for ownership change')
               );
             },
             error => err(error, 'changing owners of tasks')
@@ -733,6 +733,19 @@ const takeDescendants = (callback, data) => {
           return takeTasksOrCases('task', tasks);
         },
         error => err(error, 'getting data on tasks for ownership change')
+      );
+    }
+    // Otherwise, if the user story has test cases and no child user stories or tasks:
+    else if (data.testCases.count && ! data.tasks.count && ! data.children.count) {
+      // Get data on the test cases.
+      return getCollectionData(data.testCases.ref, ['Owner'], [])
+      .then(
+        // When the data arrive:
+        cases => {
+          // Process the test cases.
+          return takeTasksOrCases('case', cases);
+        },
+        error => err(error, 'getting data on test cases for ownership change')
       );
     }
     // Otherwise, if the user story has no child user stories, tasks, or test cases:
