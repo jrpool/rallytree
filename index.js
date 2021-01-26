@@ -1495,20 +1495,15 @@ const serveDo = () => {
   };
   // Make the request.
   const request = https.request(options, response => {
-    console.log('Request made.');
     const chunks = [];
     response.on('data', chunk => {
-      console.log('Chunk received');
       chunks.push(chunk);
     });
     // When the response is complete:
     response.on('end', () => {
-      console.log('Response complete');
       // Get its cookie.
       const receivedCookie = response.headers['set-cookie'];
       // Output it.
-      console.log(`Received data: ${chunks.join()}\n`);
-      console.log(`Received cookie:\n${JSON.stringify(receivedCookie, null, 2)}`);
       // Insert it into the form on the request page.
       fs.readFile('do.html', 'utf8')
       .then(
@@ -1925,8 +1920,10 @@ const requestHandler = (request, res) => {
       note = bodyObject.note;
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
+      // If the form contains a cookie:
       if (cookie.length) {
-        requestOptions.headers.cookie = cookie;
+        // Make every request in this session include it, forcing single-host mode.
+        requestOptions.headers.cookie = cookie.split('\r\n');
       }
       // Create and configure a Rally API client.
       restAPI = rally({
