@@ -1496,11 +1496,18 @@ const serveDo = () => {
   // Make the request.
   const request = https.request(options, response => {
     console.log('Request made.');
+    const chunks = [];
+    response.on('data', chunk => {
+      console.log('Chunk received');
+      chunks.push(chunk);
+    });
     // When the response is complete:
     response.on('end', () => {
+      console.log('Response complete');
       // Get its cookie.
       const receivedCookie = response.headers['set-cookie'];
       // Output it.
+      console.log(`Received data: ${chunks.join()}\n`);
       console.log(`Received cookie:\n${JSON.stringify(receivedCookie, null, 2)}`);
       // Insert it into the form on the request page.
       fs.readFile('do.html', 'utf8')
@@ -1509,7 +1516,7 @@ const serveDo = () => {
           const newContent = htmlContent
           .replace('__userName__', RALLY_USERNAME)
           .replace('__password__', RALLY_PASSWORD)
-          .replace('__cookie__', receivedCookie);
+          .replace('__cookie__', receivedCookie.join('\r\n'));
           // Serve the page.
           servePage(newContent, false);
         },
@@ -1899,15 +1906,16 @@ const requestHandler = (request, res) => {
       const bodyObject = parse(Buffer.concat(bodyParts).toString());
       userName = bodyObject.userName;
       const {
-        password,
-        rootID,
+        cookie,
+        iterationName,
         op,
-        takerName,
+        parentID,
+        password,
         projectName,
         releaseName,
-        iterationName,
-        parentID,
+        rootID,
         sState,
+        takerName,
         taskNameString,
         testFolderID,
         testSetID
@@ -1917,6 +1925,9 @@ const requestHandler = (request, res) => {
       note = bodyObject.note;
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
+      if (cookie.length) {
+        requestOptions.headers.cookie = cookie;
+      }
       // Create and configure a Rally API client.
       restAPI = rally({
         user: userName,
