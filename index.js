@@ -1477,11 +1477,18 @@ const servePage = (content, isReport) => {
 const serveDo = () => {
   fs.readFile('do.html', 'utf8')
   .then(
-    content => {
-      const newContent = content
-      .replace('__userName__', RALLY_USERNAME)
-      .replace('__password__', RALLY_PASSWORD);
-      servePage(newContent, false);
+    htmlContent => {
+      fs.readFile('do.js', 'utf8')
+      .then(
+        jsContent => {
+          const newContent = htmlContent
+          .replace('__userName__', RALLY_USERNAME)
+          .replace('__password__', RALLY_PASSWORD)
+          .replace('__script__', jsContent);
+          servePage(newContent, false);
+        },
+        error => err(error, 'reading do script')
+      );
     },
     error => err(error, 'reading do page')
   );
