@@ -21,6 +21,8 @@ catch (error) {
 }
 // Module to create a web server.
 const http = require('http');
+// Module to make HTTPS requests.
+const https = require('https');
 // Module to parse request bodies.
 const {parse} = require('querystring');
 // Rally module.
@@ -1475,23 +1477,50 @@ const servePage = (content, isReport) => {
 };
 // Serves the request page.
 const serveDo = () => {
-  fs.readFile('do.html', 'utf8')
-  .then(
-    htmlContent => {
-      fs.readFile('do.js', 'utf8')
+  // Options for a server-identifying erroneous request.
+  const options = {
+    hostname: 'rally1.rallydev.com',
+    port: 443,
+    path: '/slm/webservice/v2.0/user/1',
+    method: 'GET',
+    auth: `${process.env.RALLY_USERNAME}:${process.env.RALLY_PASSWORD}`,
+    headers: {
+      'X-RallyIntegrationName':
+      process.env.RALLYINTEGRATIONNAME || 'RallyTree',
+      'X-RallyIntegrationVendor':
+      process.env.RALLYINTEGRATIONVENDOR || '',
+      'X-RallyIntegrationVersion':
+      process.env.RALLYINTEGRATIONVERSION || '1.0.4'
+    }
+  };
+  // Make the request.
+  const request = https.request(options, response => {
+    console.log('Request made.');
+    // When the response is complete:
+    response.on('end', () => {
+      // Get its cookie.
+      const receivedCookie = response.headers['set-cookie'];
+      // Output it.
+      console.log(`Received cookie:\n${JSON.stringify(receivedCookie, null, 2)}`);
+      // Insert it into the form on the request page.
+      fs.readFile('do.html', 'utf8')
       .then(
-        jsContent => {
+        htmlContent => {
           const newContent = htmlContent
           .replace('__userName__', RALLY_USERNAME)
           .replace('__password__', RALLY_PASSWORD)
-          .replace('__script__', jsContent);
+          .replace('__cookie__', receivedCookie);
+          // Serve the page.
           servePage(newContent, false);
         },
-        error => err(error, 'reading do script')
+        error => err(error, 'reading do page')
       );
-    },
-    error => err(error, 'reading do page')
-  );
+    });
+  });
+  request.on('error', error => {
+    err(error, 'requesting a server identification');
+  });
+  request.end();
 };
 // Interpolates universal content into a report.
 const reportPrep = (content, jsContent) => {

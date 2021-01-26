@@ -20,6 +20,7 @@ const options = {
 };
 // Make an erroneous request in order to get a cookie identifying the server.
 const request = https.request(options, response => {
+  console.log('Request made.');
   response.on('end', () => {
     const receivedCookie = response.headers['set-cookie'];
     console.log(`Received cookie:\n${JSON.stringify(receivedCookie, null, 2)}`);
