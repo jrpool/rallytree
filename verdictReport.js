@@ -26,6 +26,9 @@ const listenForMessages = (source, eventIDs) => {
 };
 // After the DOM has loaded:
 document.addEventListener('DOMContentLoaded', () => {
+  // Start timing.
+  const startTime = Date.now();
+  console.log('Timing started in browser.');
   // Request an event stream and listen for messages on it.
   eventSource = new EventSource('/verdicttotals');
   listenForMessages(
@@ -37,6 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (lastEventTime && Date.now() - lastEventTime > 10000) {
         eventSource.close();
         clearInterval(poller);
+        // Report the elapsed time.
+        console.log(`Elapsed time: ${Math.round((Date.now() - startTime - 10000) / 1000)} sec.`);
       }
     },
     2000

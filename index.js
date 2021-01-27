@@ -828,8 +828,7 @@ const takeTree = storyRefs => {
     return Promise.resolve('');
   }
 };
-// Sequentially changes project 
-// Recursively changes project affiliations in a tree or subtree of user stories.
+// Recursively changes project affiliations in a tree or subtree of user stories: original version.
 const projectTree = storyRefs => {
   if (storyRefs.length && ! isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
@@ -898,6 +897,58 @@ const projectTree = storyRefs => {
   }
   else {
     return Promise.resolve('');
+  }
+};
+// Recursively changes project affiliations in a tree or subtree of user stories: parallel version.
+const projectTreeParallel = storyRefs => {
+  if (storyRefs.length && ! isError) {
+    // For the root of the tree or of each subtree:
+    storyRefs.forEach(storyRef => {
+      if (! isError) {
+        const shortRef = shorten('userstory', 'hierarchicalrequirement', storyRef);
+        if (! isError) {
+          // Get data on it.
+          getItemData(storyRef, ['Project'], ['Children'])
+          .then(
+            // When the data arrive:
+            data => {
+              const oldProjectRef = data.project ? shorten('project', 'project', data.project) : '';
+              if (! isError) {
+                // Process its children.
+                getCollectionData(data.children.ref, [], [])
+                .then(
+                  children => {
+                    projectTreeParallel(children.map(child => child.ref));
+                  },
+                  error => err(error, 'getting data on children of user story')
+                );
+                // If the user story belongs to no or a non-intended project:
+                if (oldProjectRef && oldProjectRef !== projectRef || ! oldProjectRef) {
+                  // Change its project.
+                  restAPI.update({
+                    ref: storyRef,
+                    data: {
+                      Project: projectRef
+                    }
+                  })
+                  .then(
+                    () => {
+                      report([['total'], ['changes']]);
+                    },
+                    error => err(error, 'changing project of user story')
+                  );
+                }
+                // Otherwise, i.e. if the user story belongs to the intended project:
+                else {
+                  report([['total']]);
+                }
+              }
+            },
+            error => err(error, 'getting data on user story for project change')
+          );
+        }
+      }
+    });
   }
 };
 // Returns the count of schedulable user stories.
@@ -1923,7 +1974,7 @@ const requestHandler = (request, res) => {
       // If the form contains a cookie:
       if (cookie.length) {
         // Make every request in this session include it, forcing single-host mode.
-        requestOptions.headers.cookie = cookie.split('\r\n');
+        requestOptions.headers.cookie = cookie.replace(/\r\n/g, '; ');
       }
       // Create and configure a Rally API client.
       restAPI = rally({
