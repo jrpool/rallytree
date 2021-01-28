@@ -1555,16 +1555,23 @@ const serveDo = () => {
     // When the response is complete:
     response.on('end', () => {
       // Get its cookie.
-      const receivedCookie = response.headers['set-cookie'];
-      // Output it.
-      // Insert it into the form on the request page.
+      const cookieHeader = response.headers['set-cookie'];
+      const neededCookies = [];
+      // If it exists:
+      if (cookieHeader.length) {
+        // Remove all but the needed ones.
+        neededCookies.push(...cookieHeader.filter(
+          cookie => cookie.startsWith('JSESSIONID') || cookie.startsWith('SUB')
+        ));
+      }
+      // Insert data into the form on the request page.
       fs.readFile('do.html', 'utf8')
       .then(
         htmlContent => {
           const newContent = htmlContent
           .replace('__userName__', RALLY_USERNAME)
           .replace('__password__', RALLY_PASSWORD)
-          .replace('__cookie__', receivedCookie.join('\r\n'));
+          .replace('__cookie__', neededCookies.join('\r\n'));
           // Serve the page.
           servePage(newContent, false);
         },
@@ -2018,13 +2025,8 @@ const requestHandler = (request, res) => {
       RALLY_PASSWORD = password;
       // If the form contains a cookie:
       if (cookie.length) {
-        const cookies = cookie.split('\r\n');
-        const neededCookies = cookies.filter(
-          cookie => cookie.startsWith('JSESSIONID') || cookie.startsWith('SUB')
-        );
-        console.log(`Needed cookies are:\n${JSON.stringify(neededCookies, null, 2)}`);
         // Make every request in this session include it, forcing single-host mode.
-        requestOptions.headers.Cookie = neededCookies.join('; ');
+        requestOptions.headers.Cookie = cookie.split('\r\n').join('; ');
       }
       // Create and configure a Rally API client.
       restAPI = rally({
