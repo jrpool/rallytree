@@ -952,7 +952,7 @@ const projectTreeParallel = storyRefs => {
   }
 };
 // Returns the count of schedulable user stories.
-const whenableCount = storyRefs => {
+const schedulableCount = storyRefs => {
   if (storyRefs.length && ! isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
@@ -969,24 +969,24 @@ const whenableCount = storyRefs => {
               // When the data arrive:
               children => {
                 // Process the child user stories sequentially.
-                return whenableCount(children.map(child => child.ref))
+                return schedulableCount(children.map(child => child.ref))
                 .then(
                   // After they are processed, process the remaining user stories.
-                  () => whenableCount(storyRefs.slice(1)),
-                  error => err(error, 'counting child user stories for whenable count')
+                  () => schedulableCount(storyRefs.slice(1)),
+                  error => err(error, 'counting child user stories for schedulable count')
                 );
               },
-              error => err(error, 'getting data on child user stories for whenable count')
+              error => err(error, 'getting data on child user stories for schedulable count')
             );
           }
           // Otherwise, i.e. if the user story has no child user stories:
           else {
             report([['total']]);
             // Process the remaining user stories.
-            return whenableCount(storyRefs.slice(1));
+            return schedulableCount(storyRefs.slice(1));
           }
         },
-        error => err(error, 'getting data on first user story for whenable count')
+        error => err(error, 'getting data on first user story for schedulable count')
       );
     }
     else {
@@ -998,7 +998,7 @@ const whenableCount = storyRefs => {
   }
 };
 // Recursively sets releases and iterations in a tree or subtree of user stories.
-const whenTree = storyRefs => {
+const scheduleTree = storyRefs => {
   if (storyRefs.length && ! isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
@@ -1015,10 +1015,10 @@ const whenTree = storyRefs => {
               // When the data arrive:
               children => {
                 // Process the child user stories sequentially.
-                return whenTree(children.map(child => child.ref))
+                return scheduleTree(children.map(child => child.ref))
                 .then(
                   // After they are processed, process the remaining user stories.
-                  () => whenTree(storyRefs.slice(1)),
+                  () => scheduleTree(storyRefs.slice(1)),
                   error => err(error, 'scheduling child user stories')
                 );
               },
@@ -1046,7 +1046,7 @@ const whenTree = storyRefs => {
               () => {
                 report([['changes']]);
                 // Process the remaining user stories.
-                return whenTree(storyRefs.slice(1));
+                return scheduleTree(storyRefs.slice(1));
               },
               error => err(error, 'scheduling user story')
             );
@@ -1274,7 +1274,7 @@ const caseTree = storyRefs => {
   }
 };
 // Creates a passing test-case result.
-const createResult = (caseRef, tester, build, testSet, note) => {
+const createPass = (caseRef, tester, build, testSet, note) => {
   // Create a passing result.
   return restAPI.create({
     type: 'testcaseresult',
@@ -1317,7 +1317,7 @@ const passCases = (caseRefs, build, note) => {
                 // When the data arrive:
                 testSets => {
                   // Create a passing result for the test case in its first test set.
-                  return createResult(firstRef, data.owner, build, testSets[0].ref, note)
+                  return createPass(firstRef, data.owner, build, testSets[0].ref, note)
                   .then(
                     // When the result has been created:
                     () => {
@@ -1334,7 +1334,7 @@ const passCases = (caseRefs, build, note) => {
             // Otherwise, i.e. if the test case is not in any test set:
             else {
               // Create a passing result for the test case with the owner as tester.
-              return createResult(firstRef, data.owner, build, null, note)
+              return createPass(firstRef, data.owner, build, null, note)
               .then(
                 // When the result has been created:
                 () => {
@@ -1359,7 +1359,7 @@ const passCases = (caseRefs, build, note) => {
   }
 };
 // Recursively creates passing test-case results for a tree or subtrees of user stories.
-const resultTree = storyRefs => {
+const passTree = storyRefs => {
   if (storyRefs.length && ! isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
@@ -1375,10 +1375,10 @@ const resultTree = storyRefs => {
             .then(
               // When the data arrive, process the children sequentially.
               children => {
-                return resultTree(children.map(child => child.ref))
+                return passTree(children.map(child => child.ref))
                 .then(
                   // After they are processed, process the remaining user stories.
-                  () => resultTree(storyRefs.slice(1)),
+                  () => passTree(storyRefs.slice(1)),
                   error => err(error, 'creating test-case results for child user stories')
                 );
               },
@@ -1396,7 +1396,7 @@ const resultTree = storyRefs => {
                 return passCases(cases.map(testCase => testCase.ref), build, note)
                 .then(
                   // After they are processed, process the remaining user stories.
-                  () => resultTree(storyRefs.slice(1)),
+                  () => passTree(storyRefs.slice(1)),
                   error => err(error, 'creating results for test cases')
                 );
               },
@@ -1583,19 +1583,30 @@ const reportPrep = (content, jsContent) => {
   .replace('__userName__', userName)
   .replace('__userRef__', userRef);
 };
+// Interpolates operation-specific content into the report script.
+const reportScriptPrep = (content, eventSource, events) => {
+  return content
+  .replace('__eventSource__', eventSource)
+  .replace(
+    'let __events__', `let __events__ = [${events.map(event => '\'' + event + '\'').join(', ')}]`
+  );
+};
 // Serves the copy report page.
 const serveCopyReport = () => {
   fs.readFile('copyReport.html', 'utf8')
   .then(
     htmlContent => {
-      fs.readFile('copyReport.js', 'utf8')
+      fs.readFile('report.js', 'utf8')
       .then(
         jsContent => {
-          const newContent = reportPrep(htmlContent, jsContent)
+          const newJSContent = reportScriptPrep(
+            jsContent, '/copytally', ['total', 'storyTotal', 'taskTotal', 'caseTotal', 'error']
+          );
+          const newContent = reportPrep(htmlContent, newJSContent)
           .replace('__parentRef__', copyParentRef);
           servePage(newContent, true);
         },
-        error => err(error, 'reading caseReport script')
+        error => err(error, 'reading report script')
       );
     },
     error => err(error, 'reading caseReport page')
@@ -1606,13 +1617,16 @@ const serveVerdictReport = () => {
   fs.readFile('verdictReport.html', 'utf8')
   .then(
     htmlContent => {
-      fs.readFile('verdictReport.js', 'utf8')
+      fs.readFile('report.js', 'utf8')
       .then(
         jsContent => {
-          const newContent = reportPrep(htmlContent, jsContent);
+          const newJSContent = reportScriptPrep(jsContent, '/verdicttally', [
+            'total', 'passes', 'fails', 'defects', 'major', 'minor', 'error'
+          ]);
+          const newContent = reportPrep(htmlContent, newJSContent);
           servePage(newContent, true);
         },
-        error => err(error, 'reading verdictReport script')
+        error => err(error, 'reading report script')
       );
     },
     error => err(error, 'reading verdictReport page')
@@ -1623,15 +1637,26 @@ const serveTakeReport = takerName => {
   fs.readFile('takeReport.html', 'utf8')
   .then(
     htmlContent => {
-      fs.readFile('takeReport.js', 'utf8')
+      fs.readFile('report.js', 'utf8')
       .then(
         jsContent => {
-          const newContent = reportPrep(htmlContent, jsContent)
+          const newJSContent = reportScriptPrep(jsContent, '/taketally', [
+            'total',
+            'storyTotal',
+            'taskTotal',
+            'caseTotal',
+            'changes',
+            'storyChanges',
+            'taskChanges',
+            'caseChanges',
+            'error'
+          ]);
+          const newContent = reportPrep(htmlContent, newJSContent)
           .replace('__takerName__', takerName)
           .replace('__takerRef__', takerRef);
           servePage(newContent, true);
         },
-        error => err(error, 'reading takeReport script')
+        error => err(error, 'reading report script')
       );
     },
     error => err(error, 'reading takeReport page')
@@ -1642,15 +1667,18 @@ const serveProjectReport = projectName => {
   fs.readFile('projectReport.html', 'utf8')
   .then(
     htmlContent => {
-      fs.readFile('projectReport.js', 'utf8')
+      fs.readFile('report.js', 'utf8')
       .then(
         jsContent => {
-          const newContent = reportPrep(htmlContent, jsContent)
+          const newJSContent = reportScriptPrep(
+            jsContent, '/projecttally', ['total', 'changes', 'error']
+          );
+          const newContent = reportPrep(htmlContent, newJSContent)
           .replace('__projectName__', projectName)
           .replace('__projectRef__', projectRef);
           servePage(newContent, true);
         },
-        error => err(error, 'reading projectReport script')
+        error => err(error, 'reading report script')
       );
     },
     error => err(error, 'reading projectReport page')
@@ -1658,13 +1686,16 @@ const serveProjectReport = projectName => {
 };
 // Serves the release and iteration report page.
 const serveWhenReport = (releaseName, iterationName) => {
-  fs.readFile('whenReport.html', 'utf8')
+  fs.readFile('scheduleReport.html', 'utf8')
   .then(
     htmlContent => {
-      fs.readFile('whenReport.js', 'utf8')
+      fs.readFile('report.js', 'utf8')
       .then(
         jsContent => {
-          const newContent = reportPrep(htmlContent, jsContent)
+          const newJSContent = reportScriptPrep(
+            jsContent, '/scheduletally', ['total', 'changes', 'error']
+          );
+          const newContent = reportPrep(htmlContent, newJSContent)
           .replace('__releaseName__', releaseName)
           .replace('__releaseRef__', releaseRef)
           .replace('__iterationName__', iterationName)
@@ -1672,10 +1703,10 @@ const serveWhenReport = (releaseName, iterationName) => {
           .replace('__scheduleState__', scheduleState);
           servePage(newContent, true);
         },
-        error => err(error, 'reading whenReport script')
+        error => err(error, 'reading wheeport script')
       );
     },
-    error => err(error, 'reading whenReport page')
+    error => err(error, 'reading scheduleReport page')
   );
 };
 // Serves the add-tasks report page.
@@ -1683,18 +1714,21 @@ const serveTaskReport = () => {
   fs.readFile('taskReport.html', 'utf8')
   .then(
     htmlContent => {
-      fs.readFile('taskReport.js', 'utf8')
+      fs.readFile('report.js', 'utf8')
       .then(
         jsContent => {
+          const newJSContent = reportScriptPrep(
+            jsContent, '/tasktally', ['total', 'changes', 'error']
+          );
           const taskCount = `${taskNames.length} task${
             taskNames.length > 1 ? 's' : ''
           }`;
-          const newContent = reportPrep(htmlContent, jsContent)
+          const newContent = reportPrep(htmlContent, newJSContent)
           .replace('__taskCount__', taskCount)
           .replace('__taskNames__', taskNames.join('\n'));
           servePage(newContent, true);
         },
-        error => err(error, 'reading taskReport script')
+        error => err(error, 'reading report script')
       );
     },
     error => err(error, 'reading taskReport page')
@@ -1705,30 +1739,36 @@ const serveCaseReport = () => {
   fs.readFile('caseReport.html', 'utf8')
   .then(
     htmlContent => {
-      fs.readFile('caseReport.js', 'utf8')
+      fs.readFile('report.js', 'utf8')
       .then(
         jsContent => {
-          const newContent = reportPrep(htmlContent, jsContent);
+          const newJSContent = reportScriptPrep(
+            jsContent, '/casetally', ['total', 'changes', 'error']
+          );
+          const newContent = reportPrep(htmlContent, newJSContent);
           servePage(newContent, true);
         },
-        error => err(error, 'reading caseReport script')
+        error => err(error, 'reading report script')
       );
     },
     error => err(error, 'reading caseReport page')
   );
 };
 // Serves the pass-test-case report page.
-const serveResultReport = () => {
-  fs.readFile('resultReport.html', 'utf8')
+const servePassReport = () => {
+  fs.readFile('passReport.html', 'utf8')
   .then(
     htmlContent => {
-      fs.readFile('resultReport.js', 'utf8')
+      fs.readFile('report.js', 'utf8')
       .then(
         jsContent => {
-          const newContent = reportPrep(htmlContent, jsContent);
+          const newJSContent = reportScriptPrep(
+            jsContent, '/passtally', ['total', 'changes']
+          );
+          const newContent = reportPrep(htmlContent, newJSContent);
           servePage(newContent, true);
         },
-        error => err(error, 'reading resultReport script')
+        error => err(error, 'reading report script')
       );
     },
     error => err(error, 'reading resultReport page')
@@ -1739,13 +1779,16 @@ const serveDocReport = () => {
   fs.readFile('docReport.html', 'utf8')
   .then(
     htmlContent => {
-      fs.readFile('docReport.js', 'utf8')
+      fs.readFile('report.js', 'utf8')
       .then(
         jsContent => {
-          const newContent = reportPrep(htmlContent, jsContent);
+          const newJSContent = reportScriptPrep(
+            jsContent, '/doc', ['doc', 'error']
+          );
+          const newContent = reportPrep(htmlContent, newJSContent);
           servePage(newContent, true);
         },
-        error => err(error, 'reading docReport script')
+        error => err(error, 'reading report script')
       );
     },
     error => err(error, 'reading docReport page')
@@ -1907,37 +1950,37 @@ const requestHandler = (request, res) => {
         Otherwise, if the requested resource is an event stream, start it
         and prevent any others from being started.
       */
-      else if (requestURL === '/copytotals' && idle) {
+      else if (requestURL === '/copytally' && idle) {
         streamInit();
         copyTree([rootRef], copyParentRef);
       }
-      else if (requestURL === '/verdicttotals' && idle) {
+      else if (requestURL === '/verdicttally' && idle) {
         streamInit();
         verdictTree(rootRef);
       }
-      else if (requestURL === '/taketotals' && idle) {
+      else if (requestURL === '/taketally' && idle) {
         streamInit();
         takeTree([rootRef]);
       }
-      else if (requestURL === '/projecttotals' && idle) {
+      else if (requestURL === '/projecttally' && idle) {
         streamInit();
         projectTree([rootRef]);
       }
-      else if (requestURL === '/whentotals' && idle) {
+      else if (requestURL === '/scheduletally' && idle) {
         streamInit();
-        whenableCount([rootRef]).then(() => whenTree([rootRef]));
+        schedulableCount([rootRef]).then(() => scheduleTree([rootRef]));
       }
-      else if (requestURL === '/tasktotals' && idle) {
+      else if (requestURL === '/tasktally' && idle) {
         streamInit();
         taskTree([rootRef]);
       }
-      else if (requestURL === '/casetotals' && idle) {
+      else if (requestURL === '/casetally' && idle) {
         streamInit();
         caseTree([rootRef]);
       }
-      else if (requestURL === '/resulttotals' && idle) {
+      else if (requestURL === '/passtally' && idle) {
         streamInit();
-        resultTree([rootRef]);
+        passTree([rootRef]);
       }
       else if (requestURL === '/doc' && idle) {
         streamInit();
@@ -1973,8 +2016,13 @@ const requestHandler = (request, res) => {
       RALLY_PASSWORD = password;
       // If the form contains a cookie:
       if (cookie.length) {
+        const cookies = cookie.split('\r\n');
+        const neededCookies = cookies.filter(
+          cookie => cookie.startsWith('JSESSIONID') || cookie.startsWith('SUB')
+        );
+        console.log(`Needed cookies are:\n${JSON.stringify(neededCookies, null, 2)}`);
         // Make every request in this session include it, forcing single-host mode.
-        requestOptions.headers.cookie = cookie.replace(/\r\n/g, '; ');
+        requestOptions.headers.Cookie = neededCookies.join('; ');
       }
       // Create and configure a Rally API client.
       restAPI = rally({
@@ -2002,9 +2050,9 @@ const requestHandler = (request, res) => {
                       // Serve a report of the tree documentation.
                       serveDocReport();
                     }
-                    // Otherwise, if the operation is test-result acquisition:
+                    // Otherwise, if the operation is verdict acquisition:
                     else if (op === 'verdict') {
-                      // Serve a report of the test results.
+                      // Serve a report of the verdicts.
                       serveVerdictReport();
                     }
                     // Otherwise, if the operation is ownership change:
@@ -2045,7 +2093,7 @@ const requestHandler = (request, res) => {
                       );
                     }
                     // Otherwise, if the operation is scheduling:
-                    else if (op === 'when') {
+                    else if (op === 'schedule') {
                       scheduleState = sState;
                       // Get the reference of the named release.
                       getProjectNameRef('release', releaseName, 'scheduling')
@@ -2131,10 +2179,10 @@ const requestHandler = (request, res) => {
                         serveCaseReport();
                       }
                     }
-                    // Otherwise, if the operation is test-case result creation:
-                    else if (op === 'result') {
-                      // Serve a report on test-case result creation.
-                      serveResultReport();
+                    // Otherwise, if the operation is passing-result creation:
+                    else if (op === 'pass') {
+                      // Serve a report on passing-result creation.
+                      servePassReport();
                     }
                     // Otherwise, if the operation is tree copying:
                     else if (op === 'copy') {

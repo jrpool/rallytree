@@ -1,5 +1,5 @@
 /*
-  whenReport.js
+  report.js
   Server-side event client script.
 
   Makes the web page subscribe to server-side events and update
@@ -8,6 +8,7 @@
 
 let eventSource;
 let lastEventTime;
+let __events__;
 // Handles a message event.
 const handleMessage = (event, type) => {
   const data = event.data;
@@ -26,17 +27,21 @@ const listenForMessages = (source, eventIDs) => {
 };
 // After the DOM has loaded:
 document.addEventListener('DOMContentLoaded', () => {
+  // Start timing.
+  const startTime = Date.now();
   // Request an event stream and listen for messages on it.
-  eventSource = new EventSource('/whentotals');
-  listenForMessages(eventSource, ['total', 'changes', 'error']);
+  eventSource = new EventSource('__eventSource__');
+  listenForMessages(eventSource, __events__);
   // Stop listening after 10 idle seconds, assuming the job complete.
   const poller = setInterval(
     () => {
       if (lastEventTime && Date.now() - lastEventTime > 10000) {
         eventSource.close();
         clearInterval(poller);
+        // Report the elapsed time in the browser console.
+        console.log(`Elapsed time: ${Math.round((Date.now() - startTime - 10000) / 1000)} sec.`);
       }
     },
-    2000
+    1000
   );
 }, {once: true});

@@ -78,10 +78,10 @@
                   aria-labelledby="copy parent"
                 >
               </p>
-              <!--OP RESULTS-->
+              <!--OP VERDICT RETRIEVAL-->
               <p class="opodd"><label>
                 <input id="op-verdict" type="radio" name="op" value="verdict">
-                <span class="label">Get test results</span>
+                <span class="label">Get test verdicts</span>
               </label></p>
               <!--OP OWNER CHANGE-->
               <p class="opeven">
@@ -127,7 +127,13 @@
               </p>
               <!--OP SCHEDULE-->
               <p class="opeven">
-                <input id="op-when" type="radio" name="op" value="when" aria-labelledby="schedule">
+                <input
+                  id="op-when"
+                  type="radio"
+                  name="op"
+                  value="schedule"
+                  aria-labelledby="schedule"
+                >
                 <span id="schedule" class="label">Schedule</span>:
                 <span id="release" class="label">Release</span>
                 <input
@@ -154,7 +160,7 @@
                   <option value="Completed">Completed</option>
                 </select>
               </p>
-              <!--OP TASKS-->
+              <!--OP TASK CREATION-->
               <p class="opodd">
                 <input id="op-task" type="radio" name="op" value="task" aria-labelledby="tasks">
                 <span id="tasks" class="label">Add tasks</span>:
@@ -170,7 +176,7 @@
                   aria-labelledby="tasks task-names"
                 >
               </p>
-              <!--OP TEST CASES-->
+              <!--OP TEST-CASE CREATION-->
               <p class="opeven">
                 <input id="op-case" type="radio" name="op" value="case" aria-labelledby="cases">
                 <span id="cases" class="label">Add test cases</span>
@@ -194,26 +200,26 @@
                   aria-labelledby="cases case-options test-set"
                 >
               </p>
-              <!--OP PASS-->
+              <!--OP PASSING-RESULT CREATION-->
               <p class="opodd">
                 <input
-                  id="op-result"
+                  id="op-pass"
                   type="radio"
                   name="op"
-                  value="result"
-                  aria-labelledby="results"
+                  value="pass"
+                  aria-labelledby="pass"
                 >
-                <span id="results" class="label">
-                  Add passing results to qualifying test cases,
+                <span id="pass" class="label">
+                  Report qualifying test cases as passing,
                 </span>
-                <span id="result-options" class="label">optionally with</span>:<br>
+                <span id="pass-options" class="label">optionally with</span>:<br>
                 <span id="build" class="label indent">Build</span>
                 <input
                   id="build"
                   name="build"
                   size="50"
                   maxwidth="128"
-                  aria-labelledby="results result-options build"
+                  aria-labelledby="pass pass-options build"
                 ><br>
                 <span id="note" class="label indent">Note</span>
                 <input
@@ -221,7 +227,7 @@
                   name="note"
                   size="30"
                   maxwidth="100"
-                  aria-labelledby="results result-options note"
+                  aria-labelledby="pass pass-options note"
                 >
               </p>
               <!--OP DOCUMENTATION-->
