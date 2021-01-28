@@ -899,6 +899,7 @@ const projectTree = storyRefs => {
     return Promise.resolve('');
   }
 };
+/*
 // Recursively changes project affiliations in a tree or subtree of user stories: parallel version.
 const projectTreeParallel = storyRefs => {
   if (storyRefs.length && ! isError) {
@@ -951,6 +952,7 @@ const projectTreeParallel = storyRefs => {
     });
   }
 };
+*/
 // Returns the count of schedulable user stories.
 const schedulableCount = storyRefs => {
   if (storyRefs.length && ! isError) {
