@@ -91,7 +91,7 @@ RallyTree interacts with its users, in part, as an ordinary web server. As such,
 
     ![report page](static/report.png)
 
-The interaction in the report page, however, employs streaming. The report page, when served, initially displays counts of 0. But, as soon as it finishes loading, it automatically submits a request to the server. To fulfill the request, the server:
+The interaction in the report page employs streaming. The report page, when served, initially displays counts of 0. But, as soon as it finishes loading, it automatically submits a request to the server. To fulfill the request, the server:
 
 - creates a server-sent-event stream
 - performs the form’s requested operation on the specified tree of user stories
@@ -99,7 +99,7 @@ The interaction in the report page, however, employs streaming. The report page,
 
 If an error occurs, including an error arising from the request form being improperly completed, the server emits an error event, causing an error message to be displayed on the report page.
 
-Each event identifies one of the counts in the report and a new count. When the event arrives, the browser updates the report by changing the identified count. The user experience is to see the report page updating itself with increasing counts. Eventually the updating stops. That tells the user that the operation is complete.
+Each (non-error) event identifies one of the count fields in the report and a new count. When the event arrives, the browser updates the report by repopulating that field with the new count. The user experience is to see the report page updating itself with increasing counts. Eventually the updating stops. That tells the user that the operation is complete.
 
 As an exception, the tree-documentation report contains a tree representation. For each user story, it shows the name; counts of tasks, test cases, and child user stories; and an array of the child user stories of the user story. The task and test-case counts are cumulative. Thus, for a user story with child user stories, its task and test-case counts are the counts of tasks and test cases of all its descendant user stories. (If these counts were not cumulative, they would always be 0, because user stories with child user stories never have tasks or test cases.)
 
