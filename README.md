@@ -179,7 +179,7 @@ This adaptation is employed by default. To turn it off, you can clear the value 
 
 Preliminary testing indicates that operations perform about 15% faster, on average, when the single-host adaptation is on than when it is off. To determine whether this adaptation improves performance for you, you can look at the console in the browser developer tools. There, the elapsed time of each operation is displayed.
 
-!(RallyTree elapsed-time report)[static/elapsed-time.png]
+!(RallyTree elapsed-time report)[/static/elapsed-time.png]
 
 The single-host adaptation does not prevent concurrency conflicts, contrary to what one might infer from the Broadcom documentation.
 
