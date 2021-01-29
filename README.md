@@ -179,7 +179,7 @@ This adaptation is employed by default. To turn it off, you can clear the value 
 
 Preliminary testing indicates that operations perform about 15% faster, on average, when the single-host adaptation is on than when it is off. To determine whether this adaptation improves performance for you, you can look at the console in the browser developer tools. There, the elapsed time of each operation is displayed.
 
-!(RallyTree elapsed-time report)[/static/elapsed-time.png]
+![RallyTree elapsed-time report](static/elapsed-time.png)
 
 The single-host adaptation does not prevent concurrency conflicts, contrary to what one might infer from the Broadcom documentation.
 
@@ -207,14 +207,16 @@ To install and use RallyTree:
 - Follow the instructions to specify the operation you want performed and whether the single-server adaptation should be turned on or off.
 
 # Support
+
 Please report bugs, comments, feature suggestions, and questions to Jonathan Pool (jonathan.pool@cvshealth.com).
 
 # Bugs
+
 In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdict-acquisition operation from returning correct results. Rally wrongly reported that test cases with defects had defect counts of 0. RallyTree relies on the correctness of this count. This bug caused reports from the verdict-acquisition operation to omit all defects. Broadcom confirmed this bug and stated that we would be notified of progress in its correction.
 
 # Version notes
 
-Version 1.5.0 introduces the single-host adaptation. It also incorporates internal nomenclature improvements and a refactoring to consolidate nine JavaScript files into one.
+Version 1.5.0 introduces the single-host adaptation. It also incorporates internal nomenclature improvements and a refactoring to consolidate nine JavaScript files into one. Finally, it removes the `pause` and `retry` branches that were present starting in the 1.1 versions.
 
 Version 1.4.3 liberalizes the validity criteria of the ownership-change operation. The operation previously treated user stories with test cases and no tasks as invalid. This version treats them as valid.
 
