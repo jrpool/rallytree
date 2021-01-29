@@ -18,7 +18,7 @@ This feature copies a tree. You designate an existing user story as the parent o
 
 This feature tallies the passing and failing results of the last runs of all the test cases, and the counts of defects, major defects, and minor defects, in a tree.
 
-# Owner change
+## Owner change
 
 This feature ensures that each user story, task, and test case in a tree has the desired owner. You can choose whether to become the new owner or instead to specify another user as the new owner.
 
