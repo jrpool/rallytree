@@ -77,7 +77,14 @@ The core functionality of RallyTree is performed by the functions `copyTree()`, 
 
 ## Server-client interactions
 
-RallyTree interacts with its users, in part, as an ordinary web server. As such, it serves three pages: an introduction, a request form, and a report.
+RallyTree interacts with its users, in part, as an ordinary web server. As such, it serves three pages:
+
+- an introduction
+    [introduction page](static/intro.png)
+- a request form
+    [request page](static/request.png)
+- a report
+    [report page](static/report.png)
 
 The interaction in the report page, however, employs streaming. The report page, when served, initially displays counts of 0. But, as soon as it finishes loading, it automatically submits a request to the server. To fulfill the request, the server:
 
