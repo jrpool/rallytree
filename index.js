@@ -43,22 +43,22 @@ const requestOptions = {
   }
 };
 let build = '';
+let caseFolderRef = '';
+let caseSetRef = '';
 let copyParentProject = '';
 let copyParentRef = '';
 let copyWhat = 'both';
 let isError = false;
-let iterationRef = '';
 let note = '';
 let projectRef = '';
-let releaseRef = '';
 let response = {};
 let restAPI = {};
 let rootRef = '';
-let scheduleState = 'unchanged';
+let scheduleIterationRef = '';
+let scheduleReleaseRef = '';
+let scheduleState;
 let takerRef = '';
 let taskNames = [];
-let testFolderRef = '';
-let testSetRef = '';
 let userName = '';
 let userRef = '';
 let totals = {
@@ -90,21 +90,21 @@ const docWait = 1500;
 // Reinitialize the global variables, except response.
 const reinit = () => {
   build = '';
+  caseFolderRef = '';
+  caseSetRef = '';
   copyParentProject = '';
   copyParentRef = '';
   copyWhat = 'both';
   isError = false;
-  iterationRef = '';
   note = '';
   projectRef = '';
-  releaseRef = '';
   restAPI = {};
   rootRef = '';
-  scheduleState = 'unchanged';
+  scheduleIterationRef = '';
+  scheduleReleaseRef = '';
+  scheduleState = '';
   takerRef = '';
   taskNames = [];
-  testFolderRef = '';
-  testSetRef = '';
   userName = '';
   userRef = '';
   totals = {
@@ -1033,8 +1033,8 @@ const scheduleTree = storyRefs => {
           else {
             // Schedule it.
             const schedule = {
-              Release: releaseRef,
-              Iteration: iterationRef
+              Release: scheduleReleaseRef,
+              Iteration: scheduleIterationRef
             };
             if (scheduleState !== 'unchanged') {
               schedule.ScheduleState = scheduleState;
@@ -1155,7 +1155,7 @@ const createCase = (name, description, owner, storyRef) => {
       Name: name,
       Description: description,
       Owner: owner,
-      TestFolder: testFolderRef || null
+      TestFolder: caseFolderRef || null
     }
   })
   .then(
@@ -1174,12 +1174,12 @@ const createCase = (name, description, owner, storyRef) => {
           // After it is linked:
           () => {
             // If a test set was specified:
-            if (testSetRef) {
+            if (caseSetRef) {
               // Link the test case to it.
               return restAPI.add({
                 ref: caseRef,
                 collection: 'TestSets',
-                data: [{_ref: testSetRef}],
+                data: [{_ref: caseSetRef}],
                 fetch: ['_ref']
               });
             }
@@ -1694,7 +1694,7 @@ const serveProjectReport = projectName => {
   );
 };
 // Serves the release and iteration report page.
-const serveWhenReport = (releaseName, iterationName) => {
+const serveScheduleReport = (releaseName, iterationName) => {
   fs.readFile('scheduleReport.html', 'utf8')
   .then(
     htmlContent => {
@@ -1706,13 +1706,13 @@ const serveWhenReport = (releaseName, iterationName) => {
           );
           const newContent = reportPrep(htmlContent, newJSContent)
           .replace('__releaseName__', releaseName)
-          .replace('__releaseRef__', releaseRef)
+          .replace('__releaseRef__', scheduleReleaseRef)
           .replace('__iterationName__', iterationName)
-          .replace('__iterationRef__', iterationRef)
+          .replace('__iterationRef__', scheduleIterationRef)
           .replace('__scheduleState__', scheduleState);
           servePage(newContent, true);
         },
-        error => err(error, 'reading wheeport script')
+        error => err(error, 'reading scheduleReport script')
       );
     },
     error => err(error, 'reading scheduleReport page')
@@ -1846,10 +1846,10 @@ const serveCaseIfSet = (testSetID) => {
   .then(
     ref => {
       if (! isError) {
-        testSetRef = shorten('testset', 'testset', ref);
+        caseSetRef = shorten('testset', 'testset', ref);
         if (! isError) {
           // Check on the existence of the test set.
-          getItemData(testSetRef, [], [])
+          getItemData(caseSetRef, [], [])
           .then(
             // When its existence is confirmed:
             () => {
@@ -2004,20 +2004,20 @@ const requestHandler = (request, res) => {
       const bodyObject = parse(Buffer.concat(bodyParts).toString());
       userName = bodyObject.userName;
       const {
+        caseFolder,
+        caseSet,
         cookie,
-        iterationName,
+        copyParent,
         op,
-        parentID,
         password,
-        projectName,
-        releaseName,
+        projectWhich,
         rootID,
-        sState,
-        takerName,
-        taskNameString,
-        testFolderID,
-        testSetID
+        scheduleIteration,
+        scheduleRelease,
+        takerWho,
+        taskName
       } = bodyObject;
+      scheduleState = bodyObject.scheduleState;
       copyWhat = bodyObject.copyWhat;
       build = bodyObject.build;
       note = bodyObject.note;
@@ -2062,14 +2062,14 @@ const requestHandler = (request, res) => {
                     // Otherwise, if the operation is ownership change:
                     else if (op === 'take') {
                       // If an owner other than the user was specified:
-                      if (takerName) {
+                      if (takerWho) {
                         // Serve a report identifying the new owner.
-                        getGlobalNameRef(takerName, 'user', 'UserName')
+                        getGlobalNameRef(takerWho, 'user', 'UserName')
                         .then(
                           ref => {
                             if (! isError) {
                               takerRef = ref;
-                              serveTakeReport(takerName);
+                              serveTakeReport(takerWho);
                             }
                           },
                           error => err(error, 'getting reference to new owner')
@@ -2085,12 +2085,12 @@ const requestHandler = (request, res) => {
                     // Otherwise, if the operation is project change:
                     else if (op === 'project') {
                       // Serve a report identifying the new project.
-                      getGlobalNameRef(projectName, 'project', 'Name')
+                      getGlobalNameRef(projectWhich, 'project', 'Name')
                       .then(
                         ref => {
                           if (! isError) {
                             projectRef = ref;
-                            serveProjectReport(projectName);
+                            serveProjectReport(projectWhich);
                           }
                         },
                         error => err(error, 'getting reference to new project')
@@ -2098,21 +2098,20 @@ const requestHandler = (request, res) => {
                     }
                     // Otherwise, if the operation is scheduling:
                     else if (op === 'schedule') {
-                      scheduleState = sState;
                       // Get the reference of the named release.
-                      getProjectNameRef('release', releaseName, 'scheduling')
+                      getProjectNameRef('release', scheduleRelease, 'scheduling')
                       .then(
                         ref => {
                           if (! isError) {
-                            releaseRef = ref;
+                            scheduleReleaseRef = ref;
                             // Get the reference of the named iteration.
-                            getProjectNameRef('iteration', iterationName, 'scheduling')
+                            getProjectNameRef('iteration', scheduleIteration, 'scheduling')
                             .then(
                               ref => {
                                 if (! isError) {
-                                  iterationRef = ref;
+                                  scheduleIterationRef = ref;
                                   // Serve a report identifying the release and iteration.
-                                  serveWhenReport(releaseName, iterationName);
+                                  serveScheduleReport(scheduleRelease, scheduleIteration);
                                 }
                               },
                               error => err(error, 'getting reference to iteration')
@@ -2124,12 +2123,12 @@ const requestHandler = (request, res) => {
                     }
                     // Otherwise, if the operation is task creation:
                     else if (op === 'task') {
-                      if (taskNameString.length < 2) {
+                      if (taskName.length < 2) {
                         err('Task names invalid', 'creating tasks');
                       }
                       else {
-                        const delimiter = taskNameString[0];
-                        taskNames.push(...taskNameString.slice(1).split(delimiter));
+                        const delimiter = taskName[0];
+                        taskNames.push(...taskName.slice(1).split(delimiter));
                         if (taskNames.every(taskName => taskName.length)) {
                           serveTaskReport();
                         }
@@ -2141,22 +2140,22 @@ const requestHandler = (request, res) => {
                     // Otherwise, if the operation is test-case creation:
                     else if (op === 'case') {
                       // If a test folder was specified:
-                      if (testFolderID) {
-                        getRef('testfolder', testFolderID, 'test-case creation')
+                      if (caseFolder) {
+                        getRef('testfolder', caseFolder, 'test-case creation')
                         .then(
                           ref => {
                             if (! isError) {
-                              testFolderRef = shorten('testfolder', 'testfolder', ref);
+                              caseFolderRef = shorten('testfolder', 'testfolder', ref);
                               if (! isError) {
                                 // Get data on the test folder.
-                                getItemData(testFolderRef, [], [])
+                                getItemData(caseFolderRef, [], [])
                                 .then(
                                   // When the data arrive:
                                   () => {
                                     // If a test set was specified:
-                                    if (testSetID) {
+                                    if (caseSet) {
                                       // Verify it and serve a report on test-case creation.
-                                      serveCaseIfSet(testSetID);
+                                      serveCaseIfSet(caseSet);
                                     }
                                     // Otherwise, i.e. if no test set was specified:
                                     else {
@@ -2173,9 +2172,9 @@ const requestHandler = (request, res) => {
                         );
                       }
                       // Otherwise, if a test set but no test folder was specified:
-                      else if (testSetID) {
+                      else if (caseSet) {
                         // Process the test set and serve a report on test-case creation.
-                        serveCaseIfSet(testSetID);
+                        serveCaseIfSet(caseSet);
                       }
                       // Otherwise, i.e. if neither a test folder nor a test set was specified:
                       else {
@@ -2190,7 +2189,7 @@ const requestHandler = (request, res) => {
                     }
                     // Otherwise, if the operation is tree copying:
                     else if (op === 'copy') {
-                      getRef('hierarchicalrequirement', parentID, 'parent of tree copy')
+                      getRef('hierarchicalrequirement', copyParent, 'parent of tree copy')
                       .then(
                         ref => {
                           if (! isError) {
