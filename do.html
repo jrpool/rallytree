@@ -26,7 +26,7 @@
               <label>
                 <span class="label">
                   <strong>Delete this for cluster mode</strong>
-                </span>
+                </span><br>
                 <textarea id="cookie" name="cookie" rows="3" cols="85">__cookie__</textarea>
               </label>
             </p>
@@ -54,185 +54,190 @@
               <!--OP COPY-->
               <p class="opeven">
                 <input
-                  id="op-copy"
+                  id="opCopy"
                   type="radio"
                   name="op"
                   value="copy"
-                  aria-labelledby="copy"
+                  aria-labelledby="copyLabel"
                   checked
                 >
-                <span id="copy" class="label">Copy</span>
+                <span id="copyLabel" class="label">Copy</span>
                 <select id="copyWhat" name="copyWhat" aria-label="what to copy">
                   <option value="both" selected>user stories, tasks, and test cases</option>
                   <option value="tasks">user stories and tasks</option>
                   <option value="cases">user stories and test cases</option>
                   <option value="neither">user stories</option>
                 </select>
-                <span id="parent" class="label">to parent</span>
+                <span id="copyParentLabel" class="label">to parent</span>
                 <input
-                  id="parentID"
-                  name="parentID"
+                  id="copyParent"
+                  name="copyParent"
                   size="12"
                   maxwidth="12"
                   placeholder="US"
-                  aria-labelledby="copy parent"
+                  aria-labelledby="copyLabel copyParentLabel"
                 >
               </p>
               <!--OP VERDICT RETRIEVAL-->
               <p class="opodd"><label>
-                <input id="op-verdict" type="radio" name="op" value="verdict">
-                <span class="label">Get test verdicts</span>
+                <input id="opVerdict" type="radio" name="op" value="verdict">
+                <span class="label">Get verdicts</span>
               </label></p>
               <!--OP OWNER CHANGE-->
-              <p class="opeven">
+              <p class="opodd">
                 <input
-                  id="op-take"
+                  id="opTake"
                   type="radio"
                   name="op"
                   value="take"
-                  aria-labelledby="change-owner"
+                  aria-labelledby="takeLabel"
                 >
-                <span id="change-owner" class="label">Change owner</span>
-                <span id="new-owner" class="label">to (email), if not you</span><br>
+                <span id="takeLabel" class="label">Change owner</span>
+                <span id="takeWhoLabel" class="label">to (email), if not you</span><br>
                 <input
-                  id="takerName"
-                  name="takerName"
+                  id="takeWho"
+                  name="takeWho"
                   type="email"
                   size="60"
                   maxwidth="60"
                   class="indent"
-                  aria-labelledby="change-owner new-owner"
+                  aria-labelledby="takeLabel takeWhoLabel"
                 >
               </p>
               <!--OP PROJECT CHANGE-->
-              <p class="opodd">
+              <p class="opeven">
                 <input
-                  id="op-project"
+                  id="opProject"
                   type="radio"
                   name="op"
                   value="project"
-                  aria-labelledby="change-project"
+                  aria-labelledby="projectLabel"
                 >
-                <span id="change-project" class="label">Change project</span>
-                <span id="new-project" class="label">to</span><br>
+                <span id="projectLabel" class="label">Change project</span>
+                <span id="projectWhichLabel" class="label">to</span><br>
                 <input
-                  id="projectName"
-                  name="projectName"
+                  id="projectWhich"
+                  name="projectWhich"
                   type="text"
                   size="60"
                   maxwidth="60"
                   class="indent"
-                  aria-labelledby="change-project new-project"
+                  aria-labelledby="projectLabel projectWhichLabel"
                 >
               </p>
               <!--OP SCHEDULE-->
-              <p class="opeven">
+              <p class="opodd">
                 <input
-                  id="op-when"
+                  id="opSchedule"
                   type="radio"
                   name="op"
                   value="schedule"
-                  aria-labelledby="schedule"
+                  aria-labelledby="scheduleLabel"
                 >
-                <span id="schedule" class="label">Schedule</span>:
-                <span id="release" class="label">Release</span>
+                <span id="scheduleLabel" class="label">Schedule</span>:
+                <span id="scheduleReleaseLabel" class="label">Release</span>
                 <input
-                  id="releaseName"
-                  name="releaseName"
+                  id="scheduleRelease"
+                  name="scheduleRelease"
                   type="text"
                   size="10"
                   maxwidth="20"
-                  aria-labelledby="schedule release"
+                  aria-labelledby="scheduleLabel scheduleReleaseLabel"
                 >
-                <span id="iteration" class="label indent">Iteration</span>
+                <span id="scheduleIterationLabel" class="label indent">Iteration</span>
                 <input
-                  id="iterationName"
-                  name="iterationName"
+                  id="scheduleIteration"
+                  name="scheduleIteration"
                   type="text"
                   size="12"
                   maxwidth="30"
-                  aria-labelledby="schedule iteration"
+                  aria-labelledby="scheduleLabel scheduleIterationLabel"
                 >
-                <select id="sState" name="sState" class="indent" aria-label="schedule state">
-                  <option value="unchanged" selected>New Schedule State?</option>
+                <span id="scheduleStateLabel" class="label indent">Schedule state</span>
+                <select
+                  id="scheduleState"
+                  name="sState"
+                  aria-labeledby="scheduleLabel scheduleStateLabel"
+                >
+                  <option value="unchanged" selected>unchanged</option>
                   <option value="Defined">Defined</option>
                   <option value="In-Progress">In Progress</option>
                   <option value="Completed">Completed</option>
                 </select>
               </p>
               <!--OP TASK CREATION-->
-              <p class="opodd">
-                <input id="op-task" type="radio" name="op" value="task" aria-labelledby="tasks">
-                <span id="tasks" class="label">Add tasks</span>:
-                <span id="task-names" class="label">
+              <p class="opeven">
+                <input id="opTask" type="radio" name="op" value="task" aria-labelledby="taskLabel">
+                <span id="taskLabel" class="label">Add tasks</span>:
+                <span id="taskNameLabel" class="label">
                   Names (prefix with delimiter, e.g. <code>;Do this;Do that</code>)
                 </span><br>
                 <input
-                  id="taskNameString"
-                  name="taskNameString"
+                  id="taskName"
+                  name="taskName"
                   size="60"
                   maxwidth="80"
                   class="indent"
-                  aria-labelledby="tasks task-names"
+                  aria-labelledby="taskLabel taskNameLabel"
                 >
               </p>
               <!--OP TEST-CASE CREATION-->
-              <p class="opeven">
-                <input id="op-case" type="radio" name="op" value="case" aria-labelledby="cases">
-                <span id="cases" class="label">Add test cases</span>
-                <span id="case-options">and (optionally) put them into</span>:<br>
-                <span id="test-folder" class="label indent">Test folder</span>
+              <p class="opodd">
+                <input id="opCase" type="radio" name="op" value="case" aria-labelledby="caseLabel">
+                <span id="caseLabel" class="label">Add test cases</span>
+                <span id="caseOptionLabel">and (optionally) put them into</span>:<br>
+                <span id="caseFolderLabel" class="label indent">Test folder</span>
                 <input
-                  id="testFolderID"
-                  name="testFolderID"
+                  id="caseFolder"
+                  name="caseFolder"
                   size="12"
                   maxwidth="12"
                   placeholder="TF"
-                  aria-labelledby="cases case-options test-folder"
+                  aria-labelledby="caseLabel caseOptionLabel caseFolderLabel"
                 >
-                <span id="test-set" class="label indent">Test set</span>
+                <span id="caseSetLabel" class="label indent">Test set</span>
                 <input
-                  id="testSetID"
-                  name="testSetID"
+                  id="caseSet"
+                  name="caseSet"
                   size="12"
                   maxwidth="12"
                   placeholder="TS"
-                  aria-labelledby="cases case-options test-set"
+                  aria-labelledby="caseLabel caseOptionLabel caseSetLabel"
                 >
               </p>
               <!--OP PASSING-RESULT CREATION-->
-              <p class="opodd">
+              <p class="opeven">
                 <input
-                  id="op-pass"
+                  id="opPass"
                   type="radio"
                   name="op"
                   value="pass"
-                  aria-labelledby="pass"
+                  aria-labelledby="passLabel"
                 >
-                <span id="pass" class="label">
+                <span id="passLabel" class="label">
                   Report qualifying test cases as passing,
                 </span>
-                <span id="pass-options" class="label">optionally with</span>:<br>
-                <span id="build" class="label indent">Build</span>
+                <span id="passOptionLabel" class="label">optionally with</span>:<br>
+                <span id="passBuildLabel" class="label indent">Build</span>
                 <input
-                  id="build"
-                  name="build"
+                  id="passBuild"
+                  name="passBuild"
                   size="50"
                   maxwidth="128"
-                  aria-labelledby="pass pass-options build"
+                  aria-labelledby="passLabel passOptionLabel passBuildLabel"
                 ><br>
-                <span id="note" class="label indent">Note</span>
+                <span id="passNoteLabel" class="label indent">Note</span>
                 <input
-                  id="note"
-                  name="note"
+                  id="passNote"
+                  name="passNote"
                   size="30"
                   maxwidth="100"
-                  aria-labelledby="pass pass-options note"
+                  aria-labelledby="passLabel passOptionLabel passNoteLabel"
                 >
               </p>
               <!--OP DOCUMENTATION-->
-              <p class="opeven"><label>
-                <input id="op-doc" type="radio" name="op" value="doc">
+              <p class="opodd"><label>
+                <input id="opDoc" type="radio" name="op" value="doc">
                 <span class="label">Get tree documentation</span>
               </label></p>
             </fieldset>
