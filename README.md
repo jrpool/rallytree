@@ -228,6 +228,8 @@ In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdi
 
 # Version notes
 
+Version 1.5.1 adopts a systematic naming convention for attributes and properties, making the code more transparent. It does not change the user interface.
+
 Version 1.5.0 introduces the single-host adaptation. It also incorporates internal nomenclature improvements and a refactoring to consolidate nine JavaScript files into one. Finally, it removes the `pause` and `retry` branches that were present starting in the 1.1 versions.
 
 Version 1.4.3 liberalizes the validity criteria of the ownership-change operation. The operation previously treated user stories with test cases and no tasks as invalid. This version treats them as valid.
