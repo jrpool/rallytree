@@ -42,14 +42,14 @@ const requestOptions = {
     process.env.RALLYINTEGRATIONVERSION || '1.0.4'
   }
 };
-let build = '';
 let caseFolderRef = '';
 let caseSetRef = '';
 let copyParentProject = '';
 let copyParentRef = '';
 let copyWhat = 'both';
 let isError = false;
-let note = '';
+let passBuild = '';
+let passNote = '';
 let projectRef = '';
 let response = {};
 let restAPI = {};
@@ -89,14 +89,14 @@ const docWait = 1500;
 
 // Reinitialize the global variables, except response.
 const reinit = () => {
-  build = '';
   caseFolderRef = '';
   caseSetRef = '';
   copyParentProject = '';
   copyParentRef = '';
   copyWhat = 'both';
   isError = false;
-  note = '';
+  passBuild = '';
+  passNote = '';
   projectRef = '';
   restAPI = {};
   rootRef = '';
@@ -1293,7 +1293,7 @@ const createPass = (caseRef, tester, build, testSet, note) => {
   });
 };
 // Creates passing results for an array of test cases.
-const passCases = (caseRefs, build, note) => {
+const passCases = (caseRefs, passBuild, passNote) => {
   if (caseRefs.length && ! isError) {
     const firstRef = shorten('testcase', 'testcase', caseRefs[0]);
     if (! isError) {
@@ -1307,7 +1307,7 @@ const passCases = (caseRefs, build, note) => {
             // Do not create one.
             report([['total']]);
             // Process the remaining test cases.
-            return passCases(caseRefs.slice(1), build, note);
+            return passCases(caseRefs.slice(1), passBuild, passNote);
           }
           // Otherwise, if the test case has no results yet but has an owner:
           else if (data.owner) {
@@ -1319,13 +1319,13 @@ const passCases = (caseRefs, build, note) => {
                 // When the data arrive:
                 testSets => {
                   // Create a passing result for the test case in its first test set.
-                  return createPass(firstRef, data.owner, build, testSets[0].ref, note)
+                  return createPass(firstRef, data.owner, passBuild, testSets[0].ref, passNote)
                   .then(
                     // When the result has been created:
                     () => {
                       report([['total'], ['changes']]);
                       // Process the remaining test cases.
-                      return passCases(caseRefs.slice(1), build, note);
+                      return passCases(caseRefs.slice(1), passBuild, passNote);
                     },
                     error => err(error, 'creating result in test set')
                   );
@@ -1336,13 +1336,13 @@ const passCases = (caseRefs, build, note) => {
             // Otherwise, i.e. if the test case is not in any test set:
             else {
               // Create a passing result for the test case with the owner as tester.
-              return createPass(firstRef, data.owner, build, null, note)
+              return createPass(firstRef, data.owner, passBuild, null, passNote)
               .then(
                 // When the result has been created:
                 () => {
                   report([['total'], ['changes']]);
                   // Process the remaining test cases.
-                  return passCases(caseRefs.slice(1), build, note);
+                  return passCases(caseRefs.slice(1), passBuild, passNote);
                 },
                 error => err(error, 'creating result in no test set')
               );
@@ -1395,7 +1395,7 @@ const passTree = storyRefs => {
               // When the data arrive:
               cases => {
                 // Process the test cases sequentially.
-                return passCases(cases.map(testCase => testCase.ref), build, note)
+                return passCases(cases.map(testCase => testCase.ref), passBuild, passNote)
                 .then(
                   // After they are processed, process the remaining user stories.
                   () => passTree(storyRefs.slice(1)),
@@ -2019,8 +2019,8 @@ const requestHandler = (request, res) => {
       } = bodyObject;
       scheduleState = bodyObject.scheduleState;
       copyWhat = bodyObject.copyWhat;
-      build = bodyObject.build;
-      note = bodyObject.note;
+      passBuild = bodyObject.passBuild;
+      passNote = bodyObject.passNote;
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
       // If the form contains a cookie:
