@@ -1294,16 +1294,16 @@ const caseTree = storyRefs => {
   }
 };
 // Creates a passing test-case result.
-const createPass = (caseRef, tester, build, testSet, note) => {
+const createPass = (caseRef, tester, testSet) => {
   // Create a passing result.
   return restAPI.create({
     type: 'testcaseresult',
     fetch: ['_ref'],
     data: {
       TestCase: caseRef,
-      Build: build,
+      Build: passBuild,
       Verdict: 'Pass',
-      Notes: note,
+      Notes: passNote,
       Date: new Date(),
       Tester: tester,
       TestSet: testSet
@@ -1311,7 +1311,7 @@ const createPass = (caseRef, tester, build, testSet, note) => {
   });
 };
 // Creates passing results for an array of test cases.
-const passCases = (caseRefs, passBuild, passNote) => {
+const passCases = caseRefs => {
   if (caseRefs.length && ! isError) {
     const firstRef = shorten('testcase', 'testcase', caseRefs[0]);
     if (! isError) {
@@ -1325,7 +1325,7 @@ const passCases = (caseRefs, passBuild, passNote) => {
             // Do not create one.
             report([['total']]);
             // Process the remaining test cases.
-            return passCases(caseRefs.slice(1), passBuild, passNote);
+            return passCases(caseRefs.slice(1));
           }
           // Otherwise, if the test case has no results yet but has an owner:
           else if (data.owner) {
@@ -1337,13 +1337,13 @@ const passCases = (caseRefs, passBuild, passNote) => {
                 // When the data arrive:
                 testSets => {
                   // Create a passing result for the test case in its first test set.
-                  return createPass(firstRef, data.owner, passBuild, testSets[0].ref, passNote)
+                  return createPass(firstRef, data.owner, testSets[0].ref)
                   .then(
                     // When the result has been created:
                     () => {
                       report([['total'], ['changes']]);
                       // Process the remaining test cases.
-                      return passCases(caseRefs.slice(1), passBuild, passNote);
+                      return passCases(caseRefs.slice(1));
                     },
                     error => err(error, 'creating result in test set')
                   );
@@ -1354,13 +1354,13 @@ const passCases = (caseRefs, passBuild, passNote) => {
             // Otherwise, i.e. if the test case is not in any test set:
             else {
               // Create a passing result for the test case with the owner as tester.
-              return createPass(firstRef, data.owner, passBuild, null, passNote)
+              return createPass(firstRef, data.owner, null)
               .then(
                 // When the result has been created:
                 () => {
                   report([['total'], ['changes']]);
                   // Process the remaining test cases.
-                  return passCases(caseRefs.slice(1), passBuild, passNote);
+                  return passCases(caseRefs.slice(1));
                 },
                 error => err(error, 'creating result in no test set')
               );
@@ -1388,50 +1388,58 @@ const passTree = storyRefs => {
       .then(
         // When the data arrive:
         data => {
-          // If the user story has any child user stories and no test cases:
-          if (data.children.count && ! data.testCases.count) {
-            // Get data on its child user stories.
-            return getCollectionData(data.children.ref, [], [])
-            .then(
-              // When the data arrive, process the children sequentially.
-              children => {
-                return passTree(children.map(child => child.ref))
-                .then(
-                  // After they are processed, process the remaining user stories.
-                  () => passTree(storyRefs.slice(1)),
-                  error => err(error, 'creating test-case results for child user stories')
-                );
-              },
-              error => err(error,'getting data on child user stories for test-case result creation')
-            );
-          }
-          // Otherwise, if the user story has any test cases and no child user stories:
-          else if (data.testCases.count && ! data.children.count) {
-            // Get data on its test cases.
+          // Processes child user stories and remaining user stories. FUNCTION DEFINITION START
+          const passChildrenAndSiblings = () => {
+            // If the user story has child user stories:
+            if (data.children.count) {
+              // Get data on them.
+              return getCollectionData(data.children.ref, [], [])
+              .then(
+                // When the data arrive:
+                children => {
+                  // Process the child user stories.
+                  return passTree(children.map(child => child.ref))
+                  .then(
+                    // After they are processed, process the remaining user stories.
+                    () => passTree(storyRefs.slice(1)),
+                    error => err(error, 'creating passing results for child user stories')
+                  );
+                },
+                error => err(error, 'getting data on child user stories')
+              );
+            }
+            // Otherwise, i.e. if the user story has no child user stories:
+            else {
+              // Process the remaining user stories.
+              return passTree(storyRefs.slice(1));
+            }      
+          };
+          // FUNCTION DEFINITION END
+          // If the user story has test cases:
+          if (data.testCases.count) {
+            // Get data on them.
             return getCollectionData(data.testCases.ref, [], [])
             .then(
               // When the data arrive:
               cases => {
                 // Process the test cases sequentially.
-                return passCases(cases.map(testCase => testCase.ref), passBuild, passNote)
+                return passCases(cases.map(testCase => testCase.ref))
                 .then(
-                  // After they are processed, process the remaining user stories.
-                  () => passTree(storyRefs.slice(1)),
-                  error => err(error, 'creating results for test cases')
+                  // After they are processed:
+                  () => {
+                    // Process child user stories and the remaining user stories.
+                    return passChildrenAndSiblings();
+                  },
+                  error => err(error, 'creating passing results')
                 );
               },
-              error => err(error, 'getting data on test cases for result creation')
+              error => err(error, 'getting data on test cases')
             );
           }
-          // Otherwise, if the user story has no child user stories and no test cases:
-          else if (! data.children.count && ! data.testCases.count) {
-            // Skip it.
-            return '';
-          }
-          // Otherwise, i.e. if the user story has both child user stories and test cases:
+          // Otherwise, i.e. if the user story has no test cases:
           else {
-            err('Invalid user story', 'creating test-case results');
-            return '';
+            // Process child user stories and the remaining user stories.
+            return passChildrenAndSiblings();
           }
         },
         error => err(error, 'getting data on user story')
