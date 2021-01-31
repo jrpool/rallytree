@@ -425,7 +425,7 @@ const copyTree = (storyRefs, parentRef) => {
                       .then(
                         // When the data arrive:
                         children => {
-                          // Process them.
+                          // Process the child user stories.
                           return copyTree(children.map(child => child.ref), copyRef)
                           .then(
                             // When they have been processed:
@@ -446,7 +446,8 @@ const copyTree = (storyRefs, parentRef) => {
                       );
                     }
                     else {
-                      return '';
+                      // Process the remaining user stories.
+                      return copyTree(storyRefs.slice(1), parentRef);
                     }
                   };
                   // If the original has test cases and they are to be copied:
@@ -469,8 +470,10 @@ const copyTree = (storyRefs, parentRef) => {
                           .then(
                             // When the tasks have been copied:
                             () => {
-                              // Copy any of its child user stories and the remaining user stories.
-                              return copyChildrenAndSiblings();
+                            /*
+                              It cannot have child user stories. Process the remaining user stories.
+                            */
+                              return copyTree(storyRefs.slice(1), parentRef);
                             },
                             error => err(error, 'copying tasks')
                           );
@@ -492,7 +495,7 @@ const copyTree = (storyRefs, parentRef) => {
                     to be copied:
                   */
                   else {
-                    // if the original has tasks and they are to be copied:
+                    // If the original has tasks and they are to be copied:
                     if (
                       data.tasks.count
                       && ['tasks', 'both'].includes(copyWhat)
@@ -502,8 +505,8 @@ const copyTree = (storyRefs, parentRef) => {
                       .then(
                         // When the tasks have been copied:
                         () => {
-                          // Copy any of its child user stories and the remaining user stories.
-                          return copyChildrenAndSiblings();
+                          // It cannot have child user stories. Process the remaining user stories.
+                          return copyTree(storyRefs.slice(1), parentRef);
                         },
                         error => err(error, 'copying tasks')
                       );
