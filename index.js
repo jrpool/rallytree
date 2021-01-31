@@ -691,86 +691,6 @@ const takeTasksOrCases = (itemType, items) => {
     return Promise.resolve('');
   }
 };
-// Changes ownerships of the child user stories or the tasks and test cases of a user story.
-const takeDescendants = (callback, data) => {
-  if (! isError) {
-    // If the user story has child user stories and no tasks or test cases:
-    if (data.children.count && ! data.tasks.count && ! data.testCases.count) {
-      // Get data on the child user stories.
-      return getCollectionData(data.children.ref, [], [])
-      .then(
-        // When the data arrive:
-        children => {
-          // Process them sequentially.
-          return callback(children.map(child => child.ref));
-        },
-        error => err(error, 'getting data on child user stories for ownership change')
-      );
-    }
-    // Otherwise, if the user story has tasks and test cases and no child user stories:
-    else if (data.tasks.count && data.testCases.count && ! data.children.count) {
-      // Get data on the tasks.
-      return getCollectionData(data.tasks.ref, ['Owner'], [])
-      .then(
-        // When the data arrive:
-        tasks => {
-          // Process the tasks.
-          return takeTasksOrCases('task', tasks)
-          .then(
-            // When they have been processed:
-            () => {
-              // Get data on the test cases.
-              return getCollectionData(data.testCases.ref, ['Owner'], [])
-              .then(
-                // When the data arrive:
-                cases => takeTasksOrCases('case', cases),
-                error => err(error, 'getting data on test cases after tasks for ownership change')
-              );
-            },
-            error => err(error, 'changing owners of tasks')
-          );
-        },
-        error => err(error, 'getting data on tasks before test cases for ownership change')
-      );
-    }
-    // Otherwise, if the user story has tasks and no child user stories or test cases:
-    else if (data.tasks.count && ! data.testCases.count && ! data.children.count) {
-      // Get data on the tasks.
-      return getCollectionData(data.tasks.ref, ['Owner'], [])
-      .then(
-        // When the data arrive:
-        tasks => {
-          // Process the tasks.
-          return takeTasksOrCases('task', tasks);
-        },
-        error => err(error, 'getting data on tasks for ownership change')
-      );
-    }
-    // Otherwise, if the user story has test cases and no child user stories or tasks:
-    else if (data.testCases.count && ! data.tasks.count && ! data.children.count) {
-      // Get data on the test cases.
-      return getCollectionData(data.testCases.ref, ['Owner'], [])
-      .then(
-        // When the data arrive:
-        cases => {
-          // Process the test cases.
-          return takeTasksOrCases('case', cases);
-        },
-        error => err(error, 'getting data on test cases for ownership change')
-      );
-    }
-    // Otherwise, if the user story has no child user stories, tasks, or test cases:
-    else if (! data.children.count && ! data.tasks.count && ! data.testCases.count) {
-      // Do nothing.
-      return Promise.resolve('');
-    }
-    // Otherwise, i.e. if the user story is invalid:
-    else {
-      err('Invalid user story', 'changing ownership');
-      return Promise.resolve('');
-    }
-  }
-};
 // Recursively changes ownerships in a tree or subtree of user stories.
 const takeTree = storyRefs => {
   if (storyRefs.length && ! isError) {
@@ -783,9 +703,105 @@ const takeTree = storyRefs => {
         data => {
           const ownerRef = data.owner ? shorten('user', 'user', data.owner) : '';
           if (! isError) {
+            /*
+              Changes the owner of the test cases and tasks or child user stories of the user story
+              and the remaining user stories.
+              OUTER FUNCTION DEFINITION START
+            */
+            const takeDescendantsAndSiblings = () => {
+              if (! isError) {
+                /*
+                  Changes the owner of the tasks or child user stories of the user story and the
+                  remaining user stories.
+                  INNER FUNCTION DEFINITION START
+                */
+                const takeTasksOrChildrenAndSiblings = () => {
+                  // If the user story has tasks:
+                  if (data.tasks.count) {
+                    // Get data on them.
+                    return getCollectionData(data.tasks.ref, ['Owner'], [])
+                    .then(
+                      // When the data arrive, process the tasks.
+                      tasks => takeTasksOrCases('task', tasks)
+                      .then(
+                        /*
+                          The user story has no children. When the tasks have been
+                          processed, process the remaining user stories.
+                        */
+                        () => takeTree(storyRefs.slice(1)),
+                        error => err(error, 'changing owner of tasks')
+                      ),
+                      error => err(error, 'getting data on tasks')
+                    );
+                  }
+                  // Otherwise, i.e. if the user story has no tasks:
+                  else {
+                    // If the user story has child user stories:
+                    if (data.children.count) {
+                      // Get data on them.
+                      return getCollectionData(data.children.ref, [], [])
+                      .then(
+                        // When the data arrive:
+                        children => {
+                          // Process the child user stories sequentially.
+                          return takeTree(children.map(child => child.ref))
+                          .then(
+                            /*
+                              When they have been processed, process the remaining
+                              user stories.
+                            */
+                            () => takeTree(storyRefs.slice(1)),
+                            error => err(error, 'Changing owner of child user stories')
+                          );
+                        },
+                        error => err(
+                          error, 'getting data on child user stories for ownership change'
+                        )
+                      );
+                    }
+                    // Otherwise, i.e. if the user story has no child user stories:
+                    else {
+                      // Process the remaining user stories.
+                      return takeTree(storyRefs.slice(1));
+                    }
+                  }
+                };
+                // INNER FUNCTION DEFINITION END
+                // If the user story has test cases:
+                if (data.testCases.count) {
+                  // Get data on them.
+                  return getCollectionData(data.testCases.ref, ['Owner'], [])
+                  .then(
+                    // When the data arrive, process the test cases.
+                    cases => takeTasksOrCases('case', cases)
+                    .then(
+                      /*
+                        When they have been processed, process the tasks or child user stories
+                        of the user story and the remaining user stories.
+                      */
+                      () => takeTasksOrChildrenAndSiblings(),
+                      error => err(error, 'changing owner of test cases')
+                    ),
+                    error => err(error, 'getting data on test cases')
+                  );
+                }
+                // Otherwise, i.e. if the user story has no test cases:
+                else {
+                  /*
+                    Process the tasks or child user stories of the user story and the remaining
+                    user stories.
+                  */
+                  return takeTasksOrChildrenAndSiblings();
+                }
+              }
+              else {
+                return '';
+              }
+            };
+            // OUTER FUNCTION DEFINITION END
             // If the user story has no owner or its owner is not the specified one:
             if (ownerRef && ownerRef !== takerRef || ! ownerRef) {
-              // Change its owner.
+              // Change the owner of the user story.
               return restAPI.update({
                 ref: firstRef,
                 data: {
@@ -796,15 +812,11 @@ const takeTree = storyRefs => {
                 // When the owner has been changed:
                 () => {
                   report([['total'], ['changes'], ['storyTotal'], ['storyChanges']]);
-                  // Process the user story’s child user stories or its tasks and test cases.
-                  return takeDescendants(takeTree, data)
-                  .then(
-                    // When they have been processed, process the remaining user stories.
-                    () => takeTree(storyRefs.slice(1)),
-                    error => err(
-                      error, 'changing owner of descendants after changing user-story owner'
-                    )
-                  );
+                  /*
+                    Process the user story’s test cases and tasks or child user stories, and
+                    the remaining user stories.
+                  */
+                  return takeDescendantsAndSiblings();
                 },
                 error => err(error, 'changing owner of user story')
               );
@@ -812,14 +824,11 @@ const takeTree = storyRefs => {
             // Otherwise, i.e. if the user story’s owner does not need to be changed:
             else {
               report([['total'], ['storyTotal']]);
-              // Process the user story’s child user stories or its tasks and test cases.
-              return takeDescendants(takeTree, data)
-              .then(
-                () => takeTree(storyRefs.slice(1)),
-                error => err(
-                  error, 'changing owner of descendants without changing user-story owner'
-                )
-              );
+              /*
+                Process the user story’s test cases and tasks or child user stories, and the
+                remaining user stories.
+              */
+              return takeDescendantsAndSiblings();
             }
           }
           else {
