@@ -57,7 +57,7 @@ let rootRef = '';
 let scheduleIterationRef = '';
 let scheduleReleaseRef = '';
 let scheduleState;
-let takerRef = '';
+let takeWhoRef = '';
 let taskNames = [];
 let userName = '';
 let userRef = '';
@@ -103,7 +103,7 @@ const reinit = () => {
   scheduleIterationRef = '';
   scheduleReleaseRef = '';
   scheduleState = '';
-  takerRef = '';
+  takeWhoRef = '';
   taskNames = [];
   userName = '';
   userRef = '';
@@ -549,9 +549,9 @@ const verdictTree = storyRef => {
     data => {
       const childCount = data.children.count;
       const caseCount = data.testCases.count;
-      // If the user story has any test cases and no child user stories:
-      if (caseCount && ! childCount) {
-        // Get data on the test cases.
+      // If the user story has test cases:
+      if (caseCount) {
+        // Get data on them.
         getCollectionData(data.testCases.ref, ['LastVerdict'], ['Defects'])
         .then(
           // When the data arrive:
@@ -571,12 +571,27 @@ const verdictTree = storyRef => {
                   report([['total']]);
                 }
                 // If the test case has any defects:
-                if (defectsCollection.count) {
+                /*
+                  NOTICE: this condition was liberalized temporarily in February 2021 because of a
+                  Rally bug that reports all defect counts as 0.
+                */
+                if (defectsCollection.count >= 0) {
                   // Get data on the defects.
                   getCollectionData(defectsCollection.ref, ['Severity'], [])
                   .then(
                     // When the data arrive:
                     defects => {
+                      // Notify user if 
+                      if (defects.length) {
+                        if (defectsCollection.count) {
+                          console.log(
+                            'Rally defect-count bug has been corrected! Revise verdictTree().'
+                          );
+                        }
+                        else {
+                          console.log('Rally defect-count bug not yet corrected!');
+                        }
+                      }
                       report([['defects', defects.length]]);
                       // Process their severities.
                       const severities = defects
@@ -599,14 +614,11 @@ const verdictTree = storyRef => {
               }
             });
           },
-          error => err(error, `getting data on test cases ${data.testCases.ref} for verdicts`)
+          error => err(error, `getting data on test cases ${data.testCases.ref}`)
         );
       }
-      /*
-        Otherwise, if the user story has any child user stories and
-        no test cases (and therefore also no defects):
-      */
-      else if (childCount && ! caseCount) {
+      // If the user story has child user stories:
+      if (childCount) {
         // Get data on its child user stories.
         getCollectionData(data.children.ref, [], [])
         .then(
@@ -624,26 +636,11 @@ const verdictTree = storyRef => {
               }
             });
           },
-          error => err(
-            error,
-            'getting data on child user stories for test-result acquisition'
-          )
-        );
-      }
-      /*
-        Otherwise, if the user story has both child user stories
-        and test cases:
-      */
-      else if (childCount && caseCount) {
-        err(
-          'User story with both children and test cases',
-          'test-result acquisition'
+          error => err(error, 'getting data on child user stories')
         );
       }
     },
-    error => err(
-      error, 'getting data on user story for test-result acquisition'
-    )
+    error => err(error, 'getting data on user story')
   );
 };
 // Sequentially ensures the ownership of an array of tasks or test cases.
@@ -656,11 +653,11 @@ const takeTasksOrCases = (itemType, items) => {
       const firstOwnerRef = items[0].owner ? shorten('user', 'user', items[0].owner) : '';
       if (! isError) {
         // If the current owner of the first item is not the intended owner:
-        if (firstOwnerRef !== takerRef) {
+        if (firstOwnerRef !== takeWhoRef) {
           // Change the owner.
           return restAPI.update({
             ref: firstItemRef,
-            data: {Owner: takerRef}
+            data: {Owner: takeWhoRef}
           })
           .then(
             // After the owner is changed:
@@ -800,12 +797,12 @@ const takeTree = storyRefs => {
             };
             // OUTER FUNCTION DEFINITION END
             // If the user story has no owner or its owner is not the specified one:
-            if (ownerRef && ownerRef !== takerRef || ! ownerRef) {
+            if (ownerRef && ownerRef !== takeWhoRef || ! ownerRef) {
               // Change the owner of the user story.
               return restAPI.update({
                 ref: firstRef,
                 data: {
-                  Owner: takerRef
+                  Owner: takeWhoRef
                 }
               })
               .then(
@@ -846,7 +843,7 @@ const takeTree = storyRefs => {
     return Promise.resolve('');
   }
 };
-// Recursively changes project affiliations in a tree or subtree of user stories: original version.
+// Recursively changes project affiliations in a tree or subtree of user stories.
 const projectTree = storyRefs => {
   if (storyRefs.length && ! isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
@@ -858,7 +855,7 @@ const projectTree = storyRefs => {
         data => {
           const oldProjectRef = data.project ? shorten('project', 'project', data.project) : '';
           if (! isError) {
-            // Processes the children of the user story.
+            // Processes the children of the user story. FUNCTION DEFINITION START
             const processMore = () => {
               // Get data on the user story’s child user stories.
               return getCollectionData(data.children.ref, [], [])
@@ -876,6 +873,7 @@ const projectTree = storyRefs => {
                 error => err(error, 'getting data on children of user story')
               );
             };
+            // FUNCTION DEFINITION END
             // If the user story belongs to no or a non-intended project:
             if (oldProjectRef && oldProjectRef !== projectRef || ! oldProjectRef) {
               // Change its project.
@@ -889,7 +887,7 @@ const projectTree = storyRefs => {
                 // When the project has been changed:
                 () => {
                   report([['total'], ['changes']]);
-                  // Process its children and the remaining user stories.
+                  // Process its child user stories and the remaining user stories.
                   return processMore();
                 },
                 error => err(error, 'changing project of user story')
@@ -917,60 +915,6 @@ const projectTree = storyRefs => {
     return Promise.resolve('');
   }
 };
-/*
-// Recursively changes project affiliations in a tree or subtree of user stories: parallel version.
-const projectTreeParallel = storyRefs => {
-  if (storyRefs.length && ! isError) {
-    // For the root of the tree or of each subtree:
-    storyRefs.forEach(storyRef => {
-      if (! isError) {
-        const shortRef = shorten('userstory', 'hierarchicalrequirement', storyRef);
-        if (! isError) {
-          // Get data on it.
-          getItemData(storyRef, ['Project'], ['Children'])
-          .then(
-            // When the data arrive:
-            data => {
-              const oldProjectRef = data.project ? shorten('project', 'project', data.project) : '';
-              if (! isError) {
-                // Process its children.
-                getCollectionData(data.children.ref, [], [])
-                .then(
-                  children => {
-                    projectTreeParallel(children.map(child => child.ref));
-                  },
-                  error => err(error, 'getting data on children of user story')
-                );
-                // If the user story belongs to no or a non-intended project:
-                if (oldProjectRef && oldProjectRef !== projectRef || ! oldProjectRef) {
-                  // Change its project.
-                  restAPI.update({
-                    ref: storyRef,
-                    data: {
-                      Project: projectRef
-                    }
-                  })
-                  .then(
-                    () => {
-                      report([['total'], ['changes']]);
-                    },
-                    error => err(error, 'changing project of user story')
-                  );
-                }
-                // Otherwise, i.e. if the user story belongs to the intended project:
-                else {
-                  report([['total']]);
-                }
-              }
-            },
-            error => err(error, 'getting data on user story for project change')
-          );
-        }
-      }
-    });
-  }
-};
-*/
 // Returns the count of schedulable user stories.
 const schedulableCount = storyRefs => {
   if (storyRefs.length && ! isError) {
@@ -1086,6 +1030,7 @@ const scheduleTree = storyRefs => {
 // Sequentially creates tasks with a specified owner and names for a user story.
 const createTasks = (storyRef, owner, names) => {
   if (names.length && ! isError) {
+    // Create a task with the first name.
     return restAPI.create({
       type: 'task',
       fetch: ['_ref'],
@@ -1096,6 +1041,7 @@ const createTasks = (storyRef, owner, names) => {
       }
     })
     .then(
+      // When it has been created, create tasks with the remaining names.
       () => createTasks(storyRef, owner, names.slice(1)),
       error => err(error, 'creating task')
     );
@@ -1295,22 +1241,23 @@ const caseTree = storyRefs => {
 };
 // Creates a passing test-case result.
 const createPass = (caseRef, tester, testSet) => {
+  const data = {
+    TestCase: caseRef,
+    Verdict: 'Pass',
+    Build: passBuild,
+    Notes: passNote,
+    Date: new Date(),
+    Tester: tester,
+    TestSet: testSet
+  };
   // Create a passing result.
   return restAPI.create({
     type: 'testcaseresult',
     fetch: ['_ref'],
-    data: {
-      TestCase: caseRef,
-      Build: passBuild,
-      Verdict: 'Pass',
-      Notes: passNote,
-      Date: new Date(),
-      Tester: tester,
-      TestSet: testSet
-    }
+    data
   });
 };
-// Creates passing results for an array of test cases.
+// Creates passing results for test cases.
 const passCases = caseRefs => {
   if (caseRefs.length && ! isError) {
     const firstRef = shorten('testcase', 'testcase', caseRefs[0]);
@@ -1327,7 +1274,10 @@ const passCases = caseRefs => {
             // Process the remaining test cases.
             return passCases(caseRefs.slice(1));
           }
-          // Otherwise, if the test case has no results yet but has an owner:
+          /*
+            Otherwise, if the test case has no results yet but has an owner, it is eligible
+            for passing-result creation, so:
+          */
           else if (data.owner) {
             // If the test case is in any test sets:
             if (data.testSets.count) {
@@ -1345,15 +1295,15 @@ const passCases = caseRefs => {
                       // Process the remaining test cases.
                       return passCases(caseRefs.slice(1));
                     },
-                    error => err(error, 'creating result in test set')
+                    error => err(error, 'creating passing result in test set')
                   );
                 },
-                error => err(error, 'getting data on test sets for result creation')
+                error => err(error, 'getting data on test sets')
               );
             }
             // Otherwise, i.e. if the test case is not in any test set:
             else {
-              // Create a passing result for the test case with the owner as tester.
+              // Create a passing result for the test case.
               return createPass(firstRef, data.owner, null)
               .then(
                 // When the result has been created:
@@ -1362,12 +1312,17 @@ const passCases = caseRefs => {
                   // Process the remaining test cases.
                   return passCases(caseRefs.slice(1));
                 },
-                error => err(error, 'creating result in no test set')
+                error => err(error, 'creating passing result in no test set')
               );
             }
           }
+          // Otherwise, i.e. if the test case has no results and no owner:
+          else {
+            // Process the remaining test cases.
+            return passCases(caseRefs.slice(1));
+          }
         },
-        error => err(error, 'getting data on test case for result creation')
+        error => err(error, 'getting data on test case')
       );
     }
     else {
@@ -1654,7 +1609,7 @@ const serveVerdictReport = () => {
   );
 };
 // Serves the change-owner report page.
-const serveTakeReport = takerName => {
+const serveTakeReport = name => {
   fs.readFile('takeReport.html', 'utf8')
   .then(
     htmlContent => {
@@ -1673,8 +1628,8 @@ const serveTakeReport = takerName => {
             'error'
           ]);
           const newContent = reportPrep(htmlContent, newJSContent)
-          .replace('__takerName__', takerName)
-          .replace('__takerRef__', takerRef);
+          .replace('__takeWhoName__', name)
+          .replace('__takeWhoRef__', takeWhoRef);
           servePage(newContent, true);
         },
         error => err(error, 'reading report script')
@@ -2026,7 +1981,7 @@ const requestHandler = (request, res) => {
         rootID,
         scheduleIteration,
         scheduleRelease,
-        takerWho,
+        takeWho,
         taskName
       } = bodyObject;
       scheduleState = bodyObject.scheduleState;
@@ -2074,14 +2029,14 @@ const requestHandler = (request, res) => {
                     // Otherwise, if the operation is ownership change:
                     else if (op === 'take') {
                       // If an owner other than the user was specified:
-                      if (takerWho) {
+                      if (takeWho) {
                         // Serve a report identifying the new owner.
-                        getGlobalNameRef(takerWho, 'user', 'UserName')
+                        getGlobalNameRef(takeWho, 'user', 'UserName')
                         .then(
                           ref => {
                             if (! isError) {
-                              takerRef = ref;
-                              serveTakeReport(takerWho);
+                              takeWhoRef = ref;
+                              serveTakeReport(takeWho);
                             }
                           },
                           error => err(error, 'getting reference to new owner')
@@ -2089,7 +2044,7 @@ const requestHandler = (request, res) => {
                       }
                       // Otherwise, the new owner will be the user, so:
                       else {
-                        takerRef = userRef;
+                        takeWhoRef = userRef;
                         // Serve a report identifying the user as new owner.
                         serveTakeReport(userName);
                       }
@@ -2196,8 +2151,13 @@ const requestHandler = (request, res) => {
                     }
                     // Otherwise, if the operation is passing-result creation:
                     else if (op === 'pass') {
-                      // Serve a report on passing-result creation.
-                      servePassReport();
+                      if (! passBuild) {
+                        err('Build blank', 'passing test cases');
+                      }
+                      else {
+                        // Serve a report on passing-result creation.
+                        servePassReport();
+                      }
                     }
                     // Otherwise, if the operation is tree copying:
                     else if (op === 'copy') {

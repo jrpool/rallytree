@@ -24,7 +24,7 @@ This feature ensures that each user story, task, and test case in a tree has the
 
 ## Project change
 
-This feature ensures that each user story in a tree belongs to the desired project. Changing the project of a user story also makes its tasks and test cases belong to the same project. (In the rare case in which a user story already belongs to the desired project, but it has any tasks or test cases belonging to no or other projects, their project affiliations will not be changed.) Because each change of a user story’s project can trigger multiple automatic changes by Rally, this operation tends to be slower than the others. You may need to wait up to about 15 seconds before concluding that the operation has finished.
+This feature ensures that each user story in a tree belongs to the desired project. Changing the project of a user story also makes its tasks and test cases belong to the same project. In case a user story already belongs to the desired project, but it has any tasks or test cases belonging to no or other projects, their project affiliations will not be changed. If you have a tree in this situation, you can change its project twice, with the second change specifying the project you really want. That will guarantee that all its user stories, tasks, and test cases belong to the desired project.
 
 ## Scheduling
 
@@ -40,7 +40,7 @@ This feature adds test cases to a tree’s user stories that have no child user 
 
 ## Pass creation
 
-This feature creates passing results for all test cases of user stories in a tree, except for test cases that already have results or that have no owner. If a test case is in any test sets, the result is defined as belonging to the first of those test sets. You can specify a build and a note to be applied to all of the new results. Whoever is the owner of the test case is defined as the tester of the result.
+This feature creates passing results for all test cases of user stories in a tree, except for test cases that already have results or that have no owner. If a test case is in any test sets, the result is defined as belonging to the first of those test sets. You must specify a build (asRally requires) and may specify a note, to be applied to all of the new results. Whoever is the owner of the test case is defined as the tester of the result.
 
 ## Documentation
 
@@ -65,7 +65,7 @@ exports.caseData = {
 };
 ```
 
-The `caseData` object can have any user-story names as property keys. For each such key, you may specify 1 or more test-case names. If any user story has a name identical to the specified user-story name and is eligible for test-case creation (i.e. has no child user stories), RallyTree will create test cases with the specified test-case names for that user story. For any eligible user story whose name is **not** in `caseData`, RallyTree will create only 1 test case, and it will have the same name as the user story.
+The `caseData` object can have any user-story names as property keys. For each such key, you may specify 0 or more test-case names. If any user story has a name identical to the specified user-story name and is eligible for test-case creation (i.e. has no child user stories), RallyTree will create test cases with the specified test-case names (if any) for that user story. For any eligible user story whose name is **not** in `caseData`, RallyTree will create 1 test case, and it will have the same name as the user story.
 
 # Architecture
 
@@ -136,7 +136,7 @@ Instead, RallyTree is designed (for most operations) to
 1. perform the operation,
 1. and incrementally send new events to the report page as they occur.
 
-The report page displays the totals and updates them as new totals arrive. When the user sees that a few seconds has passed without the total(s) being updated, the user knows that the process is finished. Rally takes enough time for dependency processing and synchronization that you should wait until about 15 seconds has passed without any updates, before you conclude that an operation has ended.
+The report page displays the totals and updates them as new totals arrive. When the user sees that the total(s) are no longer being updated, the user knows that the process is finished. The wait time between updates depends on the time that Rally needs to process dependencies and synchronize its application servers. This time can reach almost 20 seconds per update in the project-change operation.
 
 The documentation operation differs from the others in this respect. Its output can be voluminous. Updating it on every increment would annoy users and slow the result. Therefore, this operation outputs a result only if no subsequent result emerges within 1.5 seconds. Under normal conditions, there is only one (final) output from the documentation operation.
 
@@ -201,7 +201,7 @@ RallyTree also implements a sequentiality adaptation. This is not one of those s
 
 For example, suppose a user story has six child user stories. Without this adaptation, RallyTree could process all six children in a batch. JavaScript would start working on them quasi-simultaneously, in no predictable order. Each child’s update could entail a change to the parent. To avoid a concurrency conflict, Rally would need to prevent any change to the parent between the time it reads the parent for child A and the time it updates the parent for child A. But Rally does not prevent such changes. If Rally updates the parent for child B during that interval, a concurrency conflict occurs. The sequentiality adaptation prevents such concurrency conflicts.
 
-Concurrency conflicts have not occurred in the verdict-acquisition operation, where the Rally data are read but not modified. Those operations are performed in parallel whenever possible. This observation should also apply to the documentation operation, but in fact concurrency conflicts occur when it is performed in parallel.
+Concurrency conflicts have not occurred in the verdict-acquisition or documentation operation, where the Rally data are read but not modified. Those operations are performed in parallel whenever possible.
 
 # Installation and usage
 
@@ -227,6 +227,8 @@ Please report bugs, comments, feature suggestions, and questions to Jonathan Poo
 In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdict-acquisition operation from returning correct results. Rally wrongly reported that test cases with defects had defect counts of 0. RallyTree relies on the correctness of this count. This bug caused reports from the verdict-acquisition operation to omit all defects. Broadcom confirmed this bug and stated that we would be notified of progress in its correction.
 
 # Version notes
+
+Version 1.5.2 removes prohibitions on user stories that have test cases without having tasks, and on user stories that have both test cases and child user stories. Those prohibitions reflected practices of some Rally users, but exceeded Rally’s own prohibitions. This version still assumes that no user story can simultaneously have tasks and child user stories, since Rally prevents that.
 
 Version 1.5.1 adopts a systematic naming convention for attributes and properties, making the code more transparent. It does not change the user interface.
 
