@@ -1480,30 +1480,36 @@ const docTree = (storyRef, storyArray, index, ancestors) => {
     .then(
       // When the data arrive:
       data => {
+        // Count its test cases, tasks, and child user stories.
         const childCount = data.children.count;
         const taskCount = data.tasks.count;
         const caseCount = data.testCases.count;
-        // If the user story has any child user stories and no tasks or test cases):
-        if (childCount && ! taskCount && ! caseCount) {
-          // Initialize the user story’s object.
-          storyArray[index] = {
-            formattedID: data.formattedID,
-            name: data.name,
-            taskCount: 0,
-            testCaseCount: 0,
-            childCount,
-            children: []
-          };
-          // Get data on its child user stories.
+        // Initialize the user story’s object.
+        storyArray[index] = {
+          formattedID: data.formattedID,
+          name: data.name,
+          taskCount,
+          caseCount,
+          childCount,
+          children: []
+        };
+        // Add the user story’s task and test-case counts to its ancestors’.
+        ancestors.forEach(ancestor => {
+          ancestor.taskCount += taskCount;
+          ancestor.caseCount += caseCount;
+        });
+        // If the user story has child user stories:
+        if (childCount) {
+          // Get data on them.
           getCollectionData(data.children.ref, ['DragAndDropRank'], [])
           .then(
             // When the data arrive:
             children => {
-              // Sort them by rank.
+              // Sort the child user stories by rank.
               children.sort((a, b) => a.dragAndDropRank < b.dragAndDropRank ? -1 : 1);
               const childArray = storyArray[index].children;
               const childAncestors = ancestors.concat(storyArray[index]);
-              // Process them in that order.
+              // Process them in parallel, in that order.
               for (let i = 0; i < childCount; i++) {
                 if (! isError) {
                   const childRef = shorten(
@@ -1515,33 +1521,13 @@ const docTree = (storyRef, storyArray, index, ancestors) => {
                 }
               }
             },
-            error => err(error, 'getting data on child user stories for tree documentation')
+            error => err(error, 'getting data on child user stories')
           );
         }
-        // Otherwise, if the user story has no child user stories:
-        else if (! childCount) {
-          // Initialize the user story’s object.
-          storyArray[index] = {
-            formattedID: data.formattedID,
-            name: data.name,
-            taskCount,
-            testCaseCount: caseCount,
-            childCount: 0
-          };
-          // Add the user story’s task and test-case counts to its ancestors’.
-          ancestors.forEach(ancestor => {
-            ancestor.taskCount += taskCount;
-            ancestor.testCaseCount += caseCount;
-          });
-          // Send the documentation to the client if apparently complete.
-          outDoc();
-        }
-        // Otherwise, i.e. if the user story has child user stories and also tasks or test cases:
-        else {
-          err('Invalid user story', 'documenting user-story tree');
-        }
+        // Send the documentation to the client if apparently complete.
+        outDoc();
       },
-      error => err(error, 'getting data on user story for tree documentation')
+      error => err(error, 'getting data on user story')
     );
   }
 };
