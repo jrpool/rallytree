@@ -44,6 +44,7 @@ const requestOptions = {
 };
 let caseFolderRef = '';
 let caseSetRef = '';
+let caseTarget = 'all';
 let copyParentProject = '';
 let copyParentRef = '';
 let copyWhat = 'both';
@@ -91,6 +92,7 @@ const docWait = 1500;
 const reinit = () => {
   caseFolderRef = '';
   caseSetRef = '';
+  caseTarget = 'all';
   copyParentProject = '';
   copyParentRef = '';
   copyWhat = 'both';
@@ -1189,8 +1191,45 @@ const caseTree = storyRefs => {
       .then(
         // When the data arrive:
         data => {
-          // If the user story has any child user stories, it does not need test cases, so:
-          if (data.children.count) {
+          // If the user story is a leaf or all user stories are to get test cases:
+          if (caseTarget === 'all' || ! data.children.count) {
+            // Determine the default or customized names of the test cases.
+            const caseNames = caseData ? caseData[data.name] || [data.name] : [data.name];
+            // Create the test cases.
+            return createCases(caseNames, data.description, data.owner, firstRef)
+            .then(
+              // When they have been created:
+              () => {
+                report([['total']]);
+                // If the user story has child user stories:
+                if (data.children.count) {
+                  // Get data on them.
+                  return getCollectionData(data.children.ref, [], [])
+                  .then(
+                    // When the data arrive:
+                    children => {
+                      // Process the children sequentially.
+                      return caseTree(children.map(child => child.ref))
+                      .then(
+                        // After they are processed, process the remaining user stories.
+                        () => caseTree(storyRefs.slice(1)),
+                        error => err(error, 'creating test cases for child user stories')
+                      );
+                    },
+                    error => err(error, 'getting data on child user stories')
+                  );
+                }
+                // Otherwise, i.e. if the user story has no child user stories:
+                else {
+                  // Process the remaining user stories.
+                  return caseTree(storyRefs.slice(1));
+                }
+              },
+              error => err(error, 'creating test cases')
+            );
+          }
+          // Otherwise, i.e. if the user story has child user stories and is not to get test cases:
+          else {
             report([['total']]);
             // Get data on its child user stories.
             return getCollectionData(data.children.ref, [], [])
@@ -1205,26 +1244,7 @@ const caseTree = storyRefs => {
                   error => err(error, 'creating test cases for child user stories')
                 );
               },
-              error => err(
-                error,
-                'getting data on child user stories for test-case creation'
-              )
-            );
-          }
-          // Otherwise the user story needs test cases, so:
-          else {
-            // Determine their names.
-            const caseNames = caseData ? caseData[data.name] || [data.name] : [data.name];
-            // Create and link the test cases.
-            return createCases(caseNames, data.description, data.owner, firstRef)
-            .then(
-              // When they have been created:
-              () => {
-                report([['total']]);
-                // Process the remaining user stories.
-                return caseTree(storyRefs.slice(1));
-              },
-              error => err(error, 'creating and linking test cases')
+              error => err(error, 'getting data on child user stories')
             );
           }
         },
@@ -1984,10 +2004,11 @@ const requestHandler = (request, res) => {
         takeWho,
         taskName
       } = bodyObject;
-      scheduleState = bodyObject.scheduleState;
+      caseTarget = bodyObject.caseTarget;
       copyWhat = bodyObject.copyWhat;
       passBuild = bodyObject.passBuild;
       passNote = bodyObject.passNote;
+      scheduleState = bodyObject.scheduleState;
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
       // If the form contains a cookie:

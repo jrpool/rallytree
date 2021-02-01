@@ -156,7 +156,7 @@
                 <span id="scheduleStateLabel" class="label indent">Schedule state</span>
                 <select
                   id="scheduleState"
-                  name="sState"
+                  name="scheduleState"
                   aria-labeledby="scheduleLabel scheduleStateLabel"
                 >
                   <option value="unchanged" selected>unchanged</option>
@@ -184,8 +184,8 @@
               <!--OP TEST-CASE CREATION-->
               <p class="opodd">
                 <input id="opCase" type="radio" name="op" value="case" aria-labelledby="caseLabel">
-                <span id="caseLabel" class="label">Add test cases</span>
-                <span id="caseOptionLabel">and (optionally) put them into</span>:<br>
+                <span id="caseLabel" class="label">Add test cases,</span>
+                <span id="caseOptionLabel">optionally in</span>
                 <span id="caseFolderLabel" class="label indent">Test folder</span>
                 <input
                   id="caseFolder"
@@ -203,7 +203,16 @@
                   maxwidth="12"
                   placeholder="TS"
                   aria-labelledby="caseLabel caseOptionLabel caseSetLabel"
+                ><br>
+                <span id="caseTargetLabel" class="label indent">to</span>
+                <select
+                  id="caseTarget"
+                  name="caseTarget"
+                  aria-labeledby="caseLabel caseTargetLabel"
                 >
+                  <option value="all" selected>all user stories</option>
+                  <option value="leaf">leaf user stories</option>
+                </select>
               </p>
               <!--OP PASSING-RESULT CREATION-->
               <p class="opeven">
