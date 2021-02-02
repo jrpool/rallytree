@@ -543,7 +543,7 @@ const copyTree = (storyRefs, parentRef) => {
   }
 };
 // Recursively acquires test results from a tree of user stories.
-const verdictTree = storyRef => {
+const scoreTree = storyRef => {
   // Get data on the user story.
   getItemData(storyRef, [], ['Children', 'TestCases'])
   .then(
@@ -554,22 +554,22 @@ const verdictTree = storyRef => {
       // If the user story has test cases:
       if (caseCount) {
         // Get data on them.
-        getCollectionData(data.testCases.ref, ['LastVerdict'], ['Defects'])
+        getCollectionData(data.testCases.ref, ['LastScore'], ['Defects'])
         .then(
           // When the data arrive:
           cases => {
             // Process the test cases in parallel.
             cases.forEach(testCase => {
               if (! isError) {
-                const verdict = testCase.lastVerdict;
+                const score = testCase.lastScore;
                 const defectsCollection = testCase.defects;
-                if (verdict === 'Pass'){
+                if (score === 'Pass'){
                   report([['total'], ['passes']]);
                 }
-                else if (verdict === 'Fail') {
+                else if (score === 'Fail') {
                   report([['total'], ['fails']]);
                 }
-                else if (verdict !== null) {
+                else if (score !== null) {
                   report([['total']]);
                 }
                 // If the test case has any defects:
@@ -587,7 +587,7 @@ const verdictTree = storyRef => {
                       if (defects.length) {
                         if (defectsCollection.count) {
                           console.log(
-                            'Rally defect-count bug has been corrected! Revise verdictTree().'
+                            'Rally defect-count bug has been corrected! Revise scoreTree().'
                           );
                         }
                         else {
@@ -598,8 +598,8 @@ const verdictTree = storyRef => {
                       // Process their severities.
                       const severities = defects
                       .map(defect => defect.severity)
-                      .reduce((tally, verdict) => {
-                        tally[verdict]++;
+                      .reduce((tally, score) => {
+                        tally[score]++;
                         return tally;
                       }, {
                         'Minor Problem': 0,
@@ -633,7 +633,7 @@ const verdictTree = storyRef => {
                   'hierarchicalrequirement', 'hierarchicalrequirement', child.ref
                 );
                 if (! isError) {
-                  verdictTree(childRef);
+                  scoreTree(childRef);
                 }
               }
             });
@@ -1263,7 +1263,7 @@ const caseTree = storyRefs => {
 const createPass = (caseRef, tester, testSet) => {
   const data = {
     TestCase: caseRef,
-    Verdict: 'Pass',
+    Score: 'Pass',
     Build: passBuild,
     Notes: passNote,
     Date: new Date(),
@@ -1557,6 +1557,10 @@ const serveDo = () => {
         htmlContent => {
           const newContent = htmlContent
           .replace(/__storyPrefix__/g, process.env.storyPrefix || '')
+          .replace('__scoreRiskMin__', process.env.scoreRiskMin || '1')
+          .replace('__scoreRiskMax__', process.env.scoreRiskMax || '3')
+          .replace('__scorePriorityMin__', process.env.scorePriorityMin || '1')
+          .replace('__scorePriorityMax__', process.env.scorePriorityMax || '3')
           .replace('__userName__', RALLY_USERNAME)
           .replace('__password__', RALLY_PASSWORD)
           .replace('__cookie__', neededCookies.join('\r\n'));
@@ -1609,16 +1613,16 @@ const serveCopyReport = () => {
     error => err(error, 'reading caseReport page')
   );
 };
-// Serves the verdict report page.
-const serveVerdictReport = () => {
-  fs.readFile('verdictReport.html', 'utf8')
+// Serves the score report page.
+const serveScoreReport = () => {
+  fs.readFile('scoreReport.html', 'utf8')
   .then(
     htmlContent => {
       fs.readFile('report.js', 'utf8')
       .then(
         jsContent => {
-          const newJSContent = reportScriptPrep(jsContent, '/verdicttally', [
-            'total', 'passes', 'fails', 'defects', 'major', 'minor', 'error'
+          const newJSContent = reportScriptPrep(jsContent, '/scoretally', [
+            'total', 'passes', 'fails', 'defects', 'major', 'minor', 'score', 'error'
           ]);
           const newContent = reportPrep(htmlContent, newJSContent);
           servePage(newContent, true);
@@ -1626,7 +1630,7 @@ const serveVerdictReport = () => {
         error => err(error, 'reading report script')
       );
     },
-    error => err(error, 'reading verdictReport page')
+    error => err(error, 'reading scoreReport page')
   );
 };
 // Serves the change-owner report page.
@@ -1951,9 +1955,9 @@ const requestHandler = (request, res) => {
         streamInit();
         copyTree([rootRef], copyParentRef);
       }
-      else if (requestURL === '/verdicttally' && idle) {
+      else if (requestURL === '/scoretally' && idle) {
         streamInit();
-        verdictTree(rootRef);
+        scoreTree(rootRef);
       }
       else if (requestURL === '/taketally' && idle) {
         streamInit();
@@ -2043,10 +2047,10 @@ const requestHandler = (request, res) => {
                       // Serve a report of the tree documentation.
                       serveDocReport();
                     }
-                    // Otherwise, if the operation is verdict acquisition:
-                    else if (op === 'verdict') {
-                      // Serve a report of the verdicts.
-                      serveVerdictReport();
+                    // Otherwise, if the operation is score acquisition:
+                    else if (op === 'score') {
+                      // Serve a report of the scores.
+                      serveScoreReport();
                     }
                     // Otherwise, if the operation is ownership change:
                     else if (op === 'take') {

@@ -70,6 +70,10 @@ input {
   font-size: inherit;
 }
 
+input[type=number] {
+  width: 2rem;
+}
+
 label:hover .label {
   background-color: #fdd;
 }

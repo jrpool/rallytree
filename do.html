@@ -68,10 +68,55 @@
                   aria-labelledby="copyLabel copyParentLabel"
                 >
               </p>
-              <!--OP VERDICT RETRIEVAL-->
-              <p class="opeven"><label>
-                <input id="opVerdict" type="radio" name="op" value="verdict">
-                <span class="label">Get verdicts</span>
+              <!--OP SCORE RETRIEVAL-->
+              <p class="opeven">
+                <input
+                  id="opScore"
+                  type="radio"
+                  name="op"
+                  value="score"
+                  aria-labelledby="scoreLabel"
+                >
+                <span id="scoreLabel" class="label">Get scores,</span>
+                <span id="scoreWeightLabel" class="label">weighing</span>
+                <span id="scoreRiskLabel" class="label">risk</span>
+                <input
+                  id="scoreRiskMin"
+                  name="scoreRiskMin"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value="__scoreRiskMin__"
+                  aria-labelledby="scoreLabel scoreWeightLabel scoreRiskLabel"
+                >&ndash;
+                <input
+                  id="scoreRiskMax"
+                  name="scoreRiskMax"
+                  type="number"
+                  min="3"
+                  step="1"
+                  value="__scoreRiskMax__"
+                  aria-labelledby="scoreLabel scoreWeightLabel scoreRiskLabel"
+                >,
+                <span id="scorePriorityLabel" class="label">priority</span>
+                <input
+                  id="scorePriorityMin"
+                  name="scorePriorityMin"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value="__scorePriorityMin__"
+                  aria-labelledby="scoreLabel scoreWeightLabel scorePriorityLabel"
+                >&ndash;
+                <input
+                  id="scorePriorityMax"
+                  name="scorePriorityMax"
+                  type="number"
+                  min="3"
+                  step="1"
+                  value="__scorePriorityMax__"
+                  aria-labelledby="scoreLabel scoreWeightLabel scorePriorityLabel"
+                >
               </label></p>
               <!--OP OWNER CHANGE-->
               <p class="opodd">
