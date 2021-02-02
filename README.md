@@ -231,6 +231,8 @@ In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdi
 
 # Version notes
 
+Version 1.5.4 makes the request page more compact, corrects the prepopulation of the user-story input fields, and reorders the request-page sections for usability.
+
 Version 1.5.3 makes the treatment of user-story formatted-ID prefixes conform to Rally. Previous versions assumed this prefix is “US”. However, Rally allows workspace administrators to customize this prefix. This version stops assuming that it is “US”, but lets you automatically apply your workspace’s prefix with an entry in the `.env` file. If you do that, your prefix appears as the initial value in the tree-root input, instead of being a placeholder as it was in previous versions, so you can complete it with the numeric part of the formatted ID. This version also adds “Accepted” to the set of selectable schedule states in the scheduling operation.
 
 Version 1.5.2 removes prohibitions on user stories that have test cases without having tasks, and on user stories that have both test cases and child user stories. Those prohibitions reflected practices of some Rally users, but exceeded Rally’s own prohibitions. This version still assumes that no user story can simultaneously have tasks and child user stories, since Rally prevents that. This version also corrects bugs, including the erroneous treatment of the build in the test-case-creation operation as an optional input. Finally, this version implements a temporary change in the verdict operation to counteract a Rally bug that, in January and February 2021, returns 0 as the count of defects of a test case, regardless of how many defects it really has.
