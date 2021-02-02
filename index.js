@@ -1556,6 +1556,7 @@ const serveDo = () => {
       .then(
         htmlContent => {
           const newContent = htmlContent
+          .replace(/__storyPrefix__/g, process.env.storyPrefix)
           .replace('__userName__', RALLY_USERNAME)
           .replace('__password__', RALLY_PASSWORD)
           .replace('__cookie__', neededCookies.join('\r\n'));
