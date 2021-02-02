@@ -11,7 +11,7 @@
     <main>
       <h1>RallyTree request</h1>
       <section>
-        <p><a class="major" href="index.html">Introduction</a></p>
+        <p>&ShortLeftArrow; <a class="major" href="index.html">Introduction</a></p>
       </section>
       <section>
         <form
@@ -20,17 +20,6 @@
           method="post"
           class="flex"
         >
-          <section class="even">
-            <h2>Server for this session</h2>
-            <p>
-              <label>
-                <span class="label">
-                  <strong>Delete this for cluster mode</strong>
-                </span><br>
-                <textarea id="cookie" name="cookie" rows="3" cols="85">__cookie__</textarea>
-              </label>
-            </p>
-          </section>
           <section class="odd">
             <h2>Tree root</h2>
             <p>
@@ -53,7 +42,7 @@
             <fieldset>
               <legend>Choose an operation</legend>
               <!--OP COPY-->
-              <p class="opeven">
+              <p class="opodd">
                 <input
                   id="opCopy"
                   type="radio"
@@ -80,7 +69,7 @@
                 >
               </p>
               <!--OP VERDICT RETRIEVAL-->
-              <p class="opodd"><label>
+              <p class="opeven"><label>
                 <input id="opVerdict" type="radio" name="op" value="verdict">
                 <span class="label">Get verdicts</span>
               </label></p>
@@ -94,14 +83,13 @@
                   aria-labelledby="takeLabel"
                 >
                 <span id="takeLabel" class="label">Change owner</span>
-                <span id="takeWhoLabel" class="label">to (email), if not you</span><br>
+                <span id="takeWhoLabel" class="label">to you or</span>
                 <input
                   id="takeWho"
                   name="takeWho"
                   type="email"
-                  size="60"
+                  size="55"
                   maxwidth="60"
-                  class="indent"
                   aria-labelledby="takeLabel takeWhoLabel"
                 >
               </p>
@@ -115,14 +103,13 @@
                   aria-labelledby="projectLabel"
                 >
                 <span id="projectLabel" class="label">Change project</span>
-                <span id="projectWhichLabel" class="label">to</span><br>
+                <span id="projectWhichLabel" class="label">to</span>
                 <input
                   id="projectWhich"
                   name="projectWhich"
                   type="text"
                   size="60"
                   maxwidth="60"
-                  class="indent"
                   aria-labelledby="projectLabel projectWhichLabel"
                 >
               </p>
@@ -136,7 +123,7 @@
                   aria-labelledby="scheduleLabel"
                 >
                 <span id="scheduleLabel" class="label">Schedule</span>:
-                <span id="scheduleReleaseLabel" class="label">Release</span>
+                <span id="scheduleReleaseLabel" class="label">release</span>
                 <input
                   id="scheduleRelease"
                   name="scheduleRelease"
@@ -144,8 +131,8 @@
                   size="10"
                   maxwidth="20"
                   aria-labelledby="scheduleLabel scheduleReleaseLabel"
-                >
-                <span id="scheduleIterationLabel" class="label indent">Iteration</span>
+                >;
+                <span id="scheduleIterationLabel" class="label">iteration</span>
                 <input
                   id="scheduleIteration"
                   name="scheduleIteration"
@@ -153,8 +140,8 @@
                   size="12"
                   maxwidth="30"
                   aria-labelledby="scheduleLabel scheduleIterationLabel"
-                >
-                <span id="scheduleStateLabel" class="label indent">Schedule state</span>
+                >;
+                <span id="scheduleStateLabel" class="label">schedule state</span>
                 <select
                   id="scheduleState"
                   name="scheduleState"
@@ -170,16 +157,15 @@
               <!--OP TASK CREATION-->
               <p class="opeven">
                 <input id="opTask" type="radio" name="op" value="task" aria-labelledby="taskLabel">
-                <span id="taskLabel" class="label">Add tasks</span>:
+                <span id="taskLabel" class="label">Add tasks</span>
                 <span id="taskNameLabel" class="label">
-                  Names (prefix with delimiter, e.g. <code>;Do this;Do that</code>)
-                </span><br>
+                  named (e.g. <code>;Do X;Do Y</code>)
+                </span>
                 <input
                   id="taskName"
                   name="taskName"
-                  size="60"
+                  size="50"
                   maxwidth="80"
-                  class="indent"
                   aria-labelledby="taskLabel taskNameLabel"
                 >
               </p>
@@ -188,7 +174,7 @@
                 <input id="opCase" type="radio" name="op" value="case" aria-labelledby="caseLabel">
                 <span id="caseLabel" class="label">Add test cases,</span>
                 <span id="caseOptionLabel">optionally in</span>
-                <span id="caseFolderLabel" class="label indent">Test folder</span>
+                <span id="caseFolderLabel" class="label">test folder</span>
                 <input
                   id="caseFolder"
                   name="caseFolder"
@@ -196,8 +182,8 @@
                   maxwidth="12"
                   placeholder="TF"
                   aria-labelledby="caseLabel caseOptionLabel caseFolderLabel"
-                >
-                <span id="caseSetLabel" class="label indent">Test set</span>
+                >, 
+                <span id="caseSetLabel" class="label">test set</span>
                 <input
                   id="caseSet"
                   name="caseSet"
@@ -205,15 +191,15 @@
                   maxwidth="12"
                   placeholder="TS"
                   aria-labelledby="caseLabel caseOptionLabel caseSetLabel"
-                ><br>
-                <span id="caseTargetLabel" class="label indent">to</span>
+                >,
+                <span id="caseTargetLabel" class="label">to</span>
                 <select
                   id="caseTarget"
                   name="caseTarget"
                   aria-labeledby="caseLabel caseTargetLabel"
                 >
-                  <option value="all" selected>all user stories</option>
-                  <option value="leaf">leaf user stories</option>
+                <option value="leaf" selected>leaf user stories</option>
+                <option value="all">all user stories</option>
                 </select>
               </p>
               <!--OP PASSING-RESULT CREATION-->
@@ -228,8 +214,8 @@
                 <span id="passLabel" class="label">
                   Pass test cases
                 </span>
-                <span id="passWithLabel" class="label">with</span>:<br>
-                <span id="passBuildLabel" class="label indent">Build</span>
+                <span id="passWithLabel" class="label">with</span>
+                <span id="passBuildLabel" class="label">build</span>
                 <input
                   id="passBuild"
                   name="passBuild"
@@ -246,8 +232,45 @@
                   aria-labelledby="passLabel passWithLabel passNoteLabel"
                 >
               </p>
+              <!--OP CUSTOM-FIELD CHANGE-->
+              <p class="opodd">
+                <input
+                  id="opCustom"
+                  type="radio"
+                  name="op"
+                  value="custom"
+                  aria-labelledby="customLabel"
+                >
+                <span id="customLabel" class="label">Change custom field</span>
+                <input
+                  id="customWhat"
+                  name="customWhat"
+                  type="text"
+                  size="20"
+                  maxwidth="30"
+                  aria-labelledby="customLabel customWhatLabel"
+                >
+                <span id="customOfLabel" class="label">of</span>
+                <select
+                  id="customOf"
+                  name="caseOf"
+                  aria-labeledby="customLabel customOfLabel"
+                >
+                  <option value="stories" selected>user stories</option>
+                  <option value="defects">defects</option>
+                </select>
+                <span id="customToLabel" class="label">to</span>
+                <input
+                  id="customTo"
+                  name="customTo"
+                  type="text"
+                  size="20"
+                  maxwidth="30"
+                  aria-labelledby="customLabel customToLabel"
+                >
+              </p>
               <!--OP DOCUMENTATION-->
-              <p class="opodd"><label>
+              <p class="opeven"><label>
                 <input id="opDoc" type="radio" name="op" value="doc">
                 <span class="label">Get tree documentation</span>
               </label></p>
@@ -283,6 +306,17 @@
                   maxwidth="30"
                   value="__password__"
                 >
+              </label>
+            </p>
+          </section>
+          <section class="even">
+            <h2>Server for this session</h2>
+            <p>
+              <label>
+                <span class="label">
+                  <strong>Delete this for cluster mode</strong>
+                </span><br>
+                <textarea id="cookie" name="cookie" rows="3" cols="85">__cookie__</textarea>
               </label>
             </p>
           </section>

@@ -1428,6 +1428,78 @@ const passTree = storyRefs => {
     return Promise.resolve('');
   }
 };
+// Recursively changes project affiliations in a tree or subtree of user stories.
+const customTree = storyRefs => {
+  if (storyRefs.length && ! isError) {
+    const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
+    if (! isError) {
+      // Get data on the first user story of the specified array.
+      return getItemData(firstRef, ['Project'], ['Children'])
+      .then(
+        // When the data arrive:
+        data => {
+          const oldProjectRef = data.project ? shorten('project', 'project', data.project) : '';
+          if (! isError) {
+            // Processes the children of the user story. FUNCTION DEFINITION START
+            const processMore = () => {
+              // Get data on the user story’s child user stories.
+              return getCollectionData(data.children.ref, [], [])
+              .then(
+                // When the data arrive:
+                children => {
+                  // Process the children sequentially.
+                  return projectTree(children.map(child => child.ref))
+                  .then(
+                    // When they have been processed, process the remaining user stories.
+                    () => projectTree(storyRefs.slice(1)),
+                    error => err(error, 'changing project of children of user story')
+                  );
+                },
+                error => err(error, 'getting data on children of user story')
+              );
+            };
+            // FUNCTION DEFINITION END
+            // If the user story belongs to no or a non-intended project:
+            if (oldProjectRef && oldProjectRef !== projectRef || ! oldProjectRef) {
+              // Change its project.
+              return restAPI.update({
+                ref: firstRef,
+                data: {
+                  Project: projectRef
+                }
+              })
+              .then(
+                // When the project has been changed:
+                () => {
+                  report([['total'], ['changes']]);
+                  // Process its child user stories and the remaining user stories.
+                  return processMore();
+                },
+                error => err(error, 'changing project of user story')
+              );
+            }
+            // Otherwise, i.e. if the user story belongs to the intended project:
+            else {
+              report([['total']]);
+              // Process its children and the remaining user stories.
+              return processMore();
+            }
+          }
+          else {
+            return '';
+          }
+        },
+        error => err(error, 'getting data on user story for project change')
+      );
+    }
+    else {
+      return Promise.resolve('');
+    }
+  }
+  else {
+    return Promise.resolve('');
+  }
+};
 // Sends the tree documentation as an event.
 const outDoc = () => {
   if (docTimeout) {
@@ -1556,7 +1628,7 @@ const serveDo = () => {
       .then(
         htmlContent => {
           const newContent = htmlContent
-          .replace(/__storyPrefix__/g, process.env.storyPrefix)
+          .replace(/__storyPrefix__/g, process.env.storyPrefix || '')
           .replace('__userName__', RALLY_USERNAME)
           .replace('__password__', RALLY_PASSWORD)
           .replace('__cookie__', neededCookies.join('\r\n'));

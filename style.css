@@ -76,7 +76,7 @@ label:hover .label {
 
 .major {
   margin-top: 0.5rem;
-  font-size: xx-large;
+  font-size: x-large;
   font-weight: 700;
 }
 
@@ -84,8 +84,12 @@ label:hover .label {
   margin-top: 0.25rem;
 }
 
+.opeven {
+  margin: 0.25rem 0 -0.25rem 0;
+}
+
 .opodd {
-  padding: 0 0.25rem 0.25rem 0;
+  padding: 0.25rem 0.25rem 0.25rem 0;
   background-color: #fcffff;
 }
 
