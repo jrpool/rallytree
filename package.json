@@ -1,6 +1,6 @@
 {
   "name": "rallytree",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "description": "Automation of Rally tree management",
   "main": "index.html",
   "scripts": {
@@ -12,7 +12,9 @@
   },
   "keywords": [
     "API",
-    "REST"
+    "REST",
+    "Rally",
+    "SAFe"
   ],
   "author": "Jonathan Pool",
   "license": "MIT",
