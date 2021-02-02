@@ -228,7 +228,7 @@ In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdi
 
 # Version notes
 
-Version 1.5.2 removes prohibitions on user stories that have test cases without having tasks, and on user stories that have both test cases and child user stories. Those prohibitions reflected practices of some Rally users, but exceeded Rally’s own prohibitions. This version still assumes that no user story can simultaneously have tasks and child user stories, since Rally prevents that.
+Version 1.5.2 removes prohibitions on user stories that have test cases without having tasks, and on user stories that have both test cases and child user stories. Those prohibitions reflected practices of some Rally users, but exceeded Rally’s own prohibitions. This version still assumes that no user story can simultaneously have tasks and child user stories, since Rally prevents that. This version also corrects bugs, including the erroneous treatment of the build in the test-case-creation operation as an optional input.
 
 Version 1.5.1 adopts a systematic naming convention for attributes and properties, making the code more transparent. It does not change the user interface.
 
