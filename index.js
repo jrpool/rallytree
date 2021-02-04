@@ -2095,7 +2095,7 @@ const requestHandler = (request, res) => {
                     else if (op === 'score') {
                       // Checks for weight errors.
                       const validateWeights = (name, min, max) => {
-                        const context = 'score retrieval';
+                        const context = 'retrieving score';
                         const minNumber = Number.parseInt(min);
                         const maxNumber = Number.parseInt(max);
                         if (Number.isNaN(minNumber) || Number.isNaN(maxNumber)) {
@@ -2123,8 +2123,8 @@ const requestHandler = (request, res) => {
                           'priority', bodyObject.scorePriorityMin, bodyObject.scorePriorityMax
                         );
                       }
-                      // Set the score weights.
                       if (! isError) {
+                        // Set the score weights.
                         setScoreWeights(
                           'risk',
                           ['None', 'Low', 'Medium', 'High'],
@@ -2137,9 +2137,9 @@ const requestHandler = (request, res) => {
                           bodyObject.scorePriorityMin,
                           bodyObject.scorePriorityMax
                         );
+                        // Serve a report of the scores.
+                        serveScoreReport();
                       }
-                      // Serve a report of the scores.
-                      serveScoreReport();
                     }
                     // Otherwise, if the operation is ownership change:
                     else if (op === 'take') {
