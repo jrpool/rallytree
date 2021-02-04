@@ -58,6 +58,8 @@ let rootRef = '';
 let scheduleIterationRef = '';
 let scheduleReleaseRef = '';
 let scheduleState;
+let scorePriorities = ['None', 'Useful', 'Important', 'Critical'];
+let scoreRisks = ['None', 'Low', 'Medium', 'High'];
 let scoreWeights = {
   risk: {},
   priority: {}
@@ -112,6 +114,8 @@ const reinit = () => {
   scheduleIterationRef = '';
   scheduleReleaseRef = '';
   scheduleState = '';
+  scorePriorities = ['None', 'Useful', 'Important', 'Critical'];
+  scoreRisks = ['None', 'Low', 'Medium', 'High'];
   scoreWeights = {
     risk: {},
     priority: {}
@@ -578,7 +582,7 @@ const scoreTree = storyRef => {
                 const verdict = testCase.lastVerdict;
                 const riskWeight = scoreWeights.risk[testCase.risk];
                 const priorityWeight = scoreWeights.priority[testCase.priority];
-                const weight = riskWeight + priorityWeight;
+                const weight = Number.parseInt(riskWeight) + Number.parseInt(priorityWeight);
                 const defectsCollection = testCase.defects;
                 let newNumerator;
                 if (verdict === 'Pass') {
@@ -1666,9 +1670,22 @@ const serveScoreReport = () => {
       .then(
         jsContent => {
           const newJSContent = reportScriptPrep(jsContent, '/scoretally', [
-            'total', 'passes', 'fails', 'defects', 'major', 'minor', 'score', 'error'
+            'total',
+            'passes',
+            'fails',
+            'defects',
+            'major',
+            'minor',
+            'score',
+            'numerator',
+            'denominator',
+            'error'
           ]);
-          const newContent = reportPrep(htmlContent, newJSContent);
+          const newContent = reportPrep(htmlContent, newJSContent)
+          .replace('__riskMin__', scoreWeights.risk[scoreRisks[0]])
+          .replace('__priorityMin__', scoreWeights.priority[scorePriorities[0]])
+          .replace('__riskMax__', scoreWeights.risk[scoreRisks.slice(-1)])
+          .replace('__priorityMax__', scoreWeights.priority[scorePriorities.slice(-1)]);
           servePage(newContent, true);
         },
         error => err(error, 'reading report script')
@@ -2110,10 +2127,12 @@ const requestHandler = (request, res) => {
                       };
                       // Sets the score weights.
                       const setScoreWeights = (key, values, min, max) => {
+                        const minNumber = Number.parseInt(min, 10);
                         scoreWeights[key] = {};
                         for (let i = 0; i < values.length; i++) {
                           scoreWeights[key][values[i]]
-                            = min + i * (max - min) / (values.length - 1);
+                            = minNumber
+                            + i * (Number.parseInt(max, 10) - minNumber) / (values.length - 1);
                         }
                       };
                       // Validate the weights.
@@ -2127,13 +2146,13 @@ const requestHandler = (request, res) => {
                         // Set the score weights.
                         setScoreWeights(
                           'risk',
-                          ['None', 'Low', 'Medium', 'High'],
+                          scoreRisks,
                           bodyObject.scoreRiskMin,
                           bodyObject.scoreRiskMax
                         );
                         setScoreWeights(
                           'priority',
-                          ['None', 'Useful', 'Important', 'Critical'],
+                          scorePriorities,
                           bodyObject.scorePriorityMin,
                           bodyObject.scorePriorityMax
                         );
