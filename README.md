@@ -14,9 +14,9 @@ RallyTree can perform these operations on a tree:
 
 This feature copies a tree. You designate an existing user story as the parent of the root user story of the new tree. That parent must not have any tasks and must not be in the tree that you are copying. Only user stories, optionally with their tasks and/or test cases, are copied, but not defects. In a copy of a user story, task, or test case, the name, owner, rank, and description are copied from the original, but the project affiliation is copied from the designated parent of the root of the tree copy.
 
-## Verdict acquisition
+## Scoring
 
-This feature tallies the passing and failing results of the last runs of all the test cases, and the counts of defects, major defects, and minor defects, in a tree.
+This feature tallies the passing and failing results of the last runs of all the test cases, and the counts of defects, major defects, and minor defects, in a tree. It also reports a score, based on the risks and priorities of the passed and failed test cases. You can determine how the risks and priorities are weighed in the score.
 
 ## Owner change
 
@@ -230,6 +230,8 @@ Please report bugs, comments, feature suggestions, and questions to Jonathan Poo
 In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdict-acquisition operation from returning correct results. Rally wrongly reported that test cases with defects had defect counts of 0. RallyTree relies on the correctness of this count. This bug caused reports from the verdict-acquisition operation to omit all defects. Broadcom confirmed this bug and stated that we would be notified of progress in its correction. A temporary code change has been introduced to circumvent this bug.
 
 # Version notes
+
+Version 1.5.5 adds scoring to the verdict operation and renames that operation to “scoring”.
 
 Version 1.5.4 makes the request page more compact, corrects the prepopulation of the user-story input fields, and reorders the request-page sections for usability.
 
