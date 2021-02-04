@@ -16,7 +16,7 @@ This feature copies a tree. You designate an existing user story as the parent o
 
 ## Scoring
 
-This feature tallies the passing and failing results of the last runs of all the test cases, and the counts of defects, major defects, and minor defects, in a tree. It also reports a score, based on the risks and priorities of the passed and failed test cases. You can determine how the risks and priorities are weighed in the score.
+This feature tallies the passing and failing results of the last runs of all the test cases, and the counts of defects, major defects, and minor defects, in a tree. It also reports a score, based on the risks and priorities of the passed and failed test cases. You can set the minimum and maximum risk and priority weights in the score. Between those limits, risk and priority increments are uniform. For example, the risk levels are “None”, “Low”, “Medium”, and “High”. If you set the risk limits to 1 and 7, then the risk levels are weighed 1, 3, 5, and 7, respectively. The weight of a test case is the sum of its risk weight and its priority weight. The score is the sum of the passing test cases’ weights, as a percentage of the sum of the passing and failing test cases’ weights.
 
 ## Owner change
 

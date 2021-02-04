@@ -580,14 +580,16 @@ const scoreTree = storyRef => {
                 const priorityWeight = scoreWeights.priority[testCase.priority];
                 const weight = riskWeight + priorityWeight;
                 const defectsCollection = testCase.defects;
+                let newNumerator;
                 if (verdict === 'Pass') {
+                  newNumerator = totals.numerator + weight;
                   report([
                     ['total'],
                     ['passes'],
                     [
                       'score',
                       Math.round(
-                        100 * (totals.numerator + weight) / (totals.denominator + weight)
+                        newNumerator ? 100 * newNumerator / (totals.denominator + weight) : 0
                       ) - totals.score
                     ],
                     ['numerator', weight],
@@ -595,13 +597,14 @@ const scoreTree = storyRef => {
                   ]);
                 }
                 else if (verdict === 'Fail') {
+                  newNumerator = totals.numerator;
                   report([
                     ['total'],
                     ['fails'],
                     [
                       'score',
                       Math.round(
-                        100 * totals.numerator / (totals.denominator + weight)
+                        newNumerator ? 100 * newNumerator / (totals.denominator + weight) : 0
                       ) - totals.score
                     ],
                     ['denominator', weight]
