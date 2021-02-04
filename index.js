@@ -58,6 +58,10 @@ let rootRef = '';
 let scheduleIterationRef = '';
 let scheduleReleaseRef = '';
 let scheduleState;
+let scoreWeights = {
+  risk: {},
+  priority: {}
+};
 let takeWhoRef = '';
 let taskNames = [];
 let userName = '';
@@ -67,10 +71,13 @@ let totals = {
   caseTotal: 0,
   changes: 0,
   defects: 0,
+  denominator: 0,
   fails: 0,
   major: 0,
   minor: 0,
+  numerator: 0,
   passes: 0,
+  score: 0,
   storyChanges: 0,
   storyTotal: 0,
   taskChanges: 0,
@@ -105,6 +112,10 @@ const reinit = () => {
   scheduleIterationRef = '';
   scheduleReleaseRef = '';
   scheduleState = '';
+  scoreWeights = {
+    risk: {},
+    priority: {}
+  };
   takeWhoRef = '';
   taskNames = [];
   userName = '';
@@ -114,10 +125,13 @@ const reinit = () => {
     caseTotal: 0,
     changes: 0,
     defects: 0,
+    denominator: 0,
     fails: 0,
     major: 0,
     minor: 0,
+    numerator: 0,
     passes: 0,
+    score: 0,
     storyChanges: 0,
     storyTotal: 0,
     taskChanges: 0,
@@ -554,22 +568,46 @@ const scoreTree = storyRef => {
       // If the user story has test cases:
       if (caseCount) {
         // Get data on them.
-        getCollectionData(data.testCases.ref, ['LastScore'], ['Defects'])
+        getCollectionData(data.testCases.ref, ['LastVerdict', 'Risk', 'Priority'], ['Defects'])
         .then(
           // When the data arrive:
           cases => {
             // Process the test cases in parallel.
             cases.forEach(testCase => {
               if (! isError) {
-                const score = testCase.lastScore;
+                const verdict = testCase.lastVerdict;
+                const riskWeight = scoreWeights.risk[testCase.risk];
+                const priorityWeight = scoreWeights.priority[testCase.priority];
+                const weight = riskWeight + priorityWeight;
                 const defectsCollection = testCase.defects;
-                if (score === 'Pass'){
-                  report([['total'], ['passes']]);
+                if (verdict === 'Pass') {
+                  report([
+                    ['total'],
+                    ['passes'],
+                    [
+                      'score',
+                      Math.round(
+                        100 * (totals.numerator + weight) / (totals.denominator + weight)
+                      ) - totals.score
+                    ],
+                    ['numerator', weight],
+                    ['denominator', weight]
+                  ]);
                 }
-                else if (score === 'Fail') {
-                  report([['total'], ['fails']]);
+                else if (verdict === 'Fail') {
+                  report([
+                    ['total'],
+                    ['fails'],
+                    [
+                      'score',
+                      Math.round(
+                        100 * totals.numerator / (totals.denominator + weight)
+                      ) - totals.score
+                    ],
+                    ['denominator', weight]
+                  ]);
                 }
-                else if (score !== null) {
+                else if (verdict !== null) {
                   report([['total']]);
                 }
                 // If the test case has any defects:
@@ -613,6 +651,9 @@ const scoreTree = storyRef => {
                     error => err(error, 'getting data on defects')
                   );
                 }
+              }
+              else {
+                return;
               }
             });
           },
@@ -1557,9 +1598,9 @@ const serveDo = () => {
         htmlContent => {
           const newContent = htmlContent
           .replace(/__storyPrefix__/g, process.env.storyPrefix || '')
-          .replace('__scoreRiskMin__', process.env.scoreRiskMin || '1')
+          .replace('__scoreRiskMin__', process.env.scoreRiskMin || '0')
           .replace('__scoreRiskMax__', process.env.scoreRiskMax || '3')
-          .replace('__scorePriorityMin__', process.env.scorePriorityMin || '1')
+          .replace('__scorePriorityMin__', process.env.scorePriorityMin || '0')
           .replace('__scorePriorityMax__', process.env.scorePriorityMax || '3')
           .replace('__userName__', RALLY_USERNAME)
           .replace('__password__', RALLY_PASSWORD)
@@ -2049,6 +2090,51 @@ const requestHandler = (request, res) => {
                     }
                     // Otherwise, if the operation is score acquisition:
                     else if (op === 'score') {
+                      // Checks for weight errors.
+                      const validateWeights = (name, min, max) => {
+                        const context = 'score retrieval';
+                        const minNumber = Number.parseInt(min);
+                        const maxNumber = Number.parseInt(max);
+                        if (Number.isNaN(minNumber) || Number.isNaN(maxNumber)) {
+                          err(`Nonnumeric ${name} weight`, context);
+                        }
+                        else if (minNumber < 0 || maxNumber < 0) {
+                          err(`Negative ${name} weight`, context);
+                        }
+                        else if (maxNumber < minNumber) {
+                          err(`Maximum ${name} weight smaller than minimum`, context);
+                        }
+                      };
+                      // Sets the score weights.
+                      const setScoreWeights = (key, values, min, max) => {
+                        scoreWeights[key] = {};
+                        for (let i = 0; i < values.length; i++) {
+                          scoreWeights[key][values[i]]
+                            = min + i * (max - min) / (values.length - 1);
+                        }
+                      };
+                      // Validate the weights.
+                      validateWeights('risk', bodyObject.scoreRiskMin, bodyObject.scoreRiskMax);
+                      if (! isError) {
+                        validateWeights(
+                          'priority', bodyObject.scorePriorityMin, bodyObject.scorePriorityMax
+                        );
+                      }
+                      // Set the score weights.
+                      if (! isError) {
+                        setScoreWeights(
+                          'risk',
+                          ['None', 'Low', 'Medium', 'High'],
+                          bodyObject.scoreRiskMin,
+                          bodyObject.scoreRiskMax
+                        );
+                        setScoreWeights(
+                          'priority',
+                          ['None', 'Useful', 'Important', 'Critical'],
+                          bodyObject.scorePriorityMin,
+                          bodyObject.scorePriorityMax
+                        );
+                      }
                       // Serve a report of the scores.
                       serveScoreReport();
                     }
