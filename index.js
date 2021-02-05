@@ -1996,8 +1996,8 @@ const requestHandler = (request, res) => {
     // If the request requests a resource:
     if (method === 'GET') {
       // If the requested resource is a file, serve it.
-      if (requestURL === '/do.html' || requestURL === '/') {
-        // Serves the request page.
+      if (requestURL === '/do.html') {
+        // Serves the request page (in a new tab, per the link to this URL).
         serveDo();
       }
       else if (requestURL === '/style.css') {
@@ -2077,9 +2077,9 @@ const requestHandler = (request, res) => {
       scheduleState = bodyObject.scheduleState;
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
-      // If the form contains a cookie:
+      // If the user has not deleted the content of the cookie field:
       if (cookie.length) {
-        // Make every request in this session include it, forcing single-host mode.
+        // Make every request in the session include the cookie, forcing single-host mode.
         requestOptions.headers.Cookie = cookie.split('\r\n').join('; ');
       }
       // Create and configure a Rally API client.
