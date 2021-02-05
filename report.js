@@ -13,7 +13,6 @@ let __events__;
 const handleMessage = (event, type) => {
   const data = event.data;
   if (data) {
-    console.log(`${type} was ${document.getElementById(type).innerHTML}, will be ${data}`);
     document.getElementById(type).innerHTML = data;
     lastEventTime = Date.now();
   }

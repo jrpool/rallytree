@@ -1483,7 +1483,9 @@ const planCases = (caseRefs, folderRef) => {
     const firstRef = shorten('testcase', 'testcase', caseRefs[0]);
     if (! isError) {
       // Get data on the first test case.
-      return getItemData(firstRef, ['Name', 'Description', 'Owner', 'DragAndDropRank'], [])
+      return getItemData(
+        firstRef, ['Name', 'Description', 'Owner', 'DragAndDropRank', 'Project'], []
+      )
       .then(
         // When the data arrive:
         data => {
@@ -1497,7 +1499,7 @@ const planCases = (caseRefs, folderRef) => {
               Owner: data.owner,
               DragAndDropRank: data.dragAndDropRank,
               TestFolder: folderRef,
-              Project: copyParentProject
+              Project: data.project
             }
           })
           .then(
@@ -1543,7 +1545,7 @@ const planTree = (storyRefs, parentRef) => {
       // Get data on the first user story.
       return getItemData(
         firstRef,
-        ['Name', 'Description'],
+        ['Name', 'Description', 'Project'],
         ['Children', 'TestCases']
       )
       .then(
@@ -1552,7 +1554,7 @@ const planTree = (storyRefs, parentRef) => {
           const properties = {
             Name: data.name,
             Description: data.description,
-            Project: copyParentProject
+            Project: data.project
           };
           if (parentRef) {
             properties.Parent = parentRef;
@@ -1566,7 +1568,10 @@ const planTree = (storyRefs, parentRef) => {
           .then(
             // When the user story has been planified:
             folder => {
-              console.log(`Created test folder:\n${JSON.stringify(folder), null, 2}`);
+              if (! parentRef) {
+                const planRootLink = `<a href="${folder._ref}" target="_blank">New test plan</a>`;
+                response.write(`event: planRoot\ndata: ${planRootLink}\n\n`);
+              }
               report([['storyChanges']]);
               // Identify a short reference to the test folder.
               const folderRef = shorten('testfolder', 'testfolder', folder.Object._ref);
