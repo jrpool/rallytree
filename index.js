@@ -1609,7 +1609,7 @@ const planTree = (storyRefs, parentRef) => {
                   // Otherwise, i.e. if the user story has no child user stories:
                   else {
                     // Process the remaining user stories.
-                    return copyTree(storyRefs.slice(1), parentRef);
+                    return planTree(storyRefs.slice(1), parentRef);
                   }
                 };
                 // If the original has test cases:
