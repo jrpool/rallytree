@@ -231,6 +231,8 @@ In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdi
 
 # Version notes
 
+Version 1.5.6 corrects a navigation bug by making the request page open in a new tab and removing the link on that page to the introduction page.
+
 Version 1.5.5 adds scoring to the verdict operation and renames that operation to “scoring”.
 
 Version 1.5.4 makes the request page more compact, corrects the prepopulation of the user-story input fields, and reorders the request-page sections for usability.
