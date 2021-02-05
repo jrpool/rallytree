@@ -1484,7 +1484,9 @@ const planCases = (caseRefs, folderRef) => {
     if (! isError) {
       // Get data on the first test case.
       return getItemData(
-        firstRef, ['Name', 'Description', 'Owner', 'DragAndDropRank', 'Project'], []
+        firstRef,
+        ['Name', 'Description', 'Owner', 'DragAndDropRank', 'Risk', 'Priority', 'Project'],
+        []
       )
       .then(
         // When the data arrive:
@@ -1498,8 +1500,10 @@ const planCases = (caseRefs, folderRef) => {
               Description: data.description,
               Owner: data.owner,
               DragAndDropRank: data.dragAndDropRank,
-              TestFolder: folderRef,
-              Project: data.project
+              Risk: data.risk,
+              Priority: data.priority,
+              Project: data.project,
+              TestFolder: folderRef
             }
           })
           .then(
@@ -1562,15 +1566,15 @@ const planTree = (storyRefs, parentRef) => {
           // Create a test folder, with the specified parent if any.
           return restAPI.create({
             type: 'testfolder',
-            fetch: ['_ref'],
+            fetch: ['FormattedID'],
             data: properties
           })
           .then(
             // When the user story has been planified:
             folder => {
+              // If the test folder is the root, report its formatted ID.
               if (! parentRef) {
-                const planRootLink = `<a href="${folder._ref}" target="_blank">New test plan</a>`;
-                response.write(`event: planRoot\ndata: ${planRootLink}\n\n`);
+                response.write(`event: planRoot\ndata: ${folder.Object.FormattedID}\n\n`);
               }
               report([['storyChanges']]);
               // Identify a short reference to the test folder.
