@@ -380,7 +380,7 @@ const copyTasksOrCases = (itemType, itemRefs, storyRef) => {
     return Promise.resolve('');
   }
 };
-// Get data or tasks or test cases and copy them.
+// Get data on tasks or test cases and copy them.
 const getAndCopyTasksOrCases = (itemType, collectionType, data, copyRef) => {
   // Get data on the tasks or test cases.
   return getCollectionData(data[collectionType].ref, [], [])
@@ -1476,6 +1476,170 @@ const passTree = storyRefs => {
     return Promise.resolve('');
   }
 };
+// Sequentially planifies an array of tasks or an array of test cases.
+const planCases = (caseRefs, folderRef) => {
+  if (caseRefs.length && ! isError) {
+    // Identify and shorten a reference to the first test case.
+    const firstRef = shorten('testcase', 'testcase', caseRefs[0]);
+    if (! isError) {
+      // Get data on the first test case.
+      return getItemData(firstRef, ['Name', 'Description', 'Owner', 'DragAndDropRank'], [])
+      .then(
+        // When the data arrive:
+        data => {
+          // Copy the test case.
+          return restAPI.create({
+            type: 'testcase',
+            fetch: ['_ref'],
+            data: {
+              Name: data.name,
+              Description: data.description,
+              Owner: data.owner,
+              DragAndDropRank: data.dragAndDropRank,
+              TestFolder: folderRef,
+              Project: copyParentProject
+            }
+          })
+          .then(
+            // When the test case has been copied:
+            () => {
+              report([['caseChanges']]);
+              // Copy the remaining test cases in the specified array.
+              return planCases(caseRefs.slice(1), folderRef);
+            },
+            error => err(error, `copying test case ${firstRef}`)
+          );
+        },
+        error => err(error, 'getting data on test case')
+      );
+    }
+    else {
+      return Promise.resolve('');
+    }
+  }
+  else {
+    return Promise.resolve('');
+  }
+};
+// Get data on test cases and planify them.
+const getAndPlanCases = (data, folderRef) => {
+  // Get data on the tasks or test cases.
+  return getCollectionData(data.testCases.ref, [], [])
+  .then(
+    // When the data arrive:
+    cases => {
+      // Copy the tasks or test cases.
+      return planCases(cases.map(testCase => testCase.ref), folderRef);
+    },
+    error => err(error, 'getting data on test cases')
+  );
+};
+// Recursively planifies a tree or subtrees of user stories.
+const planTree = (storyRefs, parentRef) => {
+  if (storyRefs.length && ! isError) {
+    // Identify and shorten the reference to the first user story.
+    const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
+    if (! isError) {
+      // Get data on the first user story.
+      return getItemData(
+        firstRef,
+        ['Name', 'Description'],
+        ['Children', 'TestCases']
+      )
+      .then(
+        // When the data arrive:
+        data => {
+          const properties = {
+            Name: data.name,
+            Description: data.description,
+            Project: copyParentProject
+          };
+          if (parentRef) {
+            properties.Parent = parentRef;
+          }
+          // Create a test folder, with the specified parent if any.
+          return restAPI.create({
+            type: 'testfolder',
+            fetch: ['_ref'],
+            data: properties
+          })
+          .then(
+            // When the user story has been planified:
+            folder => {
+              console.log(`Created test folder:\n${JSON.stringify(folder), null, 2}`);
+              report([['storyChanges']]);
+              // Identify a short reference to the test folder.
+              const folderRef = shorten('testfolder', 'testfolder', folder.Object._ref);
+              if (! isError) {
+                // Planifies child user stories and remaining user stories.
+                const planChildrenAndSiblings = () => {
+                  // If the user story has any child user stories:
+                  if (data.children.count) {
+                    // Get data on them.
+                    return getCollectionData(data.children.ref, [], [])
+                    .then(
+                      // When the data arrive:
+                      children => {
+                        // Process the child user stories.
+                        return planTree(children.map(child => child.ref), folderRef)
+                        .then(
+                          // When they have been processed:
+                          () => {
+                            // Process the remaining user stories.
+                            return planTree(storyRefs.slice(1), parentRef);
+                          },
+                          error => err(
+                            error,
+                            'processing child user stories'
+                          )
+                        );
+                      },
+                      error => err(error, 'getting data on child user stories')
+                    );
+                  }
+                  // Otherwise, i.e. if the user story has no child user stories:
+                  else {
+                    // Process the remaining user stories.
+                    return copyTree(storyRefs.slice(1), parentRef);
+                  }
+                };
+                // If the original has test cases:
+                if (data.testCases.count) {
+                  // Get data on them and planify them.
+                  return getAndPlanCases(data, folderRef)
+                  .then(
+                    // When the test cases have been planified:
+                    () => {
+                      // Process any child user stories of the original and remaining user stories.
+                      return planChildrenAndSiblings();
+                    },
+                    error => err(error, 'getting data on test cases and planifying them')
+                  );
+                }
+                // Otherwise, i.e. if the original has no test cases:
+                else {
+                  // Process any of its child user stories and the remaining user stories.
+                  return planChildrenAndSiblings();
+                }
+              }
+              else {
+                return '';
+              }
+            },
+            error => err(error, 'planifying user story')
+          );
+        },
+        error => err(error, 'getting data on user story')
+      );
+    }
+    else {
+      return Promise.resolve('');
+    }
+  }
+  else {
+    return Promise.resolve('');
+  }
+};
 // Sends the tree documentation as an event.
 const outDoc = () => {
   if (docTimeout) {
@@ -1658,7 +1822,7 @@ const serveCopyReport = () => {
         error => err(error, 'reading report script')
       );
     },
-    error => err(error, 'reading caseReport page')
+    error => err(error, 'reading copyReport page')
   );
 };
 // Serves the score report page.
@@ -1746,7 +1910,7 @@ const serveProjectReport = projectName => {
     error => err(error, 'reading projectReport page')
   );
 };
-// Serves the release and iteration report page.
+// Serves the scheduling report page.
 const serveScheduleReport = (releaseName, iterationName) => {
   fs.readFile('scheduleReport.html', 'utf8')
   .then(
@@ -1833,7 +1997,27 @@ const servePassReport = () => {
         error => err(error, 'reading report script')
       );
     },
-    error => err(error, 'reading resultReport page')
+    error => err(error, 'reading passReport page')
+  );
+};
+// Serves the planification report page.
+const servePlanReport = () => {
+  fs.readFile('planReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('report.js', 'utf8')
+      .then(
+        jsContent => {
+          const newJSContent = reportScriptPrep(
+            jsContent, '/plantally', ['planRoot', 'storyChanges', 'caseChanges', 'error']
+          );
+          const newContent = reportPrep(htmlContent, newJSContent);
+          servePage(newContent, true);
+        },
+        error => err(error, 'reading report script')
+      );
+    },
+    error => err(error, 'reading planReport page')
   );
 };
 // Serves the documentation report page.
@@ -2044,6 +2228,10 @@ const requestHandler = (request, res) => {
         streamInit();
         passTree([rootRef]);
       }
+      else if (requestURL === '/plantally' && idle) {
+        streamInit();
+        planTree([rootRef], '');
+      }
       else if (requestURL === '/doc' && idle) {
         streamInit();
         docTree(rootRef, doc, 0, []);
@@ -2103,10 +2291,43 @@ const requestHandler = (request, res) => {
                 ref => {
                   if (! isError) {
                     userRef = ref;
-                    // If the requested operation is tree documentation:
-                    if (op === 'doc') {
-                      // Serve a report of the tree documentation.
-                      serveDocReport();
+                    // If the requested operation is tree copying:
+                    if (op === 'copy') {
+                      getRef('hierarchicalrequirement', copyParent, 'parent of tree copy')
+                      .then(
+                        ref => {
+                          if (! isError) {
+                            copyParentRef = shorten(
+                              'userstory', 'hierarchicalrequirement', ref
+                            );
+                            if (! isError) {
+                              // Get data on the parent user story of the copy.
+                              getItemData(copyParentRef, ['Project'], ['Tasks'])
+                              .then(
+                                data => {
+                                  // When the data arrive:
+                                  if (data.tasks.count) {
+                                    err(
+                                      'Attempt to copy to a user story with tasks', 'copying tree'
+                                    );
+                                  }
+                                  else {
+                                    copyParentProject = data.project;
+                                    // Copy the tree and give it the specified parent.
+                                    serveCopyReport();
+                                  }
+                                },
+                                error => err(
+                                  error, 'getting data on parent of tree copy'
+                                )
+                              );
+                            }
+                          }
+                        },
+                        error => err(
+                          error, 'getting reference to parent of tree copy'
+                        )
+                      );
                     }
                     // Otherwise, if the operation is score acquisition:
                     else if (op === 'score') {
@@ -2293,43 +2514,15 @@ const requestHandler = (request, res) => {
                         servePassReport();
                       }
                     }
-                    // Otherwise, if the operation is tree copying:
-                    else if (op === 'copy') {
-                      getRef('hierarchicalrequirement', copyParent, 'parent of tree copy')
-                      .then(
-                        ref => {
-                          if (! isError) {
-                            copyParentRef = shorten(
-                              'userstory', 'hierarchicalrequirement', ref
-                            );
-                            if (! isError) {
-                              // Get data on the parent user story of the copy.
-                              getItemData(copyParentRef, ['Project'], ['Tasks'])
-                              .then(
-                                data => {
-                                  // When the data arrive:
-                                  if (data.tasks.count) {
-                                    err(
-                                      'Attempt to copy to a user story with tasks', 'copying tree'
-                                    );
-                                  }
-                                  else {
-                                    copyParentProject = data.project;
-                                    // Copy the tree and give it the specified parent.
-                                    serveCopyReport();
-                                  }
-                                },
-                                error => err(
-                                  error, 'getting data on parent of tree copy'
-                                )
-                              );
-                            }
-                          }
-                        },
-                        error => err(
-                          error, 'getting reference to parent of tree copy'
-                        )
-                      );
+                    // Otherwise, if the operation is planification:
+                    if (op === 'plan') {
+                      // Planify the tree.
+                      servePlanReport();
+                    }
+                    // Otherwise, if the operation is tree documentation:
+                    else if (op === 'doc') {
+                      // Serve a report of the tree documentation.
+                      serveDocReport();
                     }
                     else {
                       err('Unknown operation', 'RallyTree');

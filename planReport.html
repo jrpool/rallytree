@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8">
+    <title>Test-plan conversion report | RallyTree</title>
+    <meta name="description" content="Automation of Rally tree management">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+    <script>__script__</script>
+  </head>
+  <body class="ack">
+    <main>
+      <h1>RallyTree test-plan conversion report</h1>
+      <section class="flex">
+        <section class="even">
+          <h2>Results</h2>
+          <p>User stories copied as test folders: <span id="storyChanges" role="status">0</span></p>
+          <p class="more">
+            Test cases copied into test folders: <span id="caseChanges" role="status">0</span>
+          </p>
+          <div id="error" class="error" role="alert"></div>
+        </section>
+        <section class="odd">
+          <h2>Tree</h2>
+          <p>You asked RallyTree to create a test plan mirroring the Rally tree rooted at</p>
+          <pre>__rootRef__</pre>
+          <p><a
+            href="https://rally1.rallydev.com/slm/webservice/v2.0/testfolder__planRootRef__"
+            target="_blank"
+          >New test plan</a></p>
+        </section>
+        <section class="odd">
+          <h2>You</h2>
+          <p>Your Rally user name is</p>
+          <pre>__userName__</pre>
+          <p class="more">Your Rally user reference is</p>
+          <pre>__userRef__</pre>
+        </section>
+      </section>
+      <p><a href="http://localhost:3000">Use RallyTree again.</a></p>
+    </main>
+  </body>
+</html>

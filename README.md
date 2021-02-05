@@ -42,6 +42,10 @@ This feature adds test cases to a tree’s user stories that have no child user 
 
 This feature creates passing results for all test cases of user stories in a tree, except for test cases that already have results or that have no owner. If a test case is in any test sets, the result is defined as belonging to the first of those test sets. You must specify a build (asRally requires) and may specify a note, to be applied to all of the new results. Whoever is the owner of the test case is defined as the tester of the result.
 
+## Planification
+
+This feature creates a test plan (a tree of test folders and test cases) that mirrors a tree of user stories and test cases.
+
 ## Documentation
 
 This feature produces a JSON representation of a tree of user stories.
@@ -230,6 +234,8 @@ Please report bugs, comments, feature suggestions, and questions to Jonathan Poo
 In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdict-acquisition operation from returning correct results. Rally wrongly reported that test cases with defects had defect counts of 0. RallyTree relies on the correctness of this count. This bug caused reports from the verdict-acquisition operation to omit all defects. Broadcom confirmed this bug and stated that we would be notified of progress in its correction. A temporary code change has been introduced to circumvent this bug.
 
 # Version notes
+
+Version 1.6.0 introduces the planification operation.
 
 Version 1.5.6 corrects a navigation bug by making the request page open in a new tab and removing the link on that page to the introduction page.
 
