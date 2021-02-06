@@ -2524,7 +2524,7 @@ const requestHandler = (request, res) => {
                       }
                     }
                     // Otherwise, if the operation is planification:
-                    if (op === 'plan') {
+                    else if (op === 'plan') {
                       // Planify the tree.
                       servePlanReport();
                     }
