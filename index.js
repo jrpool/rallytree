@@ -2570,7 +2570,7 @@ const requestHandler = (request, res) => {
                       }
                     }
                     // OP PLANIFICITATION
-                    if (op === 'plan') {
+                    else if (op === 'plan') {
                       // Planify the tree.
                       servePlanReport();
                     }
