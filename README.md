@@ -12,7 +12,7 @@ RallyTree can perform these operations on a tree:
 
 ## Tree-copy creation
 
-This feature copies a tree. You designate an existing user story as the parent of the root user story of the new tree. That parent must not have any tasks and must not be in the tree that you are copying. Only user stories, optionally with their tasks and/or test cases, are copied, but not defects. In a copy of a user story, task, or test case, the name, owner, rank, and description are copied from the original, but the project affiliation is copied from the designated parent of the root of the tree copy.
+This feature copies a tree. You designate an existing user story as the parent of the root user story of the new tree. That parent must not have any tasks and must not be in the tree that you are copying. Only user stories, optionally with their tasks and/or test cases, are copied, but not defects. In a copy of a user story, task, or test case, the name, rank, and description are copied from the original; you can choose whether the owner is copied from the original or is set to a particular user; and you can choose whether the project affiliation is copied from the designated parent of the root of the tree copy or is set to a particular project.
 
 ## Scoring
 
@@ -234,6 +234,8 @@ Please report bugs, comments, feature suggestions, and questions to Jonathan Poo
 In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdict-acquisition operation from returning correct results. Rally wrongly reported that test cases with defects had defect counts of 0. RallyTree relies on the correctness of this count. This bug caused reports from the verdict-acquisition operation to omit all defects. Broadcom confirmed this bug and stated that we would be notified of progress in its correction. A temporary code change has been introduced to circumvent this bug.
 
 # Version notes
+
+Version 1.6.1 adds options to specify the owner and the project of copies of work items.
 
 Version 1.6.0 introduces the planification operation.
 
