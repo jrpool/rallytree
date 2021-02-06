@@ -2569,11 +2569,7 @@ const requestHandler = (request, res) => {
                         servePassReport();
                       }
                     }
-<<<<<<< HEAD
-                    // Otherwise, if the operation is planification:
-=======
                     // OP PLANIFICITATION
->>>>>>> batch
                     else if (op === 'plan') {
                       // Planify the tree.
                       servePlanReport();
