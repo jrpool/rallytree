@@ -45,8 +45,9 @@ const requestOptions = {
 let caseFolderRef = '';
 let caseSetRef = '';
 let caseTarget = 'all';
-let copyParentProject = '';
+let copyOwnerRef = '';
 let copyParentRef = '';
+let copyProjectRef = '';
 let copyWhat = 'both';
 let isError = false;
 let passBuild = '';
@@ -102,8 +103,9 @@ const reinit = () => {
   caseFolderRef = '';
   caseSetRef = '';
   caseTarget = 'all';
-  copyParentProject = '';
+  copyOwnerRef = '';
   copyParentRef = '';
+  copyProjectRef = '';
   copyWhat = 'both';
   isError = false;
   passBuild = '';
@@ -338,7 +340,7 @@ const copyTasksOrCases = (itemType, itemRefs, storyRef) => {
             const config = {
               Name: data.name,
               Description: data.description,
-              Owner: data.owner,
+              Owner: copyOwnerRef || data.owner,
               DragAndDropRank: data.dragAndDropRank,
               WorkProduct: storyRef
             };
@@ -347,7 +349,7 @@ const copyTasksOrCases = (itemType, itemRefs, storyRef) => {
               user story, so specify its project.
             */
             if (workItemType === 'testcase') {
-              config.Project = copyParentProject;
+              config.Project = copyProjectRef;
             }
             return restAPI.create({
               type: workItemType,
@@ -416,17 +418,17 @@ const copyTree = (storyRefs, parentRef) => {
           }
           // Otherwise, i.e. if the user story is copiable:
           else {
-            // Copy the user story and give it the specified parent.
+            // Copy the user story.
             return restAPI.create({
               type: 'hierarchicalrequirement',
               fetch: ['_ref'],
               data: {
                 Name: data.name,
                 Description: data.description,
-                Owner: data.owner,
+                Owner: copyOwnerRef || data.owner,
                 DragAndDropRank: data.dragAndDropRank,
                 Parent: parentRef,
-                Project: copyParentProject
+                Project: copyProjectRef
               }
             })
             .then(
@@ -2257,7 +2259,9 @@ const requestHandler = (request, res) => {
         caseFolder,
         caseSet,
         cookie,
+        copyOwner,
         copyParent,
+        copyProject,
         op,
         password,
         projectWhich,
@@ -2300,45 +2304,87 @@ const requestHandler = (request, res) => {
                 ref => {
                   if (! isError) {
                     userRef = ref;
-                    // If the requested operation is tree copying:
+                    // OP COPYING
                     if (op === 'copy') {
+                      // Get a reference to the copy parent.
                       getRef('hierarchicalrequirement', copyParent, 'parent of tree copy')
                       .then(
+                        // When the reference has been obtained:
                         ref => {
                           if (! isError) {
+                            // Shorten it.
                             copyParentRef = shorten(
                               'userstory', 'hierarchicalrequirement', ref
                             );
                             if (! isError) {
-                              // Get data on the parent user story of the copy.
+                              // Get data on the copy parent.
                               getItemData(copyParentRef, ['Project'], ['Tasks'])
                               .then(
+                                // When the data arrive:
                                 data => {
-                                  // When the data arrive:
-                                  if (data.tasks.count) {
-                                    err(
-                                      'Attempt to copy to a user story with tasks', 'copying tree'
-                                    );
-                                  }
-                                  else {
-                                    copyParentProject = data.project;
-                                    // Copy the tree and give it the specified parent.
-                                    serveCopyReport();
+                                  if (! isError) {
+                                    // Copies the tree.
+                                    const setOwnerAndServe = () => {
+                                      // If an owner has been specified:
+                                      if (copyOwner) {
+                                        // Get a reference to it.
+                                        getGlobalNameRef(copyOwner, 'user', 'UserName')
+                                        .then(
+                                          // When the reference has been obtained:
+                                          ref => {
+                                            if (! isError) {
+                                              copyOwnerRef = ref;
+                                              // Copy the tree.
+                                              serveCopyReport();
+                                            }
+                                          },
+                                          error => err(error, 'getting reference to copy owner')
+                                        );
+                                      }
+                                      // Otherwise, i.e. if no owner has been specified:
+                                      else {
+                                        // Copy the tree.
+                                        serveCopyReport();
+                                      }
+                                    };
+                                    // If the user story has tasks, reject it.
+                                    if (data.tasks.count) {
+                                      err(
+                                        'Attempt to copy to a user story with tasks', 'copying tree'
+                                      );
+                                    }
+                                    // Otherwise, if a project has been specified:
+                                    else if (copyProject) {
+                                      // Get a reference to it.
+                                      getGlobalNameRef(copyProject, 'project', 'Name')
+                                      .then(
+                                        // When the reference has been obtained:
+                                        ref => {
+                                          if (! isError) {
+                                            copyProjectRef = ref;
+                                            setOwnerAndServe();
+                                          }
+                                        },
+                                        error => err(error, 'getting reference to copy project')
+                                      );
+                                    }
+                                    // Otherwise, i.e. if no project has been specified:
+                                    else {
+                                      // Make copy work items inherit the new parent’s project.
+                                      copyProjectRef = data.project;
+                                      setOwnerAndServe();
+                                    }
                                   }
                                 },
-                                error => err(
-                                  error, 'getting data on parent of tree copy'
-                                )
+                                error => err(error, 'getting data on copy parent')
                               );
                             }
                           }
                         },
-                        error => err(
-                          error, 'getting reference to parent of tree copy'
-                        )
+                        error => err(error, 'getting reference to copy parent')
                       );
                     }
-                    // Otherwise, if the operation is score acquisition:
+                    // OP SCORING
                     else if (op === 'score') {
                       // Checks for weight errors.
                       const validateWeights = (name, min, max) => {
@@ -2390,7 +2436,7 @@ const requestHandler = (request, res) => {
                         serveScoreReport();
                       }
                     }
-                    // Otherwise, if the operation is ownership change:
+                    // OP OWNERSHIP CHANGE
                     else if (op === 'take') {
                       // If an owner other than the user was specified:
                       if (takeWho) {
@@ -2413,7 +2459,7 @@ const requestHandler = (request, res) => {
                         serveTakeReport(userName);
                       }
                     }
-                    // Otherwise, if the operation is project change:
+                    // OP PROJECT CHANGE
                     else if (op === 'project') {
                       // Serve a report identifying the new project.
                       getGlobalNameRef(projectWhich, 'project', 'Name')
@@ -2427,7 +2473,7 @@ const requestHandler = (request, res) => {
                         error => err(error, 'getting reference to new project')
                       );
                     }
-                    // Otherwise, if the operation is scheduling:
+                    // OP SCHEDULING
                     else if (op === 'schedule') {
                       // Get the reference of the named release.
                       getProjectNameRef('release', scheduleRelease, 'scheduling')
@@ -2452,7 +2498,7 @@ const requestHandler = (request, res) => {
                         error => err(error, 'getting reference to release')
                       );
                     }
-                    // Otherwise, if the operation is task creation:
+                    // OP TASK CREATION
                     else if (op === 'task') {
                       if (taskName.length < 2) {
                         err('Task names invalid', 'creating tasks');
@@ -2468,7 +2514,7 @@ const requestHandler = (request, res) => {
                         }
                       }
                     }
-                    // Otherwise, if the operation is test-case creation:
+                    // OP TEST-CASE CREATION
                     else if (op === 'case') {
                       // If a test folder was specified:
                       if (caseFolder) {
@@ -2513,7 +2559,7 @@ const requestHandler = (request, res) => {
                         serveCaseReport();
                       }
                     }
-                    // Otherwise, if the operation is passing-result creation:
+                    // OP PASSING
                     else if (op === 'pass') {
                       if (! passBuild) {
                         err('Build blank', 'passing test cases');
@@ -2523,12 +2569,16 @@ const requestHandler = (request, res) => {
                         servePassReport();
                       }
                     }
+<<<<<<< HEAD
                     // Otherwise, if the operation is planification:
+=======
+                    // OP PLANIFICITATION
+>>>>>>> batch
                     else if (op === 'plan') {
                       // Planify the tree.
                       servePlanReport();
                     }
-                    // Otherwise, if the operation is tree documentation:
+                    // OP DOCUMENTATION
                     else if (op === 'doc') {
                       // Serve a report of the tree documentation.
                       serveDocReport();
