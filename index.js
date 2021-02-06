@@ -2322,56 +2322,58 @@ const requestHandler = (request, res) => {
                               .then(
                                 // When the data arrive:
                                 data => {
-                                  // Copies the tree.
-                                  const setOwnerAndServe = () => {
-                                    // If an owner has been specified:
-                                    if (copyOwner) {
+                                  if (! isError) {
+                                    // Copies the tree.
+                                    const setOwnerAndServe = () => {
+                                      // If an owner has been specified:
+                                      if (copyOwner) {
+                                        // Get a reference to it.
+                                        getGlobalNameRef(copyOwner, 'user', 'UserName')
+                                        .then(
+                                          // When the reference has been obtained:
+                                          ref => {
+                                            if (! isError) {
+                                              copyOwnerRef = ref;
+                                              // Copy the tree.
+                                              serveCopyReport();
+                                            }
+                                          },
+                                          error => err(error, 'getting reference to copy owner')
+                                        );
+                                      }
+                                      // Otherwise, i.e. if no owner has been specified:
+                                      else {
+                                        // Copy the tree.
+                                        serveCopyReport();
+                                      }
+                                    };
+                                    // If the user story has tasks, reject it.
+                                    if (data.tasks.count) {
+                                      err(
+                                        'Attempt to copy to a user story with tasks', 'copying tree'
+                                      );
+                                    }
+                                    // Otherwise, if a project has been specified:
+                                    else if (copyProject) {
                                       // Get a reference to it.
-                                      getGlobalNameRef(copyOwner, 'user', 'UserName')
+                                      getGlobalNameRef(copyProject, 'project', 'Name')
                                       .then(
                                         // When the reference has been obtained:
                                         ref => {
                                           if (! isError) {
-                                            copyOwnerRef = ref;
-                                            // Copy the tree.
-                                            serveCopyReport();
+                                            copyProjectRef = ref;
+                                            setOwnerAndServe();
                                           }
                                         },
-                                        error => err(error, 'getting reference to copy owner')
+                                        error => err(error, 'getting reference to copy project')
                                       );
                                     }
-                                    // Otherwise, i.e. if no owner has been specified:
+                                    // Otherwise, i.e. if no project has been specified:
                                     else {
-                                      // Copy the tree.
-                                      serveCopyReport();
+                                      // Make copy work items inherit the new parent’s project.
+                                      copyProjectRef = data.project;
+                                      setOwnerAndServe();
                                     }
-                                  };
-                                  // If the user story has tasks, reject it.
-                                  if (data.tasks.count) {
-                                    err(
-                                      'Attempt to copy to a user story with tasks', 'copying tree'
-                                    );
-                                  }
-                                  // Otherwise, if a project has been specified:
-                                  else if (copyProject) {
-                                    // Get a reference to it.
-                                    getGlobalNameRef(copyProject, 'project', 'Name')
-                                    .then(
-                                      // When the reference has been obtained:
-                                      ref => {
-                                        if (! isError) {
-                                          copyProjectRef = ref;
-                                          setOwnerAndServe();
-                                        }
-                                      },
-                                      error => err(error, 'getting reference to copy project')
-                                    );
-                                  }
-                                  // Otherwise, i.e. if no project has been specified:
-                                  else {
-                                    // Make copy work items inherit the new parent’s project.
-                                    copyProjectRef = data.project;
-                                    setOwnerAndServe();
                                   }
                                 },
                                 error => err(error, 'getting data on copy parent')
