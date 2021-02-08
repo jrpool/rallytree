@@ -64,7 +64,7 @@
                   placeholder="__storyPrefix__"
                   aria-labelledby="copyLabel copyParentLabel"
                 ><br>
-                <span id="copyOwnerLabel" class="indent">with current owner or</span>
+                <span id="copyOwnerLabel" class="label indent">with current owner or</span>
                 <input
                   id="copyOwner"
                   name="copyOwner"
@@ -73,7 +73,7 @@
                   maxwidth="60"
                   aria-labelledby="copyLabel copyOwnerLabel"
                 ><br>
-                <span id="copyProjectLabel" class="indent">with new parent&rsquo;s project or</span>
+                <span id="copyProjectLabel" class="label indent">with new parent&rsquo;s project or</span>
                 <input
                   id="copyProject"
                   name="copyProject"
@@ -81,7 +81,37 @@
                   size="55"
                   maxwidth="60"
                   aria-labelledby="copyLabel copyProjectLabel"
+                ><br>
+                <span id="copyReleaseLabel" class="label indent">with no release or</span>
+                <input
+                  id="copyRelease"
+                  name="copyRelease"
+                  type="text"
+                  size="10"
+                  maxwidth="20"
+                  aria-labelledby="copyLabel copyReleaseLabel"
+                >,
+                <span id="copyIterationLabel" class="label">with no iteration or</span>
+                <input
+                  id="copyIteration"
+                  name="copyIteration"
+                  type="text"
+                  size="12"
+                  maxwidth="30"
+                  aria-labelledby="copyLabel copyIterationLabel"
+                >,
+                <span id="copyStateLabel" class="label">with schedule state</span>
+                <select
+                  id="copyState"
+                  name="copyState"
+                  aria-labeledby="copyLabel copyStateLabel"
                 >
+                  <option value="Needs Definition" selected>Needs Definition</option>
+                  <option value="Defined">Defined</option>
+                  <option value="In-Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Accepted">Accepted</option>
+                </select>
               </p>
               <!--OP SCORE RETRIEVAL-->
               <p class="opeven">
