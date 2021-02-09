@@ -2288,20 +2288,25 @@ const requestHandler = (request, res) => {
         .then(
           // When it arrives:
           ref => {
-            // Set its global variable.
-            rootRef = shorten('userstory', 'hierarchicalrequirement', ref);
             if (! isError) {
-              // Get a reference to the user.
-              return getGlobalNameRef(userName, 'user', 'UserName')
-              .then(
-                // When it arrives:
-                ref => {
-                  // Set its global variable.
-                  userRef = ref;
-                  return '';
-                },
-                error => err(error, 'getting reference to user')
-              );
+            // Set its global variable.
+              rootRef = shorten('userstory', 'hierarchicalrequirement', ref);
+              if (! isError) {
+                // Get a reference to the user.
+                return getGlobalNameRef(userName, 'user', 'UserName')
+                .then(
+                  // When it arrives:
+                  ref => {
+                    // Set its global variable.
+                    userRef = ref;
+                    return '';
+                  },
+                  error => err(error, 'getting reference to user')
+                );
+              }
+              else {
+                return '';
+              }
             }
             else {
               return '';
