@@ -471,16 +471,10 @@ const copyTree = (storyRefs, parentRef) => {
                               // Process the remaining user stories.
                               return copyTree(storyRefs.slice(1), parentRef);
                             },
-                            error => err(
-                              error,
-                              'processing child user stories'
-                            )
+                            error => err(error,'processing child user stories')
                           );
                         },
-                        error => err(
-                          error,
-                          'getting data on child user stories'
-                        )
+                        error => err(error,'getting data on child user stories')
                       );
                     }
                     else {
@@ -499,10 +493,7 @@ const copyTree = (storyRefs, parentRef) => {
                       // When the test cases have been copied:
                       () => {
                         // if the original has tasks and they are to be copied:
-                        if (
-                          data.tasks.count
-                          && ['tasks', 'both'].includes(copyWhat)
-                        ) {
+                        if (data.tasks.count && ['tasks', 'both'].includes(copyWhat)) {
                           // Get data on the tasks and copy them.
                           return getAndCopyTasksOrCases('task', 'tasks', data, copyRef)
                           .then(
@@ -2275,31 +2266,8 @@ const requestHandler = (request, res) => {
       // Permit an event stream to be started.
       idle = true;
       const bodyObject = parse(Buffer.concat(bodyParts).toString());
+      const {cookie, op, password, rootID} = bodyObject;
       userName = bodyObject.userName;
-      const {
-        caseFolder,
-        caseSet,
-        cookie,
-        copyIteration,
-        copyOwner,
-        copyParent,
-        copyProject,
-        copyRelease,
-        op,
-        password,
-        projectWhich,
-        rootID,
-        scheduleIteration,
-        scheduleRelease,
-        takeWho,
-        taskName
-      } = bodyObject;
-      copyState = bodyObject.copyState;
-      caseTarget = bodyObject.caseTarget;
-      copyWhat = bodyObject.copyWhat;
-      passBuild = bodyObject.passBuild;
-      passNote = bodyObject.passNote;
-      scheduleState = bodyObject.scheduleState;
       RALLY_USERNAME = userName;
       RALLY_PASSWORD = password;
       // If the user has not deleted the content of the cookie field:
@@ -2313,14 +2281,14 @@ const requestHandler = (request, res) => {
         pass: password,
         requestOptions
       });
-      // Assigns values to global variables used in handling of POST requests.
+      // Assigns values to global variables for handling POST requests.
       const setGlobals = () => {
         // Get a long reference to the root user story.
         return getRef('hierarchicalrequirement', rootID, 'tree root')
         .then(
           // When it arrives:
           ref => {
-            // Set its global short-reference variable.
+            // Set its global variable.
             rootRef = shorten('userstory', 'hierarchicalrequirement', ref);
             if (! isError) {
               // Get a reference to the user.
@@ -2328,7 +2296,7 @@ const requestHandler = (request, res) => {
               .then(
                 // When it arrives:
                 ref => {
-                  // Set its global reference variable.
+                  // Set its global variable.
                   userRef = ref;
                   return '';
                 },
@@ -2351,12 +2319,15 @@ const requestHandler = (request, res) => {
           }
           // OP COPYING
           else if (op === 'copy') {
+            // Set the operation’s global variables.
+            copyState = bodyObject.copyState;
+            copyWhat = bodyObject.copyWhat;
             // Get a reference to the copy parent.
-            getRef('hierarchicalrequirement', copyParent, 'parent of tree copy')
+            getRef('hierarchicalrequirement', bodyObject.copyParent, 'parent of tree copy')
             .then(
               // When it arrives:
               ref => {
-                // Set its global reference variable. 
+                // Set its global variable. 
                 copyParentRef = shorten('userstory', 'hierarchicalrequirement', ref);
                 if (! isError) {
                   // Get data on the copy parent.
@@ -2372,14 +2343,14 @@ const requestHandler = (request, res) => {
                       // Otherwise, i.e. if the copy parent has no tasks:
                       else {
                         // Get a reference to the specified project, if any.
-                        getGlobalNameRef(copyProject, 'project', 'Project')
+                        getGlobalNameRef(bodyObject.copyProject, 'project', 'Project')
                         .then(
                           // When it or blank arrives:
                           ref => {
-                            // Set the global variable for the project of the copy.
+                            // Set its global variable.
                             copyProjectRef = ref || data.project;
                             // Get a reference to the specified owner, if any.
-                            getGlobalNameRef(copyOwner, 'user', 'UserName')
+                            getGlobalNameRef(bodyObject.copyOwner, 'user', 'UserName')
                             .then(
                               // When it or blank arrives:
                               ref => {
@@ -2387,7 +2358,7 @@ const requestHandler = (request, res) => {
                                 copyOwnerRef = ref;
                                 // Get a reference to the specified release, if any.
                                 getProjectNameRef(
-                                  copyProjectRef, 'release', copyRelease, 'tree copy'
+                                  copyProjectRef, 'release', bodyObject.copyRelease, 'tree copy'
                                 )
                                 .then(
                                   // When it or blank arrives:
@@ -2396,7 +2367,10 @@ const requestHandler = (request, res) => {
                                     copyReleaseRef = ref;
                                     // Get a reference to the specified iteration, if any.
                                     getProjectNameRef(
-                                      copyProjectRef, 'iteration', copyIteration, 'tree copy'
+                                      copyProjectRef,
+                                      'iteration',
+                                      bodyObject.copyIteration,
+                                      'tree copy'
                                     )
                                     .then(
                                       // When it or blank arrives:
@@ -2453,33 +2427,23 @@ const requestHandler = (request, res) => {
                   + i * (Number.parseInt(max, 10) - minNumber) / (values.length - 1);
               }
             };
+            const {scoreRiskMin, scoreRiskMax, scorePriorityMin, scorePriorityMax} = bodyObject;
             // Validate the weights.
-            validateWeights('risk', bodyObject.scoreRiskMin, bodyObject.scoreRiskMax);
+            validateWeights('risk', scoreRiskMin, scoreRiskMax);
             if (! isError) {
-              validateWeights(
-                'priority', bodyObject.scorePriorityMin, bodyObject.scorePriorityMax
-              );
-            }
-            if (! isError) {
-              // Set the score weights.
-              setScoreWeights(
-                'risk',
-                scoreRisks,
-                bodyObject.scoreRiskMin,
-                bodyObject.scoreRiskMax
-              );
-              setScoreWeights(
-                'priority',
-                scorePriorities,
-                bodyObject.scorePriorityMin,
-                bodyObject.scorePriorityMax
-              );
-              // Serve a report of the scores.
-              serveScoreReport();
+              validateWeights('priority', scorePriorityMin, scorePriorityMax);
+              if (! isError) {
+                // Set the score weights.
+                setScoreWeights('risk', scoreRisks, scoreRiskMin, scoreRiskMax);
+                setScoreWeights('priority', scorePriorities, scorePriorityMin, scorePriorityMax);
+                // Serve a report of the scores.
+                serveScoreReport();
+              }
             }
           }
           // OP OWNERSHIP CHANGE
           else if (op === 'take') {
+            const {takeWho} = bodyObject;
             // If an owner other than the user was specified:
             if (takeWho) {
               // Serve a report identifying the new owner.
@@ -2503,6 +2467,7 @@ const requestHandler = (request, res) => {
           }
           // OP PROJECT CHANGE
           else if (op === 'project') {
+            const projectWhich = bodyObject.projectWhich;
             // Serve a report identifying the new project.
             getGlobalNameRef(projectWhich, 'project', 'Name')
             .then(
@@ -2517,6 +2482,8 @@ const requestHandler = (request, res) => {
           }
           // OP SCHEDULING
           else if (op === 'schedule') {
+            scheduleState = bodyObject.scheduleState;
+            const {scheduleIteration, scheduleRelease} = bodyObject;
             // Get the reference of the named release.
             getProjectNameRef(rootRef, 'release', scheduleRelease, 'scheduling')
             .then(
@@ -2542,6 +2509,7 @@ const requestHandler = (request, res) => {
           }
           // OP TASK CREATION
           else if (op === 'task') {
+            const {taskName} = bodyObject;
             if (taskName.length < 2) {
               err('Task names invalid', 'creating tasks');
             }
@@ -2558,6 +2526,8 @@ const requestHandler = (request, res) => {
           }
           // OP TEST-CASE CREATION
           else if (op === 'case') {
+            caseTarget = bodyObject.caseTarget;
+            const {caseFolder, caseSet} = bodyObject;
             // If a test folder was specified:
             if (caseFolder) {
               getRef('testfolder', caseFolder, 'test-case creation')
@@ -2607,6 +2577,8 @@ const requestHandler = (request, res) => {
               err('Build blank', 'passing test cases');
             }
             else {
+              passBuild = bodyObject.passBuild;
+              passNote = bodyObject.passNote;
               // Serve a report on passing-result creation.
               servePassReport();
             }
