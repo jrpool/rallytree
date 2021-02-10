@@ -63,48 +63,49 @@
                   maxwidth="12"
                   placeholder="__storyPrefix__"
                   aria-labelledby="copyLabel copyParentLabel"
-                ><br>
-                <span id="copyOwnerLabel" class="label indent">with current owner or</span>
+                >
+                <span id="copyWithLabel" class="label">with</span>:<br>
+                <span id="copyOwnerLabel" class="label indent">current owner or</span>
                 <input
                   id="copyOwner"
                   name="copyOwner"
                   type="email"
                   size="55"
                   maxwidth="60"
-                  aria-labelledby="copyLabel copyOwnerLabel"
+                  aria-labelledby="copyLabel copyWithLabel copyOwnerLabel"
                 ><br>
-                <span id="copyProjectLabel" class="label indent">with new parent&rsquo;s project or</span>
+                <span id="copyProjectLabel" class="label indent">new parent&rsquo;s project or</span>
                 <input
                   id="copyProject"
                   name="copyProject"
                   type="text"
                   size="55"
                   maxwidth="60"
-                  aria-labelledby="copyLabel copyProjectLabel"
+                  aria-labelledby="copyLabel copyWithLabel copyProjectLabel"
                 ><br>
-                <span id="copyReleaseLabel" class="label indent">with no release or</span>
+                <span id="copyReleaseLabel" class="label indent">no release or</span>
                 <input
                   id="copyRelease"
                   name="copyRelease"
                   type="text"
                   size="10"
                   maxwidth="20"
-                  aria-labelledby="copyLabel copyReleaseLabel"
+                  aria-labelledby="copyLabel copyWithLabel copyReleaseLabel"
                 >,
-                <span id="copyIterationLabel" class="label">with no iteration or</span>
+                <span id="copyIterationLabel" class="label">no iteration or</span>
                 <input
                   id="copyIteration"
                   name="copyIteration"
                   type="text"
                   size="12"
                   maxwidth="30"
-                  aria-labelledby="copyLabel copyIterationLabel"
+                  aria-labelledby="copyLabel copyWithLabel copyIterationLabel"
                 >,
-                <span id="copyStateLabel" class="label">with schedule state</span>
+                <span id="copyStateLabel" class="label">schedule state</span>
                 <select
                   id="copyState"
                   name="copyState"
-                  aria-labeledby="copyLabel copyStateLabel"
+                  aria-labeledby="copyLabel copyWithLabel copyStateLabel"
                 >
                   <option value="Needs Definition" selected>Needs Definition</option>
                   <option value="Defined">Defined</option>
