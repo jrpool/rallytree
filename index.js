@@ -1039,17 +1039,17 @@ const schedulableCount = storyRefs => {
     return Promise.resolve('');
   }
 };
-// Recursively sets releases and iterations in a tree or subtree of user stories.
+// Recursively sets the schedule state in a tree or subtree of user stories.
 const scheduleTree = storyRefs => {
   if (storyRefs.length && ! isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
       // Get data on the first user story of the specified array.
-      return getItemData(firstRef, [], ['Children'])
+      return getItemData(firstRef, ['ScheduleState'], ['Children'])
       .then(
         // When the data arrive:
         data => {
-          // If the user story has child user stories, it cannot be scheduled, so:
+          // If the user story has child user stories, its schedule state cannot be set, so:
           if (data.children.count) {
             // Get data on them.
             return getCollectionData(data.children.ref, [], [])
@@ -1061,35 +1061,43 @@ const scheduleTree = storyRefs => {
                 .then(
                   // After they are processed, process the remaining user stories.
                   () => scheduleTree(storyRefs.slice(1)),
-                  error => err(error, 'scheduling child user stories')
+                  error => err(error, 'changing schedule state of child user stories')
                 );
               },
               error => err(
-                error, 'getting data on child user stories for scheduling'
+                error, 'getting data on child user stories'
               )
             );
           }
           // Otherwise, i.e. if the user story has no child user stories:
           else {
-            // Change its schedule state.
-            return restAPI.update({
-              ref: firstRef,
-              data: {
-                ScheduleState: scheduleState
-              }
-            })
-            .then(
-              // When the user story has been scheduled:
-              () => {
-                report([['changes']]);
-                // Process the remaining user stories.
-                return scheduleTree(storyRefs.slice(1));
-              },
-              error => err(error, 'scheduling user story')
-            );
+            // If it needs a schedule-state change:
+            if (data.scheduleState !== scheduleState) {
+            // Perform it.
+              return restAPI.update({
+                ref: firstRef,
+                data: {
+                  ScheduleState: scheduleState
+                }
+              })
+              .then(
+                // When its schedule state has been changed:
+                () => {
+                  report([['changes']]);
+                  // Process the remaining user stories.
+                  return scheduleTree(storyRefs.slice(1));
+                },
+                error => err(error, 'changing schedule state of user story')
+              );
+            }
+            // Otherwise, i.e. if the user story does not need a schedule-state change:
+            else {
+              // Process the remaining user stories.
+              return scheduleTree(storyRefs.slice(1));
+            }
           }
         },
-        error => err(error, 'getting data on user story for scheduling')
+        error => err(error, 'getting data on user story for schedule-state change')
       );
     }
     else {
@@ -1948,7 +1956,7 @@ const serveProjectReport = (projectWhich, projectRelease, projectIteration) => {
     error => err(error, 'reading projectReport page')
   );
 };
-// Serves the scheduling report page.
+// Serves the schedule-state report page.
 const serveScheduleReport = () => {
   fs.readFile('scheduleReport.html', 'utf8')
   .then(
