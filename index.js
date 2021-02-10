@@ -2538,7 +2538,7 @@ const requestHandler = (request, res) => {
           else if (op === 'task') {
             const {taskName} = bodyObject;
             if (taskName.length < 2) {
-              err('Task names invalid', 'creating tasks');
+              err('Task name(s) missing', 'creating tasks');
             }
             else {
               const delimiter = taskName[0];
@@ -2547,7 +2547,7 @@ const requestHandler = (request, res) => {
                 serveTaskReport();
               }
               else {
-                err('Empty task name', 'creating tasks');
+                err('Empty task name(s)', 'creating tasks');
               }
             }
           }
