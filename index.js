@@ -55,12 +55,12 @@ let copyWhat = 'both';
 let isError = false;
 let passBuild = '';
 let passNote = '';
+let projectIterationRef = '';
 let projectRef = '';
+let projectReleaseRef = '';
 let response = {};
 let restAPI = {};
 let rootRef = '';
-let scheduleIterationRef = '';
-let scheduleReleaseRef = '';
 let scheduleState = '';
 let scorePriorities = ['None', 'Useful', 'Important', 'Critical'];
 let scoreRisks = ['None', 'Low', 'Medium', 'High'];
@@ -116,11 +116,11 @@ const reinit = () => {
   isError = false;
   passBuild = '';
   passNote = '';
+  projectIterationRef = '';
   projectRef = '';
+  projectReleaseRef = '';
   restAPI = {};
   rootRef = '';
-  scheduleIterationRef = '';
-  scheduleReleaseRef = '';
   scheduleState = '';
   scorePriorities = ['None', 'Useful', 'Important', 'Critical'];
   scoreRisks = ['None', 'Low', 'Medium', 'High'];
@@ -908,7 +908,7 @@ const projectTree = storyRefs => {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
       // Get data on the first user story of the specified array.
-      return getItemData(firstRef, ['Project'], ['Children'])
+      return getItemData(firstRef, ['Project', 'Release', 'Iteration'], ['Children'])
       .then(
         // When the data arrive:
         data => {
@@ -933,29 +933,48 @@ const projectTree = storyRefs => {
               );
             };
             // FUNCTION DEFINITION END
+            // Initialize a configuration object for an update to the user story.
+            const config = {};
+            // Initialize an array of reportable events.
+            const events = [['total'], ['changes']];
             // If the user story belongs to no or a non-intended project:
             if (oldProjectRef && oldProjectRef !== projectRef || ! oldProjectRef) {
-              // Change its project.
+              // Add project to the object and array.
+              config.Project = projectRef;
+              events.push(['projectChanges']);
+            }
+            // If a release is specified and differs from the user story’s:
+            if (projectReleaseRef && projectReleaseRef !== data.release) {
+              // Add release to the object and array.
+              config.Release = projectReleaseRef;
+              events.push(['releaseChanges']);
+            }
+            // If an iteration is specified and differs from the user story’s:
+            if (projectIterationRef && projectIterationRef !== data.iteration) {
+              // Add iteration to the object and array.
+              config.Iteration = projectIterationRef;
+              events.push(['iterationChanges']);
+            }
+            // If the user story needs to be updated:
+            if (events.length > 2) {
+              // Update it.
               return restAPI.update({
                 ref: firstRef,
-                data: {
-                  Project: projectRef
-                }
+                data: config
               })
               .then(
-                // When the project has been changed:
+                // When it has been updated:
                 () => {
-                  report([['total'], ['changes']]);
+                  report(events);
                   // Process its child user stories and the remaining user stories.
                   return processMore();
                 },
-                error => err(error, 'changing project of user story')
+                error => err(error, 'changing project, release, and/or iteration of user story')
               );
             }
-            // Otherwise, i.e. if the user story belongs to the intended project:
+            // Otherwise, i.e. if the user story does not need to be updated:
             else {
-              report([['total']]);
-              // Process its children and the remaining user stories.
+              // Process its child user stories and the remaining user stories.
               return processMore();
             }
           }
@@ -963,7 +982,7 @@ const projectTree = storyRefs => {
             return '';
           }
         },
-        error => err(error, 'getting data on user story for project change')
+        error => err(error, 'getting data on user story')
       );
     }
     else {
@@ -1052,17 +1071,12 @@ const scheduleTree = storyRefs => {
           }
           // Otherwise, i.e. if the user story has no child user stories:
           else {
-            // Schedule it.
-            const schedule = {
-              Release: scheduleReleaseRef,
-              Iteration: scheduleIterationRef
-            };
-            if (scheduleState !== 'unchanged') {
-              schedule.ScheduleState = scheduleState;
-            }
+            // Change its schedule state.
             return restAPI.update({
               ref: firstRef,
-              data: schedule
+              data: {
+                ScheduleState: scheduleState
+              }
             })
             .then(
               // When the user story has been scheduled:
@@ -1907,7 +1921,7 @@ const serveTakeReport = name => {
   );
 };
 // Serves the change-project report page.
-const serveProjectReport = projectName => {
+const serveProjectReport = (projectWhich, projectRelease, projectIteration) => {
   fs.readFile('projectReport.html', 'utf8')
   .then(
     htmlContent => {
@@ -1915,11 +1929,17 @@ const serveProjectReport = projectName => {
       .then(
         jsContent => {
           const newJSContent = reportScriptPrep(
-            jsContent, '/projecttally', ['total', 'changes', 'error']
+            jsContent,
+            '/projecttally',
+            [
+              'total', 'changes', 'projectChanges', 'releaseChanges', 'iterationChanges', 'error'
+            ]
           );
           const newContent = reportPrep(htmlContent, newJSContent)
-          .replace('__projectName__', projectName)
-          .replace('__projectRef__', projectRef);
+          .replace('__projectWhich__', projectWhich)
+          .replace('__projectRef__', projectRef)
+          .replace('__projectRelease__', projectRelease)
+          .replace('__projectIteration__', projectIteration);
           servePage(newContent, true);
         },
         error => err(error, 'reading report script')
@@ -1929,7 +1949,7 @@ const serveProjectReport = projectName => {
   );
 };
 // Serves the scheduling report page.
-const serveScheduleReport = (releaseName, iterationName) => {
+const serveScheduleReport = () => {
   fs.readFile('scheduleReport.html', 'utf8')
   .then(
     htmlContent => {
@@ -1940,10 +1960,6 @@ const serveScheduleReport = (releaseName, iterationName) => {
             jsContent, '/scheduletally', ['total', 'changes', 'error']
           );
           const newContent = reportPrep(htmlContent, newJSContent)
-          .replace('__releaseName__', releaseName)
-          .replace('__releaseRef__', scheduleReleaseRef)
-          .replace('__iterationName__', iterationName)
-          .replace('__iterationRef__', scheduleIterationRef)
           .replace('__scheduleState__', scheduleState);
           servePage(newContent, true);
         },
@@ -2127,7 +2143,7 @@ const getProjectNameRef = (projectRef, type, name, context) => {
   // If a nonblank name has been specified:
   if (name.length) {
     /*
-      Get the reference of the specified member of the specified collection of the
+      Get a reference to the specified member of the specified collection of the
       specified project.
     */
     restAPI.query({
@@ -2363,7 +2379,7 @@ const requestHandler = (request, res) => {
                                 copyOwnerRef = ref;
                                 // Get a reference to the specified release, if any.
                                 getProjectNameRef(
-                                  copyProjectRef, 'release', bodyObject.copyRelease, 'tree copy'
+                                  copyProjectRef, 'release', bodyObject.copyRelease, 'copy'
                                 )
                                 .then(
                                   // When it or blank arrives:
@@ -2372,10 +2388,7 @@ const requestHandler = (request, res) => {
                                     copyReleaseRef = ref;
                                     // Get a reference to the specified iteration, if any.
                                     getProjectNameRef(
-                                      copyProjectRef,
-                                      'iteration',
-                                      bodyObject.copyIteration,
-                                      'tree copy'
+                                      copyProjectRef, 'iteration', bodyObject.copyIteration, 'copy'
                                     )
                                     .then(
                                       // When it or blank arrives:
@@ -2472,45 +2485,46 @@ const requestHandler = (request, res) => {
           }
           // OP PROJECT CHANGE
           else if (op === 'project') {
-            const projectWhich = bodyObject.projectWhich;
-            // Serve a report identifying the new project.
+            const {projectWhich, projectRelease, projectIteration} = bodyObject;
+            // Get a reference to the named project.
             getGlobalNameRef(projectWhich, 'project', 'Name')
             .then(
+              // When it arrives:
               ref => {
-                if (! isError) {
-                  projectRef = ref;
-                  serveProjectReport(projectWhich);
-                }
+                // Set its global variable.
+                projectRef = ref;
+                // Get a reference to the named release.
+                getProjectNameRef(ref, 'release', projectRelease, 'project change')
+                .then(
+                  // When it arrives:
+                  ref => {
+                    // Set its global variable.
+                    projectReleaseRef = ref;
+                    // Get a reference to the named iteration.
+                    getProjectNameRef(rootRef, 'iteration', projectIteration, 'scheduling')
+                    .then(
+                      // When it arrives:
+                      ref => {
+                        // Set its global variable.
+                        projectIterationRef = ref;
+                        // Serve a report identifying the project, release, and iteration.
+                        serveProjectReport(projectWhich, projectRelease, projectIteration);
+                      },
+                      error => err(error, 'getting reference to iteration')
+                    );
+                  },
+                  error => err(error, 'getting reference to release')
+                );
               },
               error => err(error, 'getting reference to new project')
             );
           }
           // OP SCHEDULING
           else if (op === 'schedule') {
+            // Set the global schedule-state variable.
             scheduleState = bodyObject.scheduleState;
-            const {scheduleIteration, scheduleRelease} = bodyObject;
-            // Get the reference of the named release.
-            getProjectNameRef(rootRef, 'release', scheduleRelease, 'scheduling')
-            .then(
-              ref => {
-                if (! isError) {
-                  scheduleReleaseRef = ref;
-                  // Get the reference of the named iteration.
-                  getProjectNameRef(rootRef, 'iteration', scheduleIteration, 'scheduling')
-                  .then(
-                    ref => {
-                      if (! isError) {
-                        scheduleIterationRef = ref;
-                        // Serve a report identifying the release and iteration.
-                        serveScheduleReport(scheduleRelease, scheduleIteration);
-                      }
-                    },
-                    error => err(error, 'getting reference to iteration')
-                  );
-                }
-              },
-              error => err(error, 'getting reference to release')
-            );
+            // Serve a report.
+            serveScheduleReport();
           }
           // OP TASK CREATION
           else if (op === 'task') {

@@ -16,7 +16,10 @@
           <h2>Results</h2>
           <h3>User stories</h3>
           <p>Checked: <span id="total" role="status">0</span></p>
-          <p>Changed: <span id="changes" role="status">0</span></p>
+          <p>Total changed: <span id="changes" role="status">0</span></p>
+          <p>Project changed: <span id="projectChanges" role="status">0</span></p>
+          <p>Release changed: <span id="releaseChanges" role="status">0</span></p>
+          <p>Iteration changed: <span id="iterationChanges" role="status">0</span></p>
           <div id="error" class="error" role="alert"></div>
         </section>
         <section class="odd">
@@ -27,11 +30,29 @@
         <section class="even">
           <h2>New project</h2>
           <p>The new project of all user stories, tasks, and test cases in the tree is</p>
-          <pre>__projectName__</pre>
+          <pre>__projectWhich__</pre>
           <p class="more">
-            The new project&rsquo;s Rally user reference is
+            The new project&rsquo;s Rally reference is
           </p>
           <pre>__projectRef__</pre>
+        </section>
+        <section class="even">
+          <h2>New release</h2>
+          <p>The new release of all schedulable user stories in the tree is</p>
+          <pre>__projectRelease__</pre>
+          <p class="more">
+            The new release&rsquo;s Rally reference is
+          </p>
+          <pre>__projectReleaseRef__</pre>
+        </section>
+        <section class="even">
+          <h2>New iteration</h2>
+          <p>The new iteration of all schedulable user stories in the tree is</p>
+          <pre>__projectIteration__</pre>
+          <p class="more">
+            The new iteration&rsquo;s Rally reference is
+          </p>
+          <pre>__projectIterationRef__</pre>
         </section>
         <section class="odd">
           <h2>You</h2>

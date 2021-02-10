@@ -12,43 +12,43 @@ RallyTree can perform these operations on a tree:
 
 ## Tree-copy creation
 
-This feature copies a tree. You designate an existing user story as the parent of the root user story of the new tree. That parent must not have any tasks and must not be in the tree that you are copying. Only user stories, optionally with their tasks and/or test cases, are copied, but not defects. In a copy of a user story, task, or test case, the name, rank, and description are copied from the original; you can choose whether the owner is copied from the original or is set to a particular user; you can choose whether the project affiliation is copied from the designated parent of the root of the tree copy or is set to a particular project; and, for a user story, you can specify the release, iteration, and schedule state.
+This operation copies a tree. You designate an existing user story as the parent of the root user story of the new tree. That parent must not have any tasks and must not be in the tree that you are copying. Only user stories, optionally with their tasks and/or test cases, are copied, but not defects. In a copy of a user story, task, or test case, the name, rank, and description are copied from the original; you can choose whether the owner is copied from the original or is set to a particular user; you can choose whether the project affiliation is copied from the designated parent of the root of the tree copy or is set to a particular project; and, for a user story, you can specify the release, iteration, and schedule state.
 
 ## Scoring
 
-This feature tallies the passing and failing results of the last runs of all the test cases, and the counts of defects, major defects, and minor defects, in a tree. It also reports a score, based on the risks and priorities of the passed and failed test cases. You can set the minimum and maximum risk and priority weights in the score. Between those limits, risk and priority increments are uniform. For example, the risk levels are “None”, “Low”, “Medium”, and “High”. If you set the risk limits to 1 and 7, then the risk levels are weighed 1, 3, 5, and 7, respectively. The weight of a test case is the sum of its risk weight and its priority weight. The score is the sum of the passing test cases’ weights, as a percentage of the sum of the passing and failing test cases’ weights.
+This operation tallies the passing and failing results of the last runs of all the test cases, and the counts of defects, major defects, and minor defects, in a tree. It also reports a score, based on the risks and priorities of the passed and failed test cases. You can set the minimum and maximum risk and priority weights in the score. Between those limits, risk and priority increments are uniform. For example, the risk levels are “None”, “Low”, “Medium”, and “High”. If you set the risk limits to 1 and 7, then the risk levels are weighed 1, 3, 5, and 7, respectively. The weight of a test case is the sum of its risk weight and its priority weight. The score is the sum of the passing test cases’ weights, as a percentage of the sum of the passing and failing test cases’ weights.
 
 ## Owner change
 
-This feature ensures that each user story, task, and test case in a tree has the desired owner. You can choose whether to become the new owner or instead to specify another user as the new owner.
+This operation ensures that each user story, task, and test case in a tree has the desired owner. You can choose whether to become the new owner or instead to specify another user as the new owner.
 
 ## Project change
 
-This feature ensures that each user story in a tree belongs to the desired project. Changing the project of a user story also makes its tasks and test cases belong to the same project. In case a user story already belongs to the desired project, but it has any tasks or test cases belonging to no or other projects, their project affiliations will not be changed. If you have a tree in this situation, you can change its project twice, with the second change specifying the project you really want. That will guarantee that all its user stories, tasks, and test cases belong to the desired project.
+This operation ensures that each user story in a tree belongs to the desired project. Changing the project of a user story also makes its tasks and test cases belong to the same project. Each project has project-specific sets of releases and iterations. When specifying a project, you may also specify a release and/or an iteration.
 
-## Scheduling
+## Schedule-state change
 
-This feature assigns a release, an iteration, and optionally a schedule state to each schedulable user story in a tree. A user story is schedulable if it has no child user stories.
+This operation assigns a schedule state to each schedulable user story in a tree. A user story is schedulable if it has no child user stories.
 
 ## Task creation
 
-This feature adds tasks to each user story with no child user stories in a tree. You can choose how many tasks to add to each user story and give a name to each task.
+This operation adds tasks to each user story with no child user stories in a tree. You can choose how many tasks to add to each user story and give a name to each task.
 
 ## Test-case creation
 
-This feature adds test cases to a tree’s user stories that have no child user stories. Generally, each such user story acquires one test case, to which it gives its name, description, and owner. However, the counts and names of test cases can be customized. You can also specify a test folder and/or a test set that the test cases will all belong to.
+This operation adds test cases to a tree’s user stories that have no child user stories. Generally, each such user story acquires one test case, to which it gives its name, description, and owner. However, the counts and names of test cases can be customized. You can also specify a test folder and/or a test set that the test cases will all belong to.
 
 ## Pass creation
 
-This feature creates passing results for all test cases of user stories in a tree, except for test cases that already have results or that have no owner. If a test case is in any test sets, the result is defined as belonging to the first of those test sets. You must specify a build (asRally requires) and may specify a note, to be applied to all of the new results. Whoever is the owner of the test case is defined as the tester of the result.
+This operation creates passing results for all test cases of user stories in a tree, except for test cases that already have results or that have no owner. If a test case is in any test sets, the result is defined as belonging to the first of those test sets. You must specify a build (asRally requires) and may specify a note, to be applied to all of the new results. Whoever is the owner of the test case is defined as the tester of the result.
 
 ## Planification
 
-This feature creates a test plan (a tree of test folders and test cases) that mirrors a tree of user stories and test cases.
+This operation creates a test plan (a tree of test folders and test cases) that mirrors a tree of user stories and test cases.
 
 ## Documentation
 
-This feature produces a JSON representation of a tree of user stories.
+This operation produces a JSON representation of a tree of user stories.
 
 # Customization
 
@@ -235,7 +235,7 @@ In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdi
 
 # Version notes
 
-Version 1.6.2 adds options to specify the release, iteration, and schedule state of copies of user stories.
+Version 1.6.2 adds options to specify the release, iteration, and schedule state of copies of user stories. It also corrects the project-change and scheduling operations, which previously were inconsistent with Rally’s ontology. Releases and iterations in Rally are project-specific, so RallyTree cannot properly validate the release and iteration that you specify unless you also specify a project, thereby ensuring that all user stories in the tree will belong to the same project. So, starting with this version, the scheduling operation is reduced to setting the schedule state; changing the release and/or iteration is now part of the project-change operation. In this version, all five schedule states (including “Needs Definition”) become options, instead of only four of them.
 
 Version 1.6.1 adds options to specify the owner and the project of copies of work items.
 

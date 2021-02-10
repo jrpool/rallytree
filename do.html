@@ -198,12 +198,31 @@
                   id="projectWhich"
                   name="projectWhich"
                   type="text"
-                  size="60"
+                  size="50"
                   maxwidth="60"
                   aria-labelledby="projectLabel projectWhichLabel"
                 >
+                <span id="projectScheduleLabel" class="label">optionally with</span>:<br>
+                <span id="projectReleaseLabel" class="label indent">release</span>
+                <input
+                  id="projectRelease"
+                  name="projectRelease"
+                  type="text"
+                  size="10"
+                  maxwidth="20"
+                  aria-labelledby="projectLabel projectScheduleLabel projectReleaseLabel"
+                >,
+                <span id="projectIterationLabel" class="label">iteration</span>
+                <input
+                  id="projectIteration"
+                  name="projectIteration"
+                  type="text"
+                  size="12"
+                  maxwidth="30"
+                  aria-labelledby="projectLabel projectScheduleLabel projectIterationLabel"
+                >
               </p>
-              <!--OP SCHEDULE-->
+              <!--OP SCHEDULE STATE CHANGE-->
               <p class="opodd">
                 <input
                   id="opSchedule"
@@ -212,32 +231,14 @@
                   value="schedule"
                   aria-labelledby="scheduleLabel"
                 >
-                <span id="scheduleLabel" class="label">Schedule</span>:
-                <span id="scheduleReleaseLabel" class="label">release</span>
-                <input
-                  id="scheduleRelease"
-                  name="scheduleRelease"
-                  type="text"
-                  size="10"
-                  maxwidth="20"
-                  aria-labelledby="scheduleLabel scheduleReleaseLabel"
-                >;
-                <span id="scheduleIterationLabel" class="label">iteration</span>
-                <input
-                  id="scheduleIteration"
-                  name="scheduleIteration"
-                  type="text"
-                  size="12"
-                  maxwidth="30"
-                  aria-labelledby="scheduleLabel scheduleIterationLabel"
-                >;
-                <span id="scheduleStateLabel" class="label">schedule state</span>
+                <span id="scheduleLabel" class="label">Change schedule state</span>
+                <span id="scheduleStateLabel" class="label">to</span>
                 <select
                   id="scheduleState"
                   name="scheduleState"
                   aria-labeledby="scheduleLabel scheduleStateLabel"
                 >
-                  <option value="unchanged" selected>unchanged</option>
+                  <option value="Needs Definition" selected>Needs Definition</option>
                   <option value="Defined">Defined</option>
                   <option value="In-Progress">In Progress</option>
                   <option value="Completed">Completed</option>
@@ -248,9 +249,7 @@
               <p class="opeven">
                 <input id="opTask" type="radio" name="op" value="task" aria-labelledby="taskLabel">
                 <span id="taskLabel" class="label">Add tasks</span>
-                <span id="taskNameLabel" class="label">
-                  named (e.g. <code>;Do X;Do Y</code>)
-                </span>
+                <span id="taskNameLabel" class="label">named (e.g. <code>;Do X;Do Y</code>)</span>
                 <input
                   id="taskName"
                   name="taskName"
