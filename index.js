@@ -2543,6 +2543,9 @@ const requestHandler = (request, res) => {
             else {
               const delimiter = taskName[0];
               taskNames.push(...taskName.slice(1).split(delimiter));
+              for (let i = 0; i < taskNames.length; i++) {
+                taskNames[i] = taskNames[i].trim();
+              }
               if (taskNames.every(taskName => taskName.length)) {
                 serveTaskReport();
               }
