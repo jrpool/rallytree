@@ -999,52 +999,6 @@ const projectTree = storyRefs => {
     return Promise.resolve('');
   }
 };
-// Returns the count of schedulable user stories.
-const schedulableCount = storyRefs => {
-  if (storyRefs.length && ! isError) {
-    const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
-    if (! isError) {
-      // Get data on the first user story of the specified array.
-      return getItemData(firstRef, [], ['Children'])
-      .then(
-        // When the data arrive:
-        data => {
-          // If the user story has child user stories:
-          if (data.children.count) {
-            // Get data on them.
-            return getCollectionData(data.children.ref, [], [])
-            .then(
-              // When the data arrive:
-              children => {
-                // Process the child user stories sequentially.
-                return schedulableCount(children.map(child => child.ref))
-                .then(
-                  // After they are processed, process the remaining user stories.
-                  () => schedulableCount(storyRefs.slice(1)),
-                  error => err(error, 'counting child user stories for schedulable count')
-                );
-              },
-              error => err(error, 'getting data on child user stories for schedulable count')
-            );
-          }
-          // Otherwise, i.e. if the user story has no child user stories:
-          else {
-            report([['total']]);
-            // Process the remaining user stories.
-            return schedulableCount(storyRefs.slice(1));
-          }
-        },
-        error => err(error, 'getting data on first user story for schedulable count')
-      );
-    }
-    else {
-      return Promise.resolve('');
-    }
-  }
-  else {
-    return Promise.resolve('');
-  }
-};
 // Recursively sets the schedule state in a tree or subtree of user stories.
 const scheduleTree = storyRefs => {
   if (storyRefs.length && ! isError) {
@@ -1079,41 +1033,46 @@ const scheduleTree = storyRefs => {
           else if (data.tasks.count) {
             // Recursively sets the states of an array of tasks. FUNCTION DEFINITION START
             const scheduleTasks = taskRefs => {
-              const firstRef = shorten('task', 'task', taskRefs[0]);
-              if (! isError) {
-                // Get data on the first task of the array.
-                return getItemData(firstRef, ['State'])
-                .then(
-                  // When the data arrive:
-                  data => {
-                    // If the task already has the specified state:
-                    if (data.state === scheduleState.task) {
-                      report([['taskTotal']]);
-                      // Set the states of the remaining tasks.
-                      return scheduleTasks(taskRefs.slice(1));
-                    }
-                    // Otherwise, i.e. if the task does not have the specified state:
-                    else {
-                      // Change the task’s state.
-                      return restAPI.update({
-                        ref: firstRef,
-                        data: {
-                          State: scheduleState.task
-                        }
-                      })
-                      .then(
-                        // When it has been changed:
-                        () => {
-                          report([['taskTotal'], ['taskChanges']]);
-                          // Set the states of the remaining tasks.
-                          return scheduleTasks(taskRefs.slice());
-                        },
-                        error => err(error, 'changing state of task')
-                      );
-                    }
-                  },
-                  error => err(error, 'getting data on task')
-                );
+              if (taskRefs.length && ! isError) {
+                const firstRef = shorten('task', 'task', taskRefs[0]);
+                if (! isError) {
+                  // Get data on the first task of the array.
+                  return getItemData(firstRef, ['State'], [])
+                  .then(
+                    // When the data arrive:
+                    data => {
+                      // If the task already has the specified state:
+                      if (data.state === scheduleState.task) {
+                        report([['total'], ['taskTotal']]);
+                        // Set the states of the remaining tasks.
+                        return scheduleTasks(taskRefs.slice(1));
+                      }
+                      // Otherwise, i.e. if the task does not have the specified state:
+                      else {
+                        // Change the task’s state.
+                        return restAPI.update({
+                          ref: firstRef,
+                          data: {
+                            State: scheduleState.task
+                          }
+                        })
+                        .then(
+                          // When it has been changed:
+                          () => {
+                            report([['total'], ['taskTotal'], ['changes'], ['taskChanges']]);
+                            // Set the states of the remaining tasks.
+                            return scheduleTasks(taskRefs.slice(1));
+                          },
+                          error => err(error, 'changing state of task')
+                        );
+                      }
+                    },
+                    error => err(error, 'getting data on task')
+                  );
+                }
+                else {
+                  return Promise.resolve('');
+                }
               }
               else {
                 return Promise.resolve('');
@@ -1123,9 +1082,9 @@ const scheduleTree = storyRefs => {
             return getCollectionData(data.tasks.ref, [], [])
             .then(
               // When the data arrive:
-              taskRefs => {
+              tasks => {
                 // Change their states.
-                return scheduleTasks(taskRefs)
+                return scheduleTasks(tasks.map(task => task.ref))
                 .then(
                   // When they have been changed:
                   () => {
@@ -1142,7 +1101,7 @@ const scheduleTree = storyRefs => {
           else {
             // If it needs a schedule-state change:
             if (data.scheduleState !== scheduleState.story) {
-            // Perform it.
+              // Perform it.
               return restAPI.update({
                 ref: firstRef,
                 data: {
@@ -1340,6 +1299,7 @@ const caseTree = storyRefs => {
       .then(
         // When the data arrive:
         data => {
+          report([['total']]);
           // If the user story is a leaf or all user stories are to get test cases:
           if (caseTarget === 'all' || ! data.children.count) {
             // Determine the default or customized names of the test cases.
@@ -1349,7 +1309,6 @@ const caseTree = storyRefs => {
             .then(
               // When they have been created:
               () => {
-                report([['total']]);
                 // If the user story has child user stories:
                 if (data.children.count) {
                   // Get data on them.
@@ -1379,7 +1338,6 @@ const caseTree = storyRefs => {
           }
           // Otherwise, i.e. if the user story has child user stories and is not to get test cases:
           else {
-            report([['total']]);
             // Get data on its child user stories.
             return getCollectionData(data.children.ref, [], [])
             .then(
@@ -1487,6 +1445,7 @@ const passCases = caseRefs => {
           }
           // Otherwise, i.e. if the test case has no results and no owner:
           else {
+            report([['total']]);
             // Process the remaining test cases.
             return passCases(caseRefs.slice(1));
           }
@@ -2331,7 +2290,7 @@ const requestHandler = (request, res) => {
       }
       else if (requestURL === '/scheduletally' && idle) {
         streamInit();
-        schedulableCount([rootRef]).then(() => scheduleTree([rootRef]));
+        scheduleTree([rootRef]);
       }
       else if (requestURL === '/tasktally' && idle) {
         streamInit();
@@ -2600,15 +2559,15 @@ const requestHandler = (request, res) => {
           // OP SCHEDULING
           else if (op === 'schedule') {
             // Set the global schedule-state variable.
-            scheduleState.body = bodyObject.scheduleState;
-            if (scheduleState.body === 'Needs Definition') {
+            scheduleState.story = bodyObject.scheduleState;
+            if (scheduleState.story === 'Needs Definition') {
               scheduleState.task = 'Defined';
             }
-            else if (scheduleState.body === 'Accepted') {
+            else if (scheduleState.story === 'Accepted') {
               scheduleState.task = 'Completed';
             }
             else {
-              scheduleState.task = scheduleState.body;
+              scheduleState.task = scheduleState.story;
             }
             // Serve a report.
             serveScheduleReport();
