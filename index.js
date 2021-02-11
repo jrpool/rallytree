@@ -2009,9 +2009,7 @@ const serveProjectReport = (projectWhich, projectRelease, projectIteration) => {
           const newJSContent = reportScriptPrep(
             jsContent,
             '/projecttally',
-            [
-              'total', 'changes', 'projectChanges', 'releaseChanges', 'iterationChanges', 'error'
-            ]
+            ['total', 'changes', 'projectChanges', 'releaseChanges', 'iterationChanges', 'error']
           );
           const newContent = reportPrep(htmlContent, newJSContent)
           .replace('__projectWhich__', projectWhich)
@@ -2035,7 +2033,9 @@ const serveScheduleReport = () => {
       .then(
         jsContent => {
           const newJSContent = reportScriptPrep(
-            jsContent, '/scheduletally', ['total', 'changes', 'error']
+            jsContent,
+            '/scheduletally',
+            ['total', 'changes', 'storyTotal', 'storyChanges', 'taskTotal', 'taskChanges', 'error']
           );
           const newContent = reportPrep(htmlContent, newJSContent)
           .replace('__scheduleState__', scheduleState.story);
