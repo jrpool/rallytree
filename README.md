@@ -28,7 +28,7 @@ This operation ensures that each user story in a tree belongs to the desired pro
 
 ## Schedule-state change
 
-This operation assigns a schedule state to each schedulable user story in a tree. A user story is schedulable if it has no child user stories.
+This operation assigns one of five schedule states to each user story without child user stories or tasks, and one of three states to each task. If you choose “Needs Definition” or “Accepted”, tasks are made “Defined” or “Completed”, respectively.
 
 ## Task creation
 

@@ -61,7 +61,10 @@ let projectReleaseRef = '';
 let response = {};
 let restAPI = {};
 let rootRef = '';
-let scheduleState = '';
+let scheduleState = {
+  story: 'Needs Definition',
+  task: 'Defined'
+};
 let scorePriorities = ['None', 'Useful', 'Important', 'Critical'];
 let scoreRisks = ['None', 'Low', 'Medium', 'High'];
 let scoreWeights = {
@@ -121,7 +124,10 @@ const reinit = () => {
   projectReleaseRef = '';
   restAPI = {};
   rootRef = '';
-  scheduleState = '';
+  scheduleState = {
+    story: 'Needs Definition',
+    task: 'Defined'
+  };
   scorePriorities = ['None', 'Useful', 'Important', 'Critical'];
   scoreRisks = ['None', 'Low', 'Medium', 'High'];
   scoreWeights = {
@@ -1045,11 +1051,11 @@ const scheduleTree = storyRefs => {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
       // Get data on the first user story of the specified array.
-      return getItemData(firstRef, ['ScheduleState'], ['Children'])
+      return getItemData(firstRef, ['ScheduleState'], ['Children', 'Tasks'])
       .then(
         // When the data arrive:
         data => {
-          // If the user story has child user stories, its schedule state cannot be set, so:
+          // If the user story has child user stories, and therefore has no tasks:
           if (data.children.count) {
             // Get data on them.
             return getCollectionData(data.children.ref, [], [])
@@ -1069,21 +1075,84 @@ const scheduleTree = storyRefs => {
               )
             );
           }
-          // Otherwise, i.e. if the user story has no child user stories:
+          // Otherwise, if the user story has tasks, and therefore has no child user stories:
+          else if (data.tasks.count) {
+            // Recursively sets the states of an array of tasks. FUNCTION DEFINITION START
+            const scheduleTasks = taskRefs => {
+              const firstRef = shorten('task', 'task', taskRefs[0]);
+              if (! isError) {
+                // Get data on the first task of the array.
+                return getItemData(firstRef, ['State'])
+                .then(
+                  // When the data arrive:
+                  data => {
+                    // If the task already has the specified state:
+                    if (data.state === scheduleState.task) {
+                      report([['taskTotal']]);
+                      // Set the states of the remaining tasks.
+                      return scheduleTasks(taskRefs.slice(1));
+                    }
+                    // Otherwise, i.e. if the task does not have the specified state:
+                    else {
+                      // Change the task’s state.
+                      return restAPI.update({
+                        ref: firstRef,
+                        data: {
+                          State: scheduleState.task
+                        }
+                      })
+                      .then(
+                        // When it has been changed:
+                        () => {
+                          report([['taskTotal'], ['taskChanges']]);
+                          // Set the states of the remaining tasks.
+                          return scheduleTasks(taskRefs.slice());
+                        },
+                        error => err(error, 'changing state of task')
+                      );
+                    }
+                  },
+                  error => err(error, 'getting data on task')
+                );
+              }
+              else {
+                return Promise.resolve('');
+              }
+            };
+            // FUNCTION DEFINITION END. Get data on the tasks.
+            return getCollectionData(data.tasks.ref, [], [])
+            .then(
+              // When the data arrive:
+              taskRefs => {
+                // Change their states.
+                return scheduleTasks(taskRefs)
+                .then(
+                  // When they have been changed:
+                  () => {
+                    // Set the schedule states of the remaining user stories.
+                    return scheduleTree(storyRefs.slice(1));
+                  },
+                  error => err(error, 'changing states of tasks')
+                );
+              },
+              error => err(error, 'getting data on tasks')
+            );
+          }
+          // Otherwise, i.e. if the user story has no child user stories and no tasks:
           else {
             // If it needs a schedule-state change:
-            if (data.scheduleState !== scheduleState) {
+            if (data.scheduleState !== scheduleState.story) {
             // Perform it.
               return restAPI.update({
                 ref: firstRef,
                 data: {
-                  ScheduleState: scheduleState
+                  ScheduleState: scheduleState.story
                 }
               })
               .then(
                 // When its schedule state has been changed:
                 () => {
-                  report([['changes']]);
+                  report([['total'], ['storyTotal'], ['changes'], ['storyChanges']]);
                   // Process the remaining user stories.
                   return scheduleTree(storyRefs.slice(1));
                 },
@@ -1092,6 +1161,7 @@ const scheduleTree = storyRefs => {
             }
             // Otherwise, i.e. if the user story does not need a schedule-state change:
             else {
+              report([['total'], ['storyTotal']]);
               // Process the remaining user stories.
               return scheduleTree(storyRefs.slice(1));
             }
@@ -1968,7 +2038,7 @@ const serveScheduleReport = () => {
             jsContent, '/scheduletally', ['total', 'changes', 'error']
           );
           const newContent = reportPrep(htmlContent, newJSContent)
-          .replace('__scheduleState__', scheduleState);
+          .replace('__scheduleState__', scheduleState.story);
           servePage(newContent, true);
         },
         error => err(error, 'reading scheduleReport script')
@@ -2530,7 +2600,16 @@ const requestHandler = (request, res) => {
           // OP SCHEDULING
           else if (op === 'schedule') {
             // Set the global schedule-state variable.
-            scheduleState = bodyObject.scheduleState;
+            scheduleState.body = bodyObject.scheduleState;
+            if (scheduleState.body === 'Needs Definition') {
+              scheduleState.task = 'Defined';
+            }
+            else if (scheduleState.body === 'Accepted') {
+              scheduleState.task = 'Completed';
+            }
+            else {
+              scheduleState.task = scheduleState.body;
+            }
             // Serve a report.
             serveScheduleReport();
           }
