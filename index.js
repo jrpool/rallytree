@@ -50,7 +50,6 @@ let copyOwnerRef = '';
 let copyParentRef = '';
 let copyProjectRef = '';
 let copyReleaseRef = '';
-let copyState;
 let copyWhat = 'both';
 let isError = false;
 let passBuild = '';
@@ -61,9 +60,9 @@ let projectReleaseRef = '';
 let response = {};
 let restAPI = {};
 let rootRef = '';
-let scheduleState = {
-  story: 'Needs Definition',
-  task: 'Defined'
+let state = {
+  story: '',
+  task: ''
 };
 let scorePriorities = ['None', 'Useful', 'Important', 'Critical'];
 let scoreRisks = ['None', 'Low', 'Medium', 'High'];
@@ -114,7 +113,6 @@ const reinit = () => {
   copyParentRef = '';
   copyProjectRef = '';
   copyReleaseRef = '';
-  copyState= '';
   copyWhat = 'both';
   isError = false;
   passBuild = '';
@@ -124,9 +122,9 @@ const reinit = () => {
   projectReleaseRef = '';
   restAPI = {};
   rootRef = '';
-  scheduleState = {
-    story: 'Needs Definition',
-    task: 'Defined'
+  state = {
+    story: '',
+    task: ''
   };
   scorePriorities = ['None', 'Useful', 'Important', 'Critical'];
   scoreRisks = ['None', 'Low', 'Medium', 'High'];
@@ -356,13 +354,18 @@ const copyTasksOrCases = (itemType, itemRefs, storyRef) => {
               DragAndDropRank: data.dragAndDropRank,
               WorkProduct: storyRef
             };
+            // If the item is a task and a state has been specified, apply it.
+            if (itemType === 'task' && state.task) {
+              config.State = state.task;
+            }
             /*
               If the item is a test case, it will not automatically inherit the project of its
               user story, so specify its project.
             */
-            if (workItemType === 'testcase') {
+            if (itemType === 'case') {
               config.Project = copyProjectRef;
             }
+            // Copy the item.
             return restAPI.create({
               type: workItemType,
               fetch: ['_ref'],
@@ -372,7 +375,7 @@ const copyTasksOrCases = (itemType, itemRefs, storyRef) => {
               // When the item has been copied:
               () => {
                 report([['total'], [`${itemType}Total`]]);
-                // Copy the remaining items in the specified array.
+                // Copy the remaining items.
                 return copyTasksOrCases(itemType, itemRefs.slice(1), storyRef);
               },
               error => err(error, `copying ${itemType} ${firstRef}`)
@@ -407,7 +410,7 @@ const getAndCopyTasksOrCases = (itemType, collectionType, data, copyRef) => {
     error => err(error, `getting data on ${collectionType}`)
   );
 };
-// Recursively copies a tree or subtrees of user stories.
+// Recursively copies a tree or subtrees.
 const copyTree = (storyRefs, parentRef) => {
   if (storyRefs.length && ! isError) {
     // Identify and shorten the reference to the first user story.
@@ -430,6 +433,7 @@ const copyTree = (storyRefs, parentRef) => {
           }
           // Otherwise, i.e. if the user story is copiable:
           else {
+            // Specify the properties of its copy.
             const properties = {
               Name: data.name,
               Description: data.description,
@@ -444,8 +448,8 @@ const copyTree = (storyRefs, parentRef) => {
             if (copyIterationRef) {
               properties.Iteration = copyIterationRef;
             }
-            if (copyState) {
-              properties.ScheduleState = copyState;
+            if (state.story && ! data.tasks.count) {
+              properties.ScheduleState = state.story;
             }
             // Copy the user story.
             return restAPI.create({
@@ -460,6 +464,7 @@ const copyTree = (storyRefs, parentRef) => {
                 // Identify a short reference to the copy.
                 const copyRef = shorten('userstory', 'hierarchicalrequirement', copy.Object._ref);
                 if (! isError) {
+                  // FUNCTION DEFINITION START
                   // Copies child user stories and remaining user stories.
                   const copyChildrenAndSiblings = () => {
                     // If the original has any child user stories:
@@ -488,6 +493,7 @@ const copyTree = (storyRefs, parentRef) => {
                       return copyTree(storyRefs.slice(1), parentRef);
                     }
                   };
+                  // FUNCTION DEFINITION END.
                   // If the original has test cases and they are to be copied:
                   if (
                     data.testCases.count
@@ -1042,7 +1048,7 @@ const scheduleTree = storyRefs => {
                     // When the data arrive:
                     data => {
                       // If the task already has the specified state:
-                      if (data.state === scheduleState.task) {
+                      if (data.state === state.task) {
                         report([['total'], ['taskTotal']]);
                         // Set the states of the remaining tasks.
                         return scheduleTasks(taskRefs.slice(1));
@@ -1053,7 +1059,7 @@ const scheduleTree = storyRefs => {
                         return restAPI.update({
                           ref: firstRef,
                           data: {
-                            State: scheduleState.task
+                            State: state.task
                           }
                         })
                         .then(
@@ -1100,12 +1106,12 @@ const scheduleTree = storyRefs => {
           // Otherwise, i.e. if the user story has no child user stories and no tasks:
           else {
             // If it needs a schedule-state change:
-            if (data.scheduleState !== scheduleState.story) {
+            if (data.scheduleState !== state.story) {
               // Perform it.
               return restAPI.update({
                 ref: firstRef,
                 data: {
-                  ScheduleState: scheduleState.story
+                  ScheduleState: state.story
                 }
               })
               .then(
@@ -1394,10 +1400,9 @@ const passCases = caseRefs => {
       .then(
         // When the data arrive:
         data => {
+          report([['total']]);
           // If the test case already has results:
           if (data.results.count) {
-            // Do not create one.
-            report([['total']]);
             // Process the remaining test cases.
             return passCases(caseRefs.slice(1));
           }
@@ -1997,7 +2002,7 @@ const serveScheduleReport = () => {
             ['total', 'changes', 'storyTotal', 'storyChanges', 'taskTotal', 'taskChanges', 'error']
           );
           const newContent = reportPrep(htmlContent, newJSContent)
-          .replace('__scheduleState__', scheduleState.story);
+          .replace('__scheduleState__', state.story);
           servePage(newContent, true);
         },
         error => err(error, 'reading scheduleReport script')
@@ -2240,6 +2245,19 @@ const getGlobalNameRef = (name, type, key) => {
     return Promise.resolve('');
   }
 };
+// Sets the global state variable.
+const setState = scheduleState => {
+  state.story = scheduleState;
+  if (state.story === 'Needs Definition') {
+    state.task = 'Defined';
+  }
+  else if (state.story === 'Accepted') {
+    state.task = 'Completed';
+  }
+  else {
+    state.task = state.story;
+  }
+};
 // Handles requests, serving the request page and the acknowledgement page.
 const requestHandler = (request, res) => {
   response = res;
@@ -2378,7 +2396,7 @@ const requestHandler = (request, res) => {
           // OP COPYING
           else if (op === 'copy') {
             // Set the operation’s global variables.
-            copyState = bodyObject.copyState;
+            setState(bodyObject.copyState);
             copyWhat = bodyObject.copyWhat;
             // Get a reference to the copy parent.
             getRef('hierarchicalrequirement', bodyObject.copyParent, 'parent of tree copy')
@@ -2558,17 +2576,8 @@ const requestHandler = (request, res) => {
           }
           // OP SCHEDULING
           else if (op === 'schedule') {
-            // Set the global schedule-state variable.
-            scheduleState.story = bodyObject.scheduleState;
-            if (scheduleState.story === 'Needs Definition') {
-              scheduleState.task = 'Defined';
-            }
-            else if (scheduleState.story === 'Accepted') {
-              scheduleState.task = 'Completed';
-            }
-            else {
-              scheduleState.task = scheduleState.story;
-            }
+            // Set the global state variable.
+            setState(bodyObject.scheduleState);
             // Serve a report.
             serveScheduleReport();
           }
