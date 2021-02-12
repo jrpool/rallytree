@@ -1017,6 +1017,7 @@ const scheduleTree = storyRefs => {
         data => {
           // If the user story has child user stories, and therefore has no tasks:
           if (data.children.count) {
+            report([['total'], ['storyTotal']]);
             // Get data on them.
             return getCollectionData(data.children.ref, [], [])
             .then(
@@ -1037,7 +1038,8 @@ const scheduleTree = storyRefs => {
           }
           // Otherwise, if the user story has tasks, and therefore has no child user stories:
           else if (data.tasks.count) {
-            // Recursively sets the states of an array of tasks. FUNCTION DEFINITION START
+            // FUNCTION DEFINITION START
+            // Recursively sets the states of an array of tasks.
             const scheduleTasks = taskRefs => {
               if (taskRefs.length && ! isError) {
                 const firstRef = shorten('task', 'task', taskRefs[0]);
@@ -1084,7 +1086,9 @@ const scheduleTree = storyRefs => {
                 return Promise.resolve('');
               }
             };
-            // FUNCTION DEFINITION END. Get data on the tasks.
+            // FUNCTION DEFINITION END.
+            report([['total'], ['storyTotal']]);
+            // Get data on the tasks.
             return getCollectionData(data.tasks.ref, [], [])
             .then(
               // When the data arrive:
@@ -1283,9 +1287,10 @@ const createCases = (names, description, owner, storyRef) => {
     // Create the first test case.
     return createCase(names[0], description, owner, storyRef)
     .then(
-      // When it has been created, create the rest of the test cases.
+      // When it has been created:
       () => {
         report([['changes']]);
+        // Create the remaining test cases.
         return createCases(names.slice(1), description, owner, storyRef);
       },
       error => err(error, 'creating and linking test case')
@@ -1376,7 +1381,7 @@ const caseTree = storyRefs => {
 const createPass = (caseRef, tester, testSet) => {
   const data = {
     TestCase: caseRef,
-    Score: 'Pass',
+    Verdict: 'Pass',
     Build: passBuild,
     Notes: passNote,
     Date: new Date(),
@@ -1423,7 +1428,7 @@ const passCases = caseRefs => {
                   .then(
                     // When the result has been created:
                     () => {
-                      report([['total'], ['changes']]);
+                      report([['changes']]);
                       // Process the remaining test cases.
                       return passCases(caseRefs.slice(1));
                     },
@@ -1440,7 +1445,7 @@ const passCases = caseRefs => {
               .then(
                 // When the result has been created:
                 () => {
-                  report([['total'], ['changes']]);
+                  report([['changes']]);
                   // Process the remaining test cases.
                   return passCases(caseRefs.slice(1));
                 },
@@ -1450,7 +1455,6 @@ const passCases = caseRefs => {
           }
           // Otherwise, i.e. if the test case has no results and no owner:
           else {
-            report([['total']]);
             // Process the remaining test cases.
             return passCases(caseRefs.slice(1));
           }
@@ -1476,7 +1480,8 @@ const passTree = storyRefs => {
       .then(
         // When the data arrive:
         data => {
-          // Processes child user stories and remaining user stories. FUNCTION DEFINITION START
+          // FUNCTION DEFINITION START
+          // Processes child user stories and remaining user stories.
           const passChildrenAndSiblings = () => {
             // If the user story has child user stories:
             if (data.children.count) {
@@ -1515,8 +1520,13 @@ const passTree = storyRefs => {
                 .then(
                   // After they are processed:
                   () => {
-                    // Process child user stories and the remaining user stories.
-                    return passChildrenAndSiblings();
+                    if (! isError) {
+                      // Process child user stories and the remaining user stories.
+                      return passChildrenAndSiblings();
+                    }
+                    else {
+                      return '';
+                    }
                   },
                   error => err(error, 'creating passing results')
                 );
@@ -2650,11 +2660,11 @@ const requestHandler = (request, res) => {
           }
           // OP PASSING
           else if (op === 'pass') {
+            passBuild = bodyObject.passBuild;
             if (! passBuild) {
               err('Build blank', 'passing test cases');
             }
             else {
-              passBuild = bodyObject.passBuild;
               passNote = bodyObject.passNote;
               // Serve a report on passing-result creation.
               servePassReport();
