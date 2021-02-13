@@ -32,11 +32,11 @@ This operation assigns one of five schedule states to each user story without ch
 
 ## Task creation
 
-This operation adds tasks to each user story with no child user stories in a tree. You can choose how many tasks to add to each user story and give a name to each task.
+This operation adds tasks to each user story with no child user stories in a tree (hereafter, “leaf user stories”). You can choose how many tasks to add to each user story and give a name to each task.
 
 ## Test-case creation
 
-This operation adds test cases to a tree’s user stories that have no child user stories. Generally, each such user story acquires one test case, to which it gives its name, description, and owner. However, the counts and names of test cases can be customized. You can also specify a test folder and/or a test set that the test cases will all belong to.
+This operation adds test cases to a tree’s leaf user stories. Generally, each such user story acquires one test case, to which it gives its name, description, and owner. However, the counts and names of test cases can be customized. You can also specify a test folder and/or a test set that the test cases will all belong to.
 
 ## Pass creation
 
@@ -50,9 +50,41 @@ This operation creates a test plan (a tree of test folders and test cases) that 
 
 This operation produces a JSON representation of a tree of user stories.
 
-# Customization
+# Releases and iterations
 
-## Test cases
+In Rally, some user stories and all tasks have `release` and `iteration` properties. The rules governing these properties are somewhat complex.
+
+- Nonleaf user stories do not have these properties.
+- Tasks inherit these properties from the user stories they belong to.
+- Only leaf user stories can have tasks, so tasks always have releases and iterations that they can inherit.
+- Releases and iterations are project-specific, not global. Two projects need not have a release or iteration with the same name. Even if they do, those releases or iterations may or may not cover the same time period.
+- If you change the project of a user story that has a non-null release and/or iteration, Rally also changes the release and/or iteration of that user story, in accord with two rules:
+
+    - If the new project has a release or iteration with the same name as the existing one, even if it covers a different time period, it becomes the new release or iteration (hereafter, “the homonym rule”).
+    - Otherwise, the release or iteration becomes null.
+
+With RallyTree, when you change the project of a tree, you also choose a new release and a new iteration. You can choose any release and any iteration from those of the new project, or you can make either or both of them null. RallyTree does not implement the homonym rule.
+
+When you copy a tree, all work items in the copy belong to the same project, regardless of what projects the original work items belong to. The new project is, by default, the project of the designated copy parent. You can specify an alternative project. If you specify a release or an iteration for the copy, RallyTree checks to ensure that the release or iteration exists in the new project.
+
+# Schedule states and states
+
+In Rally, all user stories have schedule states, and all tasks have states. They are related by somewhat complex rules.
+
+- There are 5 schedule states: `Needs Definition`, `Defined`, `In-Progress`, `Completed`, and `Accepted`.
+- There are 3 states: `Defined`, `In-Progress`, and `Completed`.
+- Nonleaf user stories have purely derivative schedule states. You cannot set them. Rally sets them on the basis of their child user stories’ schedule states.
+- You can set the states of tasks.
+- User stories with tasks have hybrid schedule states. If you change the state of a task, Rally ensures that the schedule state of the user story that the task belongs to is consistent with the new set of states of its tasks.
+- You can change the schedule state of a leaf user story, but Rally may override your change later if the state of any of its tasks changes or if the user story acquires or loses tasks.
+
+When you execute the schedule-state operation, or when you copy a tree and specify a schedule state for the copy, RallyTree applies your chosen schedule state only to leaf user stories without tasks.
+
+RallyTree converts your chosen schedule state to a state and gives that state to all tasks. To reduce the 5 schedule states to 3 states, RallyTree converts `Needs Definition` to `Defined`, and `Accepted` to `Completed`.
+
+After RallyTree gives states to tasks, Rally may perform derivative modifications of the schedule states of the tasks’ user stories.
+
+# Test cases
 
 To customize the test cases that are created by the test-case creation operation, maintain a file named `caseData.js` in a top-level directory named `data` in your local repository. In that file, define a variable named `caseData` as follows:
 
@@ -69,7 +101,7 @@ exports.caseData = {
 };
 ```
 
-The `caseData` object can have any user-story names as property keys. For each such key, you may specify 0 or more test-case names. If any user story has a name identical to the specified user-story name and is eligible for test-case creation (i.e. has no child user stories), RallyTree will create test cases with the specified test-case names (if any) for that user story. For any eligible user story whose name is **not** in `caseData`, RallyTree will create 1 test case, and it will have the same name as the user story.
+The `caseData` object can have any user-story names as property keys. For each such key, you may specify 0 or more test-case names. If any eligible user story has a name identical to the specified user-story name, RallyTree will create test cases with the specified test-case names (if any) for that user story. For any eligible user story whose name is **not** in `caseData`, RallyTree will create 1 test case, and it will have the same name as the user story. (When you execute the test-case operation, you decide whether all user stories or only leaf user stories are eligible.)
 
 # Architecture
 
@@ -235,25 +267,12 @@ In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdi
 
 # Version notes
 
-Version 1.7.0 reorganizes and expands scheduling.
-- In Rally, you can assign values to the `release` and `iteration` properties of user stories without child user stories (referred to here as “schedulable user stories”). Releases and iterations are project-specific, not global. In the Rally UI, if you change the project of a user story that has a non-null release and/or iteration, Rally also changes the release and/or iteration. If the new project happens to have a release and/or iteration with the same name, even if it covers a different time period, it becomes the new release and/or iteration. If not, the release and/or iteration becomes null.
-- Tasks have releases and iterations, too, but they are purely derivative, set equal to those of the user stories to which they belong.
-- Previous versions of RallyTree checked releases and iterations for validity within the project of the root user story. But other user stories in the same tree might belong to other projects, which might not contain releases or iterations with the same names. The scheduling operation could, in that situation, try to give invalid values to some `release` and/or `iteration` properties, throwing an error.
-- Starting with this version of RallyTree, forcing all user stories to belong to the same project is a prerequisite to giving all schedulable user stories the same release and/or iteration. Therefore, release and iteration changes are now part of the project-change operation. If you perform the project-change operation and do not specify a release or iteration, any existing release or iteration is removed, even if the new project happens to have one with the same name. The previously multi-part scheduling operation no longer sets releases and iterations; it sets only schedule states (but in a new way: See below).
-- User stories have schedule states, and tasks have states. They are related.
+Version 1.7.0 reorganizes and expands project changes and scheduling.
 
-    - User stories with child user stories have purely derivative schedule states; Rally sets them on the basis of their child user stories’ schedule states, and you cannot set them.
-    - User stories with tasks have hybrid schedule states. If you change the state of a task, Rally ensures that the schedule state of the user story that the task belongs to is consistent with the new set of states of its tasks. You can change the user story’s schedule state, but Rally may undo your change later if the state of any of its tasks changes.
-    - Tasks have states, which you can set.
-
-    Previous versions of RallyTree ignored these dependencies; this version respects them.
-
-   - When you choose a schedule state, RallyTree applies it only to user stories that have neither child user stories nor tasks.
-   - If a user story has any tasks, RallyTree gives your chosen schedule state, or the most similar existing one, to those tasks, as states. Rally then may perform a derivative modification of the schedule state of the user story.
-   - Since there is no `Needs Definition` or `Accepted` task state, if you choose one of them RallyTree gives `Definition` or `Completed`, respectively, to tasks, while giving your chosen schedule state to user stories.
-
+- Previous versions checked releases and iterations for validity within the project of the root user story, but other user stories in the same tree might belong to other projects, which might not contain releases or iterations with the same names, so release or iteration names could be invalid and an error could be thrown. This version, as explained above, does not assign releases or iterations unless you force all user stories to belong to the same project.
+- Previous versions ignored the states of tasks; this version handles them as described above.
 - `Needs Definition` was previously not one of the selectable schedule states; now it is.
-- This version adds the ability to select a release, an iteration, and/or a schedule state (or state) for copies. The work items in a tree copy always belong to a single project: either the new parent’s or one you name. RallyTree checks on whether any release or iteration you specify exists in that project.
+- This version adds the ability to select a release, an iteration, and/or a schedule state (or state) for copies.
 
 Version 1.6.1 adds options to specify the owner and the project of copies of work items.
 
