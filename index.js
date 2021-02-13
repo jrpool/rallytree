@@ -428,7 +428,8 @@ const copyTree = (storyRefs, parentRef) => {
             if (copyIterationRef) {
               properties.Iteration = copyIterationRef;
             }
-            if (state.story && ! data.tasks.count) {
+            // The schedule state will be set but may be overridden by task inference.
+            if (state.story) {
               properties.ScheduleState = state.story;
             }
             // Copy the user story.
@@ -937,24 +938,22 @@ const projectTree = storyRefs => {
             if (oldProjectRef && oldProjectRef !== projectRef || ! oldProjectRef) {
               // Add project to the configuration and events.
               config.Project = projectRef;
-              events.push(['projectChanges']);
+              events.push(['changes'], ['projectChanges']);
             }
             // If the user story’s release needs to be changed:
             if (data.release !== projectReleaseRef && ! data.children.count) {
               // Add release to the configuration and events.
               config.Release = projectReleaseRef;
-              events.push([['releaseChanges']]);
+              events.push(['changes'], ['releaseChanges']);
             }
             // If the user story’s iteration needs to be changed:
             if (data.iteration !== projectIterationRef && ! data.children.count) {
               // Add iteration to the configuration and events.
               config.Iteration = projectIterationRef;
-              events.push([['iterationChanges']]);
+              events.push(['changes'], ['iterationChanges']);
             }
             // If the user story needs to be updated:
             if (events.length > 1) {
-              // Add changes to the events.
-              events.push([['changes']]);
               // Update it.
               return restAPI.update({
                 ref: firstRef,
@@ -2365,9 +2364,11 @@ const requestHandler = (request, res) => {
                 .then(
                   // When it arrives:
                   ref => {
-                    // Set its global variable.
-                    userRef = ref;
-                    return '';
+                    if (! isError) {
+                      // Set its global variable.
+                      userRef = ref;
+                      return '';
+                    }
                   },
                   error => err(error, 'getting reference to user')
                 );
@@ -2416,48 +2417,56 @@ const requestHandler = (request, res) => {
                       // Otherwise, i.e. if the copy parent has no tasks:
                       else {
                         // Get a reference to the specified project, if any.
-                        getGlobalNameRef(bodyObject.copyProject, 'project', 'Project')
+                        getGlobalNameRef(bodyObject.copyProject, 'project', 'Name')
                         .then(
                           // When it or blank arrives:
                           ref => {
-                            // Set its global variable.
-                            copyProjectRef = ref || data.project;
-                            // Get a reference to the specified owner, if any.
-                            getGlobalNameRef(bodyObject.copyOwner, 'user', 'UserName')
-                            .then(
-                              // When it or blank arrives:
-                              ref => {
-                                // Set its global variable.
-                                copyOwnerRef = ref;
-                                // Get a reference to the specified release, if any.
-                                getProjectNameRef(
-                                  copyProjectRef, 'release', bodyObject.copyRelease, 'copy'
-                                )
-                                .then(
-                                  // When it or blank arrives:
-                                  ref => {
+                            if (! isError) {
+                              // Set its global variable.
+                              copyProjectRef = ref || data.project;
+                              // Get a reference to the specified owner, if any.
+                              getGlobalNameRef(bodyObject.copyOwner, 'user', 'UserName')
+                              .then(
+                                // When it or blank arrives:
+                                ref => {
+                                  if (! isError) {
                                     // Set its global variable.
-                                    copyReleaseRef = ref;
-                                    // Get a reference to the specified iteration, if any.
+                                    copyOwnerRef = ref;
+                                    // Get a reference to the specified release, if any.
                                     getProjectNameRef(
-                                      copyProjectRef, 'iteration', bodyObject.copyIteration, 'copy'
+                                      copyProjectRef, 'release', bodyObject.copyRelease, 'copy'
                                     )
                                     .then(
                                       // When it or blank arrives:
                                       ref => {
-                                        // Set its global variable.
-                                        copyIterationRef = ref;
-                                        // Copy the tree.
-                                        serveCopyReport();
+                                        if (! isError) {
+                                          // Set its global variable.
+                                          copyReleaseRef = ref;
+                                          // Get a reference to the specified iteration, if any.
+                                          getProjectNameRef(
+                                            copyProjectRef, 'iteration', bodyObject.copyIteration, 'copy'
+                                          )
+                                          .then(
+                                            // When it or blank arrives:
+                                            ref => {
+                                              if (! isError) {
+                                                // Set its global variable.
+                                                copyIterationRef = ref;
+                                                // Copy the tree.
+                                                serveCopyReport();
+                                              }
+                                            },
+                                            error => err(error, 'getting reference to iteration')
+                                          );
+                                        }
                                       },
-                                      error => err(error, 'getting reference to iteration')
+                                      error => err(error, 'getting reference to release')
                                     );
-                                  },
-                                  error => err(error, 'getting reference to release')
-                                );
-                              },
-                              error => err(error, 'getting reference to owner')
-                            );
+                                  }
+                                },
+                                error => err(error, 'getting reference to owner')
+                              );
+                            }
                           },
                           error => err(error, 'getting reference to project')
                         );
@@ -2543,34 +2552,36 @@ const requestHandler = (request, res) => {
             .then(
               // When it arrives:
               ref => {
-                // Set its global variable.
-                projectRef = ref;
-                // Get a reference to the named release.
-                getProjectNameRef(projectRef, 'release', projectRelease, 'project change')
-                .then(
-                  // When it arrives:
-                  ref => {
-                    if (! isError) {
-                      // Set its global variable.
-                      projectReleaseRef = ref;
-                      // Get a reference to the named iteration.
-                      getProjectNameRef(projectRef, 'iteration', projectIteration, 'project change')
-                      .then(
-                        // When it arrives:
-                        ref => {
-                          if (! isError) {
-                            // Set its global variable.
-                            projectIterationRef = ref;
-                            // Serve a report identifying the project, release, and iteration.
-                            serveProjectReport(projectWhich, projectRelease, projectIteration);
-                          }
-                        },
-                        error => err(error, 'getting reference to iteration')
-                      );
-                    }
-                  },
-                  error => err(error, 'getting reference to release')
-                );
+                if (! isError) {
+                  // Set its global variable.
+                  projectRef = ref;
+                  // Get a reference to the named release.
+                  getProjectNameRef(projectRef, 'release', projectRelease, 'project change')
+                  .then(
+                    // When it arrives:
+                    ref => {
+                      if (! isError) {
+                        // Set its global variable.
+                        projectReleaseRef = ref;
+                        // Get a reference to the named iteration.
+                        getProjectNameRef(projectRef, 'iteration', projectIteration, 'project change')
+                        .then(
+                          // When it arrives:
+                          ref => {
+                            if (! isError) {
+                              // Set its global variable.
+                              projectIterationRef = ref;
+                              // Serve a report identifying the project, release, and iteration.
+                              serveProjectReport(projectWhich, projectRelease, projectIteration);
+                            }
+                          },
+                          error => err(error, 'getting reference to iteration')
+                        );
+                      }
+                    },
+                    error => err(error, 'getting reference to release')
+                  );
+                }
               },
               error => err(error, 'getting reference to new project')
             );
