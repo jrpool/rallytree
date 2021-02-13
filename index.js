@@ -42,6 +42,29 @@ const requestOptions = {
     process.env.RALLYINTEGRATIONVERSION || '1.0.4'
   }
 };
+const scorePriorities = ['None', 'Useful', 'Important', 'Critical'];
+const scoreRisks = ['None', 'Low', 'Medium', 'High'];
+const totalInit = {
+  caseChanges: 0,
+  caseTotal: 0,
+  changes: 0,
+  defects: 0,
+  denominator: 0,
+  fails: 0,
+  iterationChanges: 0,
+  major: 0,
+  minor: 0,
+  numerator: 0,
+  passes: 0,
+  projectChanges: 0,
+  releaseChanges: 0,
+  score: 0,
+  storyChanges: 0,
+  storyTotal: 0,
+  taskChanges: 0,
+  taskTotal: 0,
+  total: 0
+};
 let caseFolderRef = '';
 let caseSetRef = '';
 let caseTarget = 'all';
@@ -54,44 +77,25 @@ let copyWhat = 'both';
 let isError = false;
 let passBuild = '';
 let passNote = '';
-let projectIterationRef = '';
+let projectIterationRef = null;
 let projectRef = '';
-let projectReleaseRef = '';
+let projectReleaseRef = null;
 let response = {};
 let restAPI = {};
 let rootRef = '';
-let state = {
-  story: '',
-  task: ''
-};
-let scorePriorities = ['None', 'Useful', 'Important', 'Critical'];
-let scoreRisks = ['None', 'Low', 'Medium', 'High'];
-let scoreWeights = {
+const scoreWeights = {
   risk: {},
   priority: {}
+};
+const state = {
+  story: '',
+  task: ''
 };
 let takeWhoRef = '';
 let taskNames = [];
 let userName = '';
 let userRef = '';
-let totals = {
-  caseChanges: 0,
-  caseTotal: 0,
-  changes: 0,
-  defects: 0,
-  denominator: 0,
-  fails: 0,
-  major: 0,
-  minor: 0,
-  numerator: 0,
-  passes: 0,
-  score: 0,
-  storyChanges: 0,
-  storyTotal: 0,
-  taskChanges: 0,
-  taskTotal: 0,
-  total: 0
-};
+const totals = Object.assign({}, totalInit);
 let doc = [];
 let docTimeout = 0;
 let idle = false;
@@ -117,43 +121,19 @@ const reinit = () => {
   isError = false;
   passBuild = '';
   passNote = '';
-  projectIterationRef = '';
+  projectIterationRef = null;
   projectRef = '';
-  projectReleaseRef = '';
+  projectReleaseRef = null;
   restAPI = {};
   rootRef = '';
-  state = {
-    story: '',
-    task: ''
-  };
-  scorePriorities = ['None', 'Useful', 'Important', 'Critical'];
-  scoreRisks = ['None', 'Low', 'Medium', 'High'];
-  scoreWeights = {
-    risk: {},
-    priority: {}
-  };
+  state.story = state.task = '';
+  scoreWeights.risk = {};
+  scoreWeights.priority = {};
   takeWhoRef = '';
   taskNames = [];
+  Object.assign(totals, totalInit);
   userName = '';
   userRef = '';
-  totals = {
-    caseChanges: 0,
-    caseTotal: 0,
-    changes: 0,
-    defects: 0,
-    denominator: 0,
-    fails: 0,
-    major: 0,
-    minor: 0,
-    numerator: 0,
-    passes: 0,
-    score: 0,
-    storyChanges: 0,
-    storyTotal: 0,
-    taskChanges: 0,
-    taskTotal: 0,
-    total: 0
-  };
   doc = [];
   docTimeout = 0;
   idle = false;
@@ -914,7 +894,10 @@ const takeTree = storyRefs => {
     return Promise.resolve('');
   }
 };
-// Recursively changes project affiliations in a tree or subtree of user stories.
+/*
+  Recursively changes project affiliations, and optionally releases and/or iterations, of
+  user stories in a tree or subtree.
+*/
 const projectTree = storyRefs => {
   if (storyRefs.length && ! isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
@@ -926,7 +909,8 @@ const projectTree = storyRefs => {
         data => {
           const oldProjectRef = data.project ? shorten('project', 'project', data.project) : '';
           if (! isError) {
-            // Processes the children of the user story. FUNCTION DEFINITION START
+            // FUNCTION DEFINITION START
+            // Processes the children of the user story.
             const processMore = () => {
               // Get data on the user story’s child user stories.
               return getCollectionData(data.children.ref, [], [])
@@ -947,28 +931,30 @@ const projectTree = storyRefs => {
             // FUNCTION DEFINITION END
             // Initialize a configuration object for an update to the user story.
             const config = {};
-            // Initialize an array of reportable events.
-            const events = [['total'], ['changes']];
-            // If the user story belongs to no or a non-intended project:
+            // Initialize an array of events reportable for the user story.
+            const events = [['total']];
+            // If the user story’s project needs to be changed:
             if (oldProjectRef && oldProjectRef !== projectRef || ! oldProjectRef) {
-              // Add project to the object and array.
+              // Add project to the configuration and events.
               config.Project = projectRef;
               events.push(['projectChanges']);
             }
-            // If a release is specified and differs from the user story’s:
-            if (projectReleaseRef && projectReleaseRef !== data.release) {
-              // Add release to the object and array.
+            // If the user story’s release needs to be changed:
+            if (data.release !== projectReleaseRef && ! data.children.count) {
+              // Add release to the configuration and events.
               config.Release = projectReleaseRef;
-              events.push(['releaseChanges']);
+              events.push([['releaseChanges']]);
             }
-            // If an iteration is specified and differs from the user story’s:
-            if (projectIterationRef && projectIterationRef !== data.iteration) {
-              // Add iteration to the object and array.
+            // If the user story’s iteration needs to be changed:
+            if (data.iteration !== projectIterationRef && ! data.children.count) {
+              // Add iteration to the configuration and events.
               config.Iteration = projectIterationRef;
-              events.push(['iterationChanges']);
+              events.push([['iterationChanges']]);
             }
             // If the user story needs to be updated:
-            if (events.length > 2) {
+            if (events.length > 1) {
+              // Add changes to the events.
+              events.push([['changes']]);
               // Update it.
               return restAPI.update({
                 ref: firstRef,
@@ -986,6 +972,7 @@ const projectTree = storyRefs => {
             }
             // Otherwise, i.e. if the user story does not need to be updated:
             else {
+              report(events);
               // Process its child user stories and the remaining user stories.
               return processMore();
             }
@@ -2198,7 +2185,7 @@ const getProjectNameRef = (projectRef, type, name, context) => {
       Get a reference to the specified member of the specified collection of the
       specified project.
     */
-    restAPI.query({
+    return restAPI.query({
       type,
       fetch: '_ref',
       query: queryUtils.where('Name', '=', name).and('Project', '=', projectRef)
@@ -2559,24 +2546,28 @@ const requestHandler = (request, res) => {
                 // Set its global variable.
                 projectRef = ref;
                 // Get a reference to the named release.
-                getProjectNameRef(ref, 'release', projectRelease, 'project change')
+                getProjectNameRef(projectRef, 'release', projectRelease, 'project change')
                 .then(
                   // When it arrives:
                   ref => {
-                    // Set its global variable.
-                    projectReleaseRef = ref;
-                    // Get a reference to the named iteration.
-                    getProjectNameRef(rootRef, 'iteration', projectIteration, 'scheduling')
-                    .then(
-                      // When it arrives:
-                      ref => {
-                        // Set its global variable.
-                        projectIterationRef = ref;
-                        // Serve a report identifying the project, release, and iteration.
-                        serveProjectReport(projectWhich, projectRelease, projectIteration);
-                      },
-                      error => err(error, 'getting reference to iteration')
-                    );
+                    if (! isError) {
+                      // Set its global variable.
+                      projectReleaseRef = ref;
+                      // Get a reference to the named iteration.
+                      getProjectNameRef(projectRef, 'iteration', projectIteration, 'project change')
+                      .then(
+                        // When it arrives:
+                        ref => {
+                          if (! isError) {
+                            // Set its global variable.
+                            projectIterationRef = ref;
+                            // Serve a report identifying the project, release, and iteration.
+                            serveProjectReport(projectWhich, projectRelease, projectIteration);
+                          }
+                        },
+                        error => err(error, 'getting reference to iteration')
+                      );
+                    }
                   },
                   error => err(error, 'getting reference to release')
                 );
