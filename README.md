@@ -78,7 +78,7 @@ In Rally, all user stories have schedule states, and all tasks have states. They
 - User stories with tasks have hybrid schedule states. If you change the state of a task, Rally ensures that the schedule state of the user story that the task belongs to is consistent with the new set of states of its tasks.
 - You can change the schedule state of a leaf user story, but Rally may override your change later if the state of any of its tasks changes or if the user story acquires or loses tasks.
 
-When you execute the schedule-state operation, or when you copy a tree and specify a schedule state for the copy, RallyTree applies your chosen schedule state only to leaf user stories without tasks.
+When you execute the schedule-state operation, or when you copy a tree and specify a schedule state for the copy, RallyTree applies your chosen schedule state only to leaf user stories without tasks. However, in the copy operation, every user-story copy is initially a leaf without tasks, and your schedule-state specification is therefore applied to it, even if it will momentarily acquire tasks copied from its original, and when their states are set the user story’s schedule state may be derivatively modified by Rally.
 
 RallyTree converts your chosen schedule state to a state and gives that state to all tasks. To reduce the 5 schedule states to 3 states, RallyTree converts `Needs Definition` to `Defined`, and `Accepted` to `Completed`.
 
