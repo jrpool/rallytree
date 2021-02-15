@@ -267,6 +267,8 @@ In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdi
 
 # Version notes
 
+Version 1.7.1 corrects the obsolete destination of the “Use RallyTree again” link at the end of each report.
+
 Version 1.7.0 reorganizes and expands project changes and scheduling.
 
 - Previous versions checked releases and iterations for validity within the project of the root user story, but other user stories in the same tree might belong to other projects, which might not contain releases or iterations with the same names, so release or iteration names could be invalid and an error could be thrown. This version, as explained above, does not assign releases or iterations unless you force all user stories to belong to the same project.
