@@ -267,7 +267,7 @@ In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdi
 
 # Version notes
 
-Version 1.7.2 adds the option to specify a project to which created test cases will belong.
+Version 1.7.2 adds the option to specify a project to which created test cases will belong and refactors some code for parsimony.
 
 Version 1.7.1 corrects the obsolete destination of the “Use RallyTree again” link at the end of each report.
 
