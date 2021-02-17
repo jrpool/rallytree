@@ -273,7 +273,7 @@ In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdi
 
 # Version notes
 
-Version 1.7.4 adds to the copy operation the option to give the copy a feature parent
+Version 1.7.4 adds support for feature parents of user stories. In the documentation operation, the output identifies the parent of the root user story, which may be a feature or a user story. In the copy operation, you can choose either a user story or a feature as the parent of the tree copy.
 
 Version 1.7.3 extends the scope of the project-change operation, making it ensure that test cases belong to the specified project even when their user stories already do.
 

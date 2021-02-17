@@ -85,6 +85,7 @@ let caseTarget = 'all';
 let copyIterationRef = '';
 let copyOwnerRef = '';
 let copyParentRef = '';
+let copyParentType = 'hierarchicalrequirement';
 let copyProjectRef = '';
 let copyReleaseRef = '';
 let copyWhat = 'both';
@@ -120,6 +121,7 @@ const reinit = () => {
   copyIterationRef = '';
   copyOwnerRef = '';
   copyParentRef = '';
+  copyParentType = 'hierarchicalrequirement';
   copyProjectRef = '';
   copyReleaseRef = '';
   copyWhat = 'both';
@@ -263,65 +265,75 @@ const report = specs => {
 const lc0Of = string => string.length ? `${string[0].toLowerCase()}${string.slice(1)}` : '';
 // Gets data on a work item.
 const getItemData = (ref, facts, collections) => {
-  return restAPI.get({
-    ref,
-    fetch: facts.concat(collections)
-  })
-  .then(
-    item => {
-      const obj = item.Object;
-      const data = {};
-      // Get the facts, or, if they are objects, references to them.
-      facts.forEach(fact => {
-        data[lc0Of(fact)] = obj[fact] !== null && typeof obj[fact] === 'object'
-          ? obj[fact]._ref
-          : obj[fact];
-      });
-      // Get references to, and sizes of, the collections.
-      collections.forEach(collection => {
-        data[lc0Of(collection)] = {
-          ref: obj[collection]._ref,
-          count: obj[collection].Count
-        };
-      });
-      return data;
-    },
-    error => err(error, `getting data on ${ref}`)
-  );
-};
-// Gets data on a collection.
-const getCollectionData = (ref, facts, collections) => {
-  return restAPI.get({
-    ref,
-    fetch: facts.concat(collections)
-  })
-  .then(
-    collection => {
-      const members = collection.Object.Results;
-      const data = [];
-      members.forEach(member => {
-        const memberData = {
-          ref: member._ref
-        };
+  if (ref) {
+    return restAPI.get({
+      ref,
+      fetch: facts.concat(collections)
+    })
+    .then(
+      item => {
+        const obj = item.Object;
+        const data = {};
         // Get the facts, or, if they are objects, references to them.
         facts.forEach(fact => {
-          memberData[lc0Of(fact)] = member[fact] !== null && typeof member[fact] === 'object'
-            ? member[fact]._ref
-            : member[fact];
+          data[lc0Of(fact)] = obj[fact] !== null && typeof obj[fact] === 'object'
+            ? obj[fact]._ref
+            : obj[fact];
         });
         // Get references to, and sizes of, the collections.
         collections.forEach(collection => {
-          memberData[lc0Of(collection)] = {
-            ref: member[collection]._ref,
-            count: member[collection].Count
+          data[lc0Of(collection)] = {
+            ref: obj[collection]._ref,
+            count: obj[collection].Count
           };
         });
-        data.push(memberData);
-      });
-      return data;
-    },
-    error => err(error, `getting data on ${ref}`)
-  );
+        return data;
+      },
+      error => err(error, `getting data on ${ref}`)
+    );
+  }
+  else {
+    return Promise.resolve('');
+  }
+};
+// Gets data on a collection.
+const getCollectionData = (ref, facts, collections) => {
+  if (ref) {
+    return restAPI.get({
+      ref,
+      fetch: facts.concat(collections)
+    })
+    .then(
+      collection => {
+        const members = collection.Object.Results;
+        const data = [];
+        members.forEach(member => {
+          const memberData = {
+            ref: member._ref
+          };
+          // Get the facts, or, if they are objects, references to them.
+          facts.forEach(fact => {
+            memberData[lc0Of(fact)] = member[fact] !== null && typeof member[fact] === 'object'
+              ? member[fact]._ref
+              : member[fact];
+          });
+          // Get references to, and sizes of, the collections.
+          collections.forEach(collection => {
+            memberData[lc0Of(collection)] = {
+              ref: member[collection]._ref,
+              count: member[collection].Count
+            };
+          });
+          data.push(memberData);
+        });
+        return data;
+      },
+      error => err(error, `getting data on ${ref}`)
+    );
+  }
+  else {
+    return Promise.resolve('');
+  }
 };
 // Sequentially copies an array of tasks or an array of test cases.
 const copyTasksOrCases = (itemType, itemRefs, storyRef) => {
@@ -1816,6 +1828,8 @@ const docTree = (storyRef, storyArray, index, ancestors) => {
         storyArray[index] = {
           formattedID: data.formattedID,
           name: data.name,
+          featureParent: '',
+          storyParent: '',
           taskCount,
           caseCount,
           childCount,
@@ -1835,6 +1849,10 @@ const docTree = (storyRef, storyArray, index, ancestors) => {
               storyArray[index].storyParent = data ? data.formattedID : '';
             }
           );
+        }
+        else {
+          delete storyArray[index].featureParent;
+          delete storyArray[index].storyParent;
         }
         // Add the user story’s task and test-case counts to its ancestors’.
         ancestors.forEach(ancestor => {
@@ -2462,22 +2480,32 @@ const requestHandler = (request, res) => {
             // Set the operation’s global variables.
             setState(bodyObject.copyState);
             copyWhat = bodyObject.copyWhat;
+            let copyParentReadType = 'userstory';
+            if (bodyObject.copyParentType === 'feature') {
+              copyParentType = 'portfolioitem';
+              copyParentReadType = 'portfolioitem/feature';
+            }
             // Get a reference to the copy parent.
-            getRef('hierarchicalrequirement', bodyObject.copyParent, 'parent of tree copy')
+            getRef(copyParentType, bodyObject.copyParent, 'parent of tree copy')
             .then(
               // When it arrives:
               ref => {
                 if (ref) {
+                  console.log(`Copy parent ref is ${ref}`);
                   // Set its global variable. 
-                  copyParentRef = shorten('userstory', 'hierarchicalrequirement', ref);
+                  copyParentRef = shorten(copyParentReadType, 'hierarchicalrequirement', ref);
                   if (! isError) {
                     // Get data on the copy parent.
-                    getItemData(copyParentRef, ['Project'], ['Tasks'])
+                    getItemData(
+                      copyParentRef,
+                      ['Project'],
+                      [copyParentType === 'hierarchicalrequirement' ? 'Tasks' : '']
+                    )
                     .then(
                       // When the data arrive:
                       data => {
                         // If the copy parent has tasks:
-                        if (data.tasks.count) {
+                        if (copyParentType === 'hierarchicalrequirement' && data.tasks.count) {
                           // Reject the request.
                           err('Attempt to copy to a user story with tasks', 'copying tree');
                         }

@@ -55,14 +55,18 @@
                   <option value="cases">user stories and test cases</option>
                   <option value="neither">user stories</option>
                 </select>
-                <span id="copyParentLabel" class="label">to parent</span>
+                <span id="copyParentLabel0" class="label">to</span>
+                <select id="copyParentType" name="copyParentType" aria-label="type of copy parent">
+                  <option value="userStory" selected>user story</option>
+                  <option value="feature">feature</option>
+                </select>
+                <span id="copyParentLabel1" class="label">parent</span>
                 <input
                   id="copyParent"
                   name="copyParent"
                   size="12"
                   maxwidth="12"
-                  placeholder="__storyPrefix__"
-                  aria-labelledby="copyLabel copyParentLabel"
+                  aria-labelledby="copyLabel copyParentLabel0 copyParentLabel1"
                 >
                 <span id="copyWithLabel" class="label">with</span><br>
                 <span id="copyOwnerLabel" class="label indent">current owners or</span>
