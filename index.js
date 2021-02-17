@@ -903,37 +903,82 @@ const takeTree = storyRefs => {
   }
 };
 /*
-  Recursively changes project affiliations, and optionally releases and/or iterations, of
-  user stories in a tree or subtree.
+  Recursively changes project affiliations and optionally releases and/or iterations of
+  user stories, and project affiliations of test cases, in a tree or subtree.
 */
 const projectTree = storyRefs => {
   if (storyRefs.length && ! isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
       // Get data on the first user story of the specified array.
-      return getItemData(firstRef, ['Project', 'Release', 'Iteration'], ['Children'])
+      return getItemData(firstRef, ['Project', 'Release', 'Iteration'], ['Children', 'TestCases'])
       .then(
         // When the data arrive:
         data => {
           const oldProjectRef = data.project ? shorten('project', 'project', data.project) : '';
           if (! isError) {
             // FUNCTION DEFINITION START
-            // Processes the children of the user story.
+            // Processes an array of test cases.
+            const processCases = caseRefs => {
+              // Change the project of the first test case.
+              const firstRef = shorten('testcase', 'testcase', caseRefs[0]);
+              if (! isError) {
+                return restAPI.update({
+                  ref: firstRef,
+                  data: {
+                    Project: projectRef
+                  }
+                })
+                .then(
+                  // When it has been changed:
+                  () => {
+                    // Change the projects of the remaining test cases.
+                    return processCases(caseRefs.slice(1));
+                  },
+                  error => err(error, 'changing project of test case')
+                );
+              }
+              else {
+                return Promise.resolve('');
+              }
+            };
+            // FUNCTION DEFINITION END
+            // FUNCTION DEFINITION START
+            // Processes the children of the user story and the remaining user stories.
             const processMore = () => {
-              // Get data on the user story’s child user stories.
-              return getCollectionData(data.children.ref, [], [])
+              // Get data on the user story’s test cases.
+              return getCollectionData(data.testCases.ref, ['Project'], [])
               .then(
                 // When the data arrive:
-                children => {
-                  // Process the children sequentially.
-                  return projectTree(children.map(child => child.ref))
+                cases => {
+                  // Process sequentially the test cases needing a project change.
+                  return processCases(
+                    cases.filter(testCase => testCase.project !== projectRef)
+                    .map(testCase => testCase.ref)
+                  )
                   .then(
-                    // When they have been processed, process the remaining user stories.
-                    () => projectTree(storyRefs.slice(1)),
-                    error => err(error, 'changing project of children of user story')
+                    // When they have been processed:
+                    () => {
+                      // Get data on the user story’s child user stories.
+                      return getCollectionData(data.children.ref, [], [])
+                      .then(
+                        // When the data arrive:
+                        children => {
+                          // Process the children sequentially.
+                          return projectTree(children.map(child => child.ref))
+                          .then(
+                            // When they have been processed, process the remaining user stories.
+                            () => projectTree(storyRefs.slice(1)),
+                            error => err(error, 'changing project of children of user story')
+                          );
+                        },
+                        error => err(error, 'getting data on children of user story')
+                      );
+                    },
+                    error => err(error, 'changing projects of test cases')
                   );
                 },
-                error => err(error, 'getting data on children of user story')
+                error => err(error, 'getting data on test cases')
               );
             };
             // FUNCTION DEFINITION END
@@ -970,16 +1015,16 @@ const projectTree = storyRefs => {
                 // When it has been updated:
                 () => {
                   report(events);
-                  // Process its child user stories and the remaining user stories.
+                  // Process its test cases and child user stories and the remaining user stories.
                   return processMore();
                 },
-                error => err(error, 'changing project, release, and/or iteration of user story')
+                error => err(error, 'changing project of user story')
               );
             }
             // Otherwise, i.e. if the user story does not need to be updated:
             else {
               report(events);
-              // Process its child user stories and the remaining user stories.
+              // Process its test cases and child user stories and the remaining user stories.
               return processMore();
             }
           }
