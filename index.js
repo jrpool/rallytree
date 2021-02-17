@@ -2613,7 +2613,7 @@ const requestHandler = (request, res) => {
             caseTarget = bodyObject.caseTarget;
             const {caseFolder, caseSet, caseProject} = bodyObject;
             // Get a reference to the project, if specified.
-            getRef('project', caseProject, 'test-case creation')
+            getGlobalNameRef(caseProject, 'project', 'Name')
             .then(
               // When the reference or blank arrives:
               ref => {
