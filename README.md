@@ -24,7 +24,7 @@ This operation ensures that each user story, task, and test case in a tree has t
 
 ## Project change
 
-This operation ensures that each user story in a tree belongs to the desired project. Changing the project of a user story also makes its tasks belong to the same project. Each project has project-specific sets of releases and iterations. When specifying a project, you may also specify a release and/or an iteration.
+This operation ensures that each user story and test case in a tree belongs to the desired project. Changing the project of a user story also makes its tasks and test cases belong to the same project, but the projects of test cases can be changed to differ from those of their user stories. This operation makes test cases belong to the specified project even when their user stories already do. Each project has project-specific sets of releases and iterations. When specifying a project, you may also specify a release and/or an iteration.
 
 ## Schedule-state change
 
@@ -49,6 +49,12 @@ This operation creates a test plan (a tree of test folders and test cases) that 
 ## Documentation
 
 This operation produces a JSON representation of a tree of user stories.
+
+# Projects
+
+Rally forces tasks to belong to whatever project their user stories belong to.
+
+When you change the project of a user story in Rally, Rally also propagates that change to any test cases of the user story. But Rally does not require the test cases to remain in that project. Their projects can be changed, making them differ from those of their user stories. If you request a project change with RallyTree, the user-story projects are changed whenever they are not yet the specified project. This could leave test cases of unchanged user stories in the wrong project. So, to ensure that test-case projects conform, RallyTree checks test cases, too, and changes them when they are not yet the specified project.
 
 # Releases and iterations
 
@@ -267,7 +273,7 @@ In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdi
 
 # Version notes
 
-Version 1.7.3 extends the scope of the project-change operation, making it set the projects of test cases in addition to user stories.
+Version 1.7.3 extends the scope of the project-change operation, making it ensure that test cases belong to the specified project even when their user stories already do.
 
 Version 1.7.2 adds the option to specify a project to which created test cases will belong and refactors some code for parsimony.
 

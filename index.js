@@ -920,23 +920,29 @@ const projectTree = storyRefs => {
             // FUNCTION DEFINITION START
             // Processes an array of test cases.
             const processCases = caseRefs => {
-              // Change the project of the first test case.
-              const firstRef = shorten('testcase', 'testcase', caseRefs[0]);
-              if (! isError) {
-                return restAPI.update({
-                  ref: firstRef,
-                  data: {
-                    Project: projectRef
-                  }
-                })
-                .then(
-                  // When it has been changed:
-                  () => {
-                    // Change the projects of the remaining test cases.
-                    return processCases(caseRefs.slice(1));
-                  },
-                  error => err(error, 'changing project of test case')
-                );
+              if (caseRefs.length) {
+                // Change the project of the first test case.
+                const firstRef = shorten('testcase', 'testcase', caseRefs[0]);
+                if (! isError) {
+                  return restAPI.update({
+                    ref: firstRef,
+                    data: {
+                      Project: projectRef
+                    }
+                  })
+                  .then(
+                    // When it has been changed:
+                    () => {
+                      report([['changes'], ['projectChanges']]);
+                      // Change the projects of the remaining test cases.
+                      return processCases(caseRefs.slice(1));
+                    },
+                    error => err(error, 'changing project of test case')
+                  );
+                }
+                else {
+                  return Promise.resolve('');
+                }
               }
               else {
                 return Promise.resolve('');
@@ -951,9 +957,12 @@ const projectTree = storyRefs => {
               .then(
                 // When the data arrive:
                 cases => {
+                  cases.length && report([['total', cases.length]]);
                   // Process sequentially the test cases needing a project change.
                   return processCases(
-                    cases.filter(testCase => testCase.project !== projectRef)
+                    cases.filter(
+                      testCase => shorten('project', 'project', testCase.project) !== projectRef
+                    )
                     .map(testCase => testCase.ref)
                   )
                   .then(
@@ -2602,7 +2611,7 @@ const requestHandler = (request, res) => {
                     ref => {
                       if (! isError) {
                         // Set its global variable.
-                        projectReleaseRef = ref;
+                        projectReleaseRef = ref || null;
                         // Get a reference to the named iteration.
                         getProjectNameRef(projectRef, 'iteration', projectIteration, 'project change')
                         .then(
@@ -2610,7 +2619,7 @@ const requestHandler = (request, res) => {
                           ref => {
                             if (! isError) {
                               // Set its global variable.
-                              projectIterationRef = ref;
+                              projectIterationRef = ref || null;
                               // Serve a report identifying the project, release, and iteration.
                               serveProjectReport(projectWhich, projectRelease, projectIteration);
                             }
