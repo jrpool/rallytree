@@ -64,7 +64,7 @@
                   placeholder="__storyPrefix__"
                   aria-labelledby="copyLabel copyParentLabel"
                 >
-                <span id="copyWithLabel" class="label">with</span>:<br>
+                <span id="copyWithLabel" class="label">with</span><br>
                 <span id="copyOwnerLabel" class="label indent">current owners or</span>
                 <input
                   id="copyOwner"
@@ -73,7 +73,7 @@
                   size="55"
                   maxwidth="60"
                   aria-labelledby="copyLabel copyWithLabel copyOwnerLabel"
-                ><br>
+                >,<br>
                 <span id="copyProjectLabel" class="label indent">new parent&rsquo;s project or</span>
                 <input
                   id="copyProject"
@@ -82,7 +82,7 @@
                   size="55"
                   maxwidth="60"
                   aria-labelledby="copyLabel copyWithLabel copyProjectLabel"
-                ><br>
+                >,<br>
                 <span id="copyReleaseLabel" class="label indent">no release or</span>
                 <input
                   id="copyRelease"
@@ -199,7 +199,7 @@
                   id="projectWhich"
                   name="projectWhich"
                   type="text"
-                  size="50"
+                  size="60"
                   maxwidth="60"
                   aria-labelledby="projectLabel projectWhichLabel"
                 ><br>
@@ -262,26 +262,7 @@
               <!--OP TEST-CASE CREATION-->
               <p class="opodd">
                 <input id="opCase" type="radio" name="op" value="case" aria-labelledby="caseLabel">
-                <span id="caseLabel" class="label">Add test cases,</span>
-                <span id="caseOptionLabel">optionally in</span>
-                <span id="caseFolderLabel" class="label">test folder</span>
-                <input
-                  id="caseFolder"
-                  name="caseFolder"
-                  size="12"
-                  maxwidth="12"
-                  placeholder="TF"
-                  aria-labelledby="caseLabel caseOptionLabel caseFolderLabel"
-                >, 
-                <span id="caseSetLabel" class="label">test set</span>
-                <input
-                  id="caseSet"
-                  name="caseSet"
-                  size="12"
-                  maxwidth="12"
-                  placeholder="TS"
-                  aria-labelledby="caseLabel caseOptionLabel caseSetLabel"
-                >,
+                <span id="caseLabel" class="label">Add test cases</span>
                 <span id="caseTargetLabel" class="label">to</span>
                 <select
                   id="caseTarget"
@@ -290,7 +271,34 @@
                 >
                 <option value="leaf" selected>leaf user stories</option>
                 <option value="all">all user stories</option>
-                </select>
+                </select>,
+                <span id="caseOptionLabel">in</span>
+                <span id="caseFolderLabel" class="label">no test folder or</span>
+                <input
+                  id="caseFolder"
+                  name="caseFolder"
+                  size="12"
+                  maxwidth="12"
+                  placeholder="TF"
+                  aria-labelledby="caseLabel caseOptionLabel caseFolderLabel"
+                >, 
+                <span id="caseSetLabel" class="label">no test set or</span>
+                <input
+                  id="caseSet"
+                  name="caseSet"
+                  size="12"
+                  maxwidth="12"
+                  placeholder="TS"
+                  aria-labelledby="caseLabel caseOptionLabel caseSetLabel"
+                >,<br>
+                <span id="caseProjectLabel" class="label indent">user stories&rsquo; projects or</span>
+                <input
+                  id="caseProject"
+                  name="caseProject"
+                  size="60"
+                  maxwidth="60"
+                  aria-labelledby="caseLabel caseOptionLabel caseProjectLabel"
+                >
               </p>
               <!--OP PASSING-RESULT CREATION-->
               <p class="opeven">
@@ -304,22 +312,21 @@
                 <span id="passLabel" class="label">
                   Pass test cases
                 </span>
-                <span id="passWithLabel" class="label">with</span>
-                <span id="passBuildLabel" class="label">build</span>
+                <span id="passBuildLabel" class="label">with build</span>
                 <input
                   id="passBuild"
                   name="passBuild"
                   size="50"
                   maxwidth="128"
-                  aria-labelledby="passLabel passWithLabel passBuildLabel"
-                ><br>
-                <span id="passNoteLabel" class="label indent">Note (optional)</span>
+                  aria-labelledby="passLabel passBuildLabel"
+                >,<br>
+                <span id="passNoteLabel" class="label indent">no note or</span>
                 <input
                   id="passNote"
                   name="passNote"
-                  size="30"
+                  size="60"
                   maxwidth="100"
-                  aria-labelledby="passLabel passWithLabel passNoteLabel"
+                  aria-labelledby="passLabel passNoteLabel"
                 >
               </p>
               <!--OP PLANIFY-->

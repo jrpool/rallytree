@@ -66,6 +66,7 @@ const totalInit = {
   total: 0
 };
 let caseFolderRef = '';
+let caseProjectRef = '';
 let caseSetRef = '';
 let caseTarget = 'all';
 let copyIterationRef = '';
@@ -110,6 +111,7 @@ const docWait = 1500;
 // Reinitialize the global variables, except response.
 const reinit = () => {
   caseFolderRef = '';
+  caseProjectRef = '';
   caseSetRef = '';
   caseTarget = 'all';
   copyIterationRef = '';
@@ -211,29 +213,34 @@ const shorten = (readType, writeType, longRef) => {
 };
 // Returns the long reference of a member of a collection with a formatted ID.
 const getRef = (type, formattedID, context) => {
-  const numericID = formattedID.replace(/^[A-Za-z]+/, '');
-  if (/^\d+$/.test(numericID)) {
-    return restAPI.query({
-      type,
-      fetch: '_ref',
-      query: queryUtils.where('FormattedID', '=', numericID)
-    })
-    .then(
-      result => {
-        const resultArray = result.Results;
-        if (resultArray.length) {
-          return resultArray[0]._ref;
-        }
-        else {
-          err('No such ID', `getting reference to ${type} for ${context}`);
-          return '';
-        }
-      },
-      error => err(error, `getting reference to ${type} for ${context}`)
-    );
+  if (formattedID) {
+    const numericID = formattedID.replace(/^[A-Za-z]+/, '');
+    if (/^\d+$/.test(numericID)) {
+      return restAPI.query({
+        type,
+        fetch: '_ref',
+        query: queryUtils.where('FormattedID', '=', numericID)
+      })
+      .then(
+        result => {
+          const resultArray = result.Results;
+          if (resultArray.length) {
+            return resultArray[0]._ref;
+          }
+          else {
+            err('No such ID', `getting reference to ${type} for ${context}`);
+            return '';
+          }
+        },
+        error => err(error, `getting reference to ${type} for ${context}`)
+      );
+    }
+    else {
+      err('Invalid ID', `getting reference to ${type} for ${context}`);
+      return Promise.resolve('');
+    }
   }
   else {
-    err('Invalid ID', `getting reference to ${type} for ${context}`);
     return Promise.resolve('');
   }
 };
@@ -1216,8 +1223,8 @@ const taskTree = storyRefs => {
   }
 };
 // Creates a test case.
-const createCase = (name, description, owner, storyRef) => {
-  // Create a test case and set its test-folder property.
+const createCase = (name, description, owner, projectRef, storyRef) => {
+  // Create a test case.
   return restAPI.create({
     type: 'testcase',
     fetch: ['_ref'],
@@ -1225,6 +1232,7 @@ const createCase = (name, description, owner, storyRef) => {
       Name: name,
       Description: description,
       Owner: owner,
+      Project: projectRef,
       TestFolder: caseFolderRef || null
     }
   })
@@ -1268,10 +1276,10 @@ const createCase = (name, description, owner, storyRef) => {
   );
 };
 // Creates test cases.
-const createCases = (names, description, owner, storyRef) => {
+const createCases = (names, description, owner, projectRef, storyRef) => {
   if (names.length) {
     // Create the first test case.
-    return createCase(names[0], description, owner, storyRef)
+    return createCase(names[0], description, owner, projectRef, storyRef)
     .then(
       // When it has been created:
       () => {
@@ -1292,7 +1300,7 @@ const caseTree = storyRefs => {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! isError) {
       // Get data on the first user story of the specified array.
-      return getItemData(firstRef, ['Name', 'Description', 'Owner'], ['Children'])
+      return getItemData(firstRef, ['Name', 'Description', 'Owner', 'Project'], ['Children'])
       .then(
         // When the data arrive:
         data => {
@@ -1300,9 +1308,11 @@ const caseTree = storyRefs => {
           // If the user story is a leaf or all user stories are to get test cases:
           if (caseTarget === 'all' || ! data.children.count) {
             // Determine the default or customized names of the test cases.
-            const caseNames = caseData ? caseData[data.name] || [data.name] : [data.name];
+            const names = caseData ? caseData[data.name] || [data.name] : [data.name];
+            // Determine the default or customized project of the test cases.
+            const projectRef = caseProjectRef || data.project;
             // Create the test cases.
-            return createCases(caseNames, data.description, data.owner, firstRef)
+            return createCases(names, data.description, data.owner, projectRef, firstRef)
             .then(
               // When they have been created:
               () => {
@@ -2148,31 +2158,6 @@ const streamInit = () => {
   totals.total = totals.changes = 0;
   serveEventStart();
 };
-// Serves a test-case-creation report if a test set is specified.
-const serveCaseIfSet = (testSetID) => {
-  // Get a reference to it.
-  getRef('testset', testSetID, 'test-case creation')
-  .then(
-    ref => {
-      if (! isError) {
-        caseSetRef = shorten('testset', 'testset', ref);
-        if (! isError) {
-          // Check on the existence of the test set.
-          getItemData(caseSetRef, [], [])
-          .then(
-            // When its existence is confirmed:
-            () => {
-              // Serve a report on test-case creation.
-              serveCaseReport();
-            },
-            error => err(error, 'getting data on test set')
-          );
-        }
-      }
-    },
-    error => err(error, 'getting reference to test set')
-  );
-};
 /*
   Returns the long reference of a member of a collection with a project-unique name.
   Release and iteration names are project-unique, not globally unique.
@@ -2355,30 +2340,35 @@ const requestHandler = (request, res) => {
         .then(
           // When it arrives:
           ref => {
-            if (! isError) {
-            // Set its global variable.
-              rootRef = shorten('userstory', 'hierarchicalrequirement', ref);
+            if (ref) {
               if (! isError) {
-                // Get a reference to the user.
-                return getGlobalNameRef(userName, 'user', 'UserName')
-                .then(
-                  // When it arrives:
-                  ref => {
-                    if (! isError) {
-                      // Set its global variable.
-                      userRef = ref;
-                      return '';
-                    }
-                  },
-                  error => err(error, 'getting reference to user')
-                );
+                // Set its global variable.
+                rootRef = shorten('userstory', 'hierarchicalrequirement', ref);
+                if (! isError) {
+                  // Get a reference to the user.
+                  return getGlobalNameRef(userName, 'user', 'UserName')
+                  .then(
+                    // When it arrives:
+                    ref => {
+                      if (! isError) {
+                        // Set its global variable.
+                        userRef = ref;
+                        return '';
+                      }
+                    },
+                    error => err(error, 'getting reference to user')
+                  );
+                }
+                else {
+                  return '';
+                }
               }
               else {
                 return '';
               }
             }
             else {
-              return '';
+              return err('Root ID missing', 'submitting request');
             }
           },
           error => err(error, 'getting reference to root user story')
@@ -2401,79 +2391,84 @@ const requestHandler = (request, res) => {
             .then(
               // When it arrives:
               ref => {
-                // Set its global variable. 
-                copyParentRef = shorten('userstory', 'hierarchicalrequirement', ref);
-                if (! isError) {
-                  // Get data on the copy parent.
-                  getItemData(copyParentRef, ['Project'], ['Tasks'])
-                  .then(
-                    // When the data arrive:
-                    data => {
-                      // If the copy parent has tasks:
-                      if (data.tasks.count) {
-                        // Reject the request.
-                        err('Attempt to copy to a user story with tasks', 'copying tree');
-                      }
-                      // Otherwise, i.e. if the copy parent has no tasks:
-                      else {
-                        // Get a reference to the specified project, if any.
-                        getGlobalNameRef(bodyObject.copyProject, 'project', 'Name')
-                        .then(
-                          // When it or blank arrives:
-                          ref => {
-                            if (! isError) {
-                              // Set its global variable.
-                              copyProjectRef = ref || data.project;
-                              // Get a reference to the specified owner, if any.
-                              getGlobalNameRef(bodyObject.copyOwner, 'user', 'UserName')
-                              .then(
-                                // When it or blank arrives:
-                                ref => {
-                                  if (! isError) {
-                                    // Set its global variable.
-                                    copyOwnerRef = ref;
-                                    // Get a reference to the specified release, if any.
-                                    getProjectNameRef(
-                                      copyProjectRef, 'release', bodyObject.copyRelease, 'copy'
-                                    )
-                                    .then(
-                                      // When it or blank arrives:
-                                      ref => {
-                                        if (! isError) {
-                                          // Set its global variable.
-                                          copyReleaseRef = ref;
-                                          // Get a reference to the specified iteration, if any.
-                                          getProjectNameRef(
-                                            copyProjectRef, 'iteration', bodyObject.copyIteration, 'copy'
-                                          )
-                                          .then(
-                                            // When it or blank arrives:
-                                            ref => {
-                                              if (! isError) {
-                                                // Set its global variable.
-                                                copyIterationRef = ref;
-                                                // Copy the tree.
-                                                serveCopyReport();
-                                              }
-                                            },
-                                            error => err(error, 'getting reference to iteration')
-                                          );
-                                        }
-                                      },
-                                      error => err(error, 'getting reference to release')
-                                    );
-                                  }
-                                },
-                                error => err(error, 'getting reference to owner')
-                              );
-                            }
-                          },
-                          error => err(error, 'getting reference to project')
-                        );
-                      }
-                    },
-                    error => err(error, 'getting data on copy parent')
-                  );
+                if (ref) {
+                  // Set its global variable. 
+                  copyParentRef = shorten('userstory', 'hierarchicalrequirement', ref);
+                  if (! isError) {
+                    // Get data on the copy parent.
+                    getItemData(copyParentRef, ['Project'], ['Tasks'])
+                    .then(
+                      // When the data arrive:
+                      data => {
+                        // If the copy parent has tasks:
+                        if (data.tasks.count) {
+                          // Reject the request.
+                          err('Attempt to copy to a user story with tasks', 'copying tree');
+                        }
+                        // Otherwise, i.e. if the copy parent has no tasks:
+                        else {
+                          // Get a reference to the specified project, if any.
+                          getGlobalNameRef(bodyObject.copyProject, 'project', 'Name')
+                          .then(
+                            // When it or blank arrives:
+                            ref => {
+                              if (! isError) {
+                                // Set its global variable.
+                                copyProjectRef = ref || data.project;
+                                // Get a reference to the specified owner, if any.
+                                getGlobalNameRef(bodyObject.copyOwner, 'user', 'UserName')
+                                .then(
+                                  // When it or blank arrives:
+                                  ref => {
+                                    if (! isError) {
+                                      // Set its global variable.
+                                      copyOwnerRef = ref;
+                                      // Get a reference to the specified release, if any.
+                                      getProjectNameRef(
+                                        copyProjectRef, 'release', bodyObject.copyRelease, 'copy'
+                                      )
+                                      .then(
+                                        // When it or blank arrives:
+                                        ref => {
+                                          if (! isError) {
+                                            // Set its global variable.
+                                            copyReleaseRef = ref;
+                                            // Get a reference to the specified iteration, if any.
+                                            getProjectNameRef(
+                                              copyProjectRef, 'iteration', bodyObject.copyIteration, 'copy'
+                                            )
+                                            .then(
+                                              // When it or blank arrives:
+                                              ref => {
+                                                if (! isError) {
+                                                  // Set its global variable.
+                                                  copyIterationRef = ref;
+                                                  // Copy the tree.
+                                                  serveCopyReport();
+                                                }
+                                              },
+                                              error => err(error, 'getting reference to iteration')
+                                            );
+                                          }
+                                        },
+                                        error => err(error, 'getting reference to release')
+                                      );
+                                    }
+                                  },
+                                  error => err(error, 'getting reference to owner')
+                                );
+                              }
+                            },
+                            error => err(error, 'getting reference to project')
+                          );
+                        }
+                      },
+                      error => err(error, 'getting data on copy parent')
+                    );
+                  }
+                }
+                else {
+                  err('Missing copy-parent ID', 'submitting request');
                 }
               },
               error => err(error, 'getting reference to copy parent')
@@ -2616,49 +2611,49 @@ const requestHandler = (request, res) => {
           // OP TEST-CASE CREATION
           else if (op === 'case') {
             caseTarget = bodyObject.caseTarget;
-            const {caseFolder, caseSet} = bodyObject;
-            // If a test folder was specified:
-            if (caseFolder) {
-              getRef('testfolder', caseFolder, 'test-case creation')
-              .then(
-                ref => {
+            const {caseFolder, caseSet, caseProject} = bodyObject;
+            // Get a reference to the project, if specified.
+            getRef('project', caseProject, 'test-case creation')
+            .then(
+              // When the reference or blank arrives:
+              ref => {
+                if (! isError) {
+                  // Set its global variable.
+                  caseProjectRef = ref ? shorten('project', 'project', ref) : '';
                   if (! isError) {
-                    caseFolderRef = shorten('testfolder', 'testfolder', ref);
-                    if (! isError) {
-                      // Get data on the test folder.
-                      getItemData(caseFolderRef, [], [])
-                      .then(
-                        // When the data arrive:
-                        () => {
-                          // If a test set was specified:
-                          if (caseSet) {
-                            // Verify it and serve a report on test-case creation.
-                            serveCaseIfSet(caseSet);
+                    // Get a reference to the test folder, if specified.
+                    getRef('testfolder', caseFolder, 'test-case creation')
+                    .then(
+                      // When the reference or blank arrives:
+                      ref => {
+                        if (! isError) {
+                          // Set its global variable.
+                          caseFolderRef = ref ? shorten('testfolder', 'testfolder', ref) : '';
+                          if (! isError) {
+                            // Get a reference to the test set, if specified.
+                            getRef('testset', caseSet, 'test-case creation')
+                            .then(
+                              // When the reference or blank arrives:
+                              ref => {
+                                if (! isError) {
+                                  // Set its global variable.
+                                  caseSetRef = ref ? shorten('testset', 'testset', ref) : '';
+                                  // Serve a report on test-case creation.
+                                  serveCaseReport();
+                                }
+                              },
+                              error => err(error, 'getting reference to test set')
+                            );
                           }
-                          // Otherwise, i.e. if no test set was specified:
-                          else {
-                            // Serve a report on test-case creation.
-                            serveCaseReport();
-                          }
-                        },
-                        error => err(error, 'getting data on test folder')
-                      );
-                    }
+                        }
+                      },
+                      error => err(error, 'getting reference to test folder')
+                    );
                   }
-                },
-                error => err(error, 'getting reference to test folder')
-              );
-            }
-            // Otherwise, if a test set but no test folder was specified:
-            else if (caseSet) {
-              // Process the test set and serve a report on test-case creation.
-              serveCaseIfSet(caseSet);
-            }
-            // Otherwise, i.e. if neither a test folder nor a test set was specified:
-            else {
-              // Serve a report on test-case creation.
-              serveCaseReport();
-            }
+                }
+              },
+              error => err(error, 'getting reference to project')
+            );
           }
           // OP PASSING
           else if (op === 'pass') {
