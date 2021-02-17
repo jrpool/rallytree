@@ -28,8 +28,9 @@ const {parse} = require('querystring');
 // Rally module.
 const rally = require('rally');
 
-// ########## GLOBAL VARIABLES
+// ########## GLOBAL CONSTANTS
 
+const docWait = 1500;
 const queryUtils = rally.util.query;
 // REST API.
 const requestOptions = {
@@ -44,6 +45,14 @@ const requestOptions = {
 };
 const scorePriorities = ['None', 'Useful', 'Important', 'Critical'];
 const scoreRisks = ['None', 'Low', 'Medium', 'High'];
+const scoreWeights = {
+  risk: {},
+  priority: {}
+};
+const state = {
+  story: '',
+  task: ''
+};
 const totalInit = {
   caseChanges: 0,
   caseTotal: 0,
@@ -65,6 +74,10 @@ const totalInit = {
   taskTotal: 0,
   total: 0
 };
+const totals = Object.assign({}, totalInit);
+
+// ########## GLOBAL VARIABLES
+
 let caseFolderRef = '';
 let caseProjectRef = '';
 let caseSetRef = '';
@@ -75,36 +88,26 @@ let copyParentRef = '';
 let copyProjectRef = '';
 let copyReleaseRef = '';
 let copyWhat = 'both';
+let doc = [];
+let docTimeout = 0;
+let idle = false;
 let isError = false;
 let passBuild = '';
 let passNote = '';
 let projectIterationRef = null;
 let projectRef = '';
 let projectReleaseRef = null;
+let reportServed = false;
 let response = {};
 let restAPI = {};
 let rootRef = '';
-const scoreWeights = {
-  risk: {},
-  priority: {}
-};
-const state = {
-  story: '',
-  task: ''
-};
 let takeWhoRef = '';
 let taskNames = [];
 let userName = '';
 let userRef = '';
-const totals = Object.assign({}, totalInit);
-let doc = [];
-let docTimeout = 0;
-let idle = false;
-let reportServed = false;
 let {RALLY_USERNAME, RALLY_PASSWORD} = process.env;
 RALLY_USERNAME = RALLY_USERNAME || '';
 RALLY_PASSWORD = RALLY_PASSWORD || '';
-const docWait = 1500;
 
 // ########## FUNCTIONS
 
@@ -120,26 +123,26 @@ const reinit = () => {
   copyProjectRef = '';
   copyReleaseRef = '';
   copyWhat = 'both';
+  doc = [];
+  docTimeout = 0;
+  idle = false;
   isError = false;
   passBuild = '';
   passNote = '';
   projectIterationRef = null;
   projectRef = '';
   projectReleaseRef = null;
+  reportServed = false;
   restAPI = {};
   rootRef = '';
-  state.story = state.task = '';
   scoreWeights.risk = {};
   scoreWeights.priority = {};
+  state.story = state.task = '';
   takeWhoRef = '';
   taskNames = [];
   Object.assign(totals, totalInit);
   userName = '';
   userRef = '';
-  doc = [];
-  docTimeout = 0;
-  idle = false;
-  reportServed = false;
 };
 // Processes a thrown error.
 const err = (error, context) => {
@@ -1797,7 +1800,11 @@ const outDoc = () => {
 const docTree = (storyRef, storyArray, index, ancestors) => {
   if (! isError) {
     // Get data on the user story.
-    getItemData(storyRef, ['FormattedID', 'Name'], ['Children', 'Tasks', 'TestCases'])
+    getItemData(
+      storyRef,
+      ['FormattedID', 'Name', 'Parent', 'PortfolioItem'],
+      ['Children', 'Tasks', 'TestCases']
+    )
     .then(
       // When the data arrive:
       data => {
@@ -1814,6 +1821,21 @@ const docTree = (storyRef, storyArray, index, ancestors) => {
           childCount,
           children: []
         };
+        // If the user story is the root, add root properties to its object.
+        if (! ancestors.length) {
+          getItemData(data.portfolioItem, ['FormattedID'], [])
+          .then(
+            data => {
+              storyArray[index].featureParent = data ? data.formattedID : '';
+            }
+          );
+          getItemData(data.parent, ['FormattedID'], [])
+          .then(
+            data => {
+              storyArray[index].storyParent = data ? data.formattedID : '';
+            }
+          );
+        }
         // Add the user story’s task and test-case counts to its ancestors’.
         ancestors.forEach(ancestor => {
           ancestor.taskCount += taskCount;

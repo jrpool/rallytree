@@ -273,6 +273,8 @@ In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdi
 
 # Version notes
 
+Version 1.7.4 adds to the copy operation the option to give the copy a feature parent
+
 Version 1.7.3 extends the scope of the project-change operation, making it ensure that test cases belong to the specified project even when their user stories already do.
 
 Version 1.7.2 adds the option to specify a project to which created test cases will belong and refactors some code for parsimony.
