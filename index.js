@@ -233,8 +233,7 @@ const getRef = (type, formattedID, context) => {
             return resultArray[0]._ref;
           }
           else {
-            err('No such ID', `getting reference to ${type} for ${context}`);
-            return '';
+            return err('No such ID', `getting reference to ${type} for ${context}`);
           }
         },
         error => err(error, `getting reference to ${type} for ${context}`)
@@ -413,7 +412,7 @@ const getAndCopyTasksOrCases = (itemType, collectionType, data, copyRef) => {
   );
 };
 // Recursively copies a tree or subtrees.
-const copyTree = (storyRefs, parentRef) => {
+const copyTree = (storyRefs, parentType, parentRef) => {
   if (storyRefs.length && ! isError) {
     // Identify and shorten the reference to the first user story.
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
@@ -441,9 +440,14 @@ const copyTree = (storyRefs, parentRef) => {
               Description: data.description,
               Owner: copyOwnerRef || data.owner,
               DragAndDropRank: data.dragAndDropRank,
-              Parent: parentRef,
               Project: copyProjectRef
             };
+            if (parentType === 'story') {
+              properties.Parent = parentRef;
+            }
+            else {
+              properties.PortfolioItem = parentRef;
+            }
             if (copyReleaseRef) {
               properties.Release = copyReleaseRef;
             }
@@ -478,12 +482,12 @@ const copyTree = (storyRefs, parentRef) => {
                         // When the data arrive:
                         children => {
                           // Process the child user stories.
-                          return copyTree(children.map(child => child.ref), copyRef)
+                          return copyTree(children.map(child => child.ref), 'story', copyRef)
                           .then(
                             // When they have been processed:
                             () => {
                               // Process the remaining user stories.
-                              return copyTree(storyRefs.slice(1), parentRef);
+                              return copyTree(storyRefs.slice(1), 'story', parentRef);
                             },
                             error => err(error,'processing child user stories')
                           );
@@ -493,7 +497,7 @@ const copyTree = (storyRefs, parentRef) => {
                     }
                     else {
                       // Process the remaining user stories.
-                      return copyTree(storyRefs.slice(1), parentRef);
+                      return copyTree(storyRefs.slice(1), 'story', parentRef);
                     }
                   };
                   // FUNCTION DEFINITION END.
@@ -517,7 +521,7 @@ const copyTree = (storyRefs, parentRef) => {
                             /*
                               It cannot have child user stories. Process the remaining user stories.
                             */
-                              return copyTree(storyRefs.slice(1), parentRef);
+                              return copyTree(storyRefs.slice(1), 'story', parentRef);
                             },
                             error => err(error, 'copying tasks')
                           );
@@ -550,7 +554,7 @@ const copyTree = (storyRefs, parentRef) => {
                         // When the tasks have been copied:
                         () => {
                           // It cannot have child user stories. Process the remaining user stories.
-                          return copyTree(storyRefs.slice(1), parentRef);
+                          return copyTree(storyRefs.slice(1), 'story', parentRef);
                         },
                         error => err(error, 'copying tasks')
                       );
@@ -2367,7 +2371,11 @@ const requestHandler = (request, res) => {
       */
       else if (requestURL === '/copytally' && idle) {
         streamInit();
-        copyTree([rootRef], copyParentRef);
+        copyTree(
+          [rootRef],
+          copyParentType === 'hierarchicalrequirement' ? 'story' : 'feature',
+          copyParentRef
+        );
       }
       else if (requestURL === '/scoretally' && idle) {
         streamInit();
@@ -2490,89 +2498,90 @@ const requestHandler = (request, res) => {
             .then(
               // When it arrives:
               ref => {
-                if (ref) {
-                  console.log(`Copy parent ref is ${ref}`);
-                  // Set its global variable. 
-                  copyParentRef = shorten(copyParentReadType, 'hierarchicalrequirement', ref);
-                  if (! isError) {
-                    // Get data on the copy parent.
-                    getItemData(
-                      copyParentRef,
-                      ['Project'],
-                      [copyParentType === 'hierarchicalrequirement' ? 'Tasks' : '']
-                    )
-                    .then(
-                      // When the data arrive:
-                      data => {
-                        // If the copy parent has tasks:
-                        if (copyParentType === 'hierarchicalrequirement' && data.tasks.count) {
-                          // Reject the request.
-                          err('Attempt to copy to a user story with tasks', 'copying tree');
-                        }
-                        // Otherwise, i.e. if the copy parent has no tasks:
-                        else {
-                          // Get a reference to the specified project, if any.
-                          getGlobalNameRef(bodyObject.copyProject, 'project', 'Name')
-                          .then(
-                            // When it or blank arrives:
-                            ref => {
-                              if (! isError) {
-                                // Set its global variable.
-                                copyProjectRef = ref || data.project;
-                                // Get a reference to the specified owner, if any.
-                                getGlobalNameRef(bodyObject.copyOwner, 'user', 'UserName')
-                                .then(
-                                  // When it or blank arrives:
-                                  ref => {
-                                    if (! isError) {
-                                      // Set its global variable.
-                                      copyOwnerRef = ref;
-                                      // Get a reference to the specified release, if any.
-                                      getProjectNameRef(
-                                        copyProjectRef, 'release', bodyObject.copyRelease, 'copy'
-                                      )
-                                      .then(
-                                        // When it or blank arrives:
-                                        ref => {
-                                          if (! isError) {
-                                            // Set its global variable.
-                                            copyReleaseRef = ref;
-                                            // Get a reference to the specified iteration, if any.
-                                            getProjectNameRef(
-                                              copyProjectRef, 'iteration', bodyObject.copyIteration, 'copy'
-                                            )
-                                            .then(
-                                              // When it or blank arrives:
-                                              ref => {
-                                                if (! isError) {
-                                                  // Set its global variable.
-                                                  copyIterationRef = ref;
-                                                  // Copy the tree.
-                                                  serveCopyReport();
-                                                }
-                                              },
-                                              error => err(error, 'getting reference to iteration')
-                                            );
-                                          }
-                                        },
-                                        error => err(error, 'getting reference to release')
-                                      );
-                                    }
-                                  },
-                                  error => err(error, 'getting reference to owner')
-                                );
-                              }
-                            },
-                            error => err(error, 'getting reference to project')
-                          );
-                        }
-                      },
-                      error => err(error, 'getting data on copy parent')
-                    );
+                if (! isError) {
+                  if (ref) {
+                    // Set its global variable. 
+                    copyParentRef = shorten(copyParentReadType, copyParentType, ref);
+                    if (! isError) {
+                      // Get data on the copy parent.
+                      getItemData(
+                        copyParentRef,
+                        ['Project'],
+                        copyParentType === 'hierarchicalrequirement' ? ['Tasks'] : []
+                      )
+                      .then(
+                        // When the data arrive:
+                        data => {
+                          // If the copy parent has tasks:
+                          if (copyParentType === 'hierarchicalrequirement' && data.tasks.count) {
+                            // Reject the request.
+                            err('Attempt to copy to a user story with tasks', 'copying tree');
+                          }
+                          // Otherwise, i.e. if the copy parent has no tasks:
+                          else {
+                            // Get a reference to the specified project, if any.
+                            getGlobalNameRef(bodyObject.copyProject, 'project', 'Name')
+                            .then(
+                              // When it or blank arrives:
+                              ref => {
+                                if (! isError) {
+                                  // Set its global variable.
+                                  copyProjectRef = ref || data.project;
+                                  // Get a reference to the specified owner, if any.
+                                  getGlobalNameRef(bodyObject.copyOwner, 'user', 'UserName')
+                                  .then(
+                                    // When it or blank arrives:
+                                    ref => {
+                                      if (! isError) {
+                                        // Set its global variable.
+                                        copyOwnerRef = ref;
+                                        // Get a reference to the specified release, if any.
+                                        getProjectNameRef(
+                                          copyProjectRef, 'release', bodyObject.copyRelease, 'copy'
+                                        )
+                                        .then(
+                                          // When it or blank arrives:
+                                          ref => {
+                                            if (! isError) {
+                                              // Set its global variable.
+                                              copyReleaseRef = ref;
+                                              // Get a reference to the specified iteration, if any.
+                                              getProjectNameRef(
+                                                copyProjectRef, 'iteration', bodyObject.copyIteration, 'copy'
+                                              )
+                                              .then(
+                                                // When it or blank arrives:
+                                                ref => {
+                                                  if (! isError) {
+                                                    // Set its global variable.
+                                                    copyIterationRef = ref;
+                                                    // Copy the tree.
+                                                    serveCopyReport();
+                                                  }
+                                                },
+                                                error => err(error, 'getting reference to iteration')
+                                              );
+                                            }
+                                          },
+                                          error => err(error, 'getting reference to release')
+                                        );
+                                      }
+                                    },
+                                    error => err(error, 'getting reference to owner')
+                                  );
+                                }
+                              },
+                              error => err(error, 'getting reference to project')
+                            );
+                          }
+                        },
+                        error => err(error, 'getting data on copy parent')
+                      );
+                    }
                   }
-                }
-                else {
-                  err('Missing copy-parent ID', 'submitting request');
+                  else {
+                    err('Missing copy-parent ID', 'submitting request');
+                  }
                 }
               },
               error => err(error, 'getting reference to copy parent')

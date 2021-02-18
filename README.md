@@ -12,7 +12,7 @@ RallyTree can perform these operations on a tree:
 
 ## Tree-copy creation
 
-This operation copies a tree. You designate an existing user story as the parent of the root user story of the new tree. That parent must not have any tasks and must not be in the tree that you are copying. Only user stories, optionally with their tasks and/or test cases, are copied, but not defects. In a copy of a user story, task, or test case, the name, rank, and description are copied from the original; you can choose whether the owner is copied from the original or is set to a particular user; you can choose whether the project affiliation is copied from the designated parent of the root of the tree copy or is set to a particular project; and, for a user story, you can specify the release, iteration, and schedule state.
+This operation copies a tree. You designate an existing user story or feature as the parent of the root user story of the new tree. If that parent is a user story, must not have any tasks and must not be in the tree that you are copying. User stories, optionally with their tasks and/or test cases, are copied, but not defects. In a copy of a user story, task, or test case, the name, rank, and description are copied from the original; you can choose whether the owner is copied from the original or is set to a particular user; you can choose whether the project affiliation is copied from the designated parent of the root of the tree copy or is set to a particular project; and you can specify a release, an iteration, and/or a schedule state.
 
 ## Scoring
 
@@ -62,7 +62,7 @@ In Rally, some user stories and all tasks have `release` and `iteration` propert
 
 - Nonleaf user stories do not have these properties.
 - Tasks inherit these properties from the user stories they belong to.
-- Only leaf user stories can have tasks, so tasks always have releases and iterations that they can inherit.
+- Only leaf user stories can have tasks. Since tasks belong only to leaf user stories, tasks always have user stories to inherit releases and iterations from.
 - Releases and iterations are project-specific, not global. Two projects need not have a release or iteration with the same name. Even if they do, those releases or iterations may or may not cover the same time period.
 - If you change the project of a user story that has a non-null release and/or iteration, Rally also changes the release and/or iteration of that user story, in accord with two rules:
 
@@ -82,7 +82,7 @@ In Rally, all user stories have schedule states, and all tasks have states. They
 - Nonleaf user stories have purely derivative schedule states. You cannot set them. Rally sets them on the basis of their child user stories’ schedule states.
 - You can set the states of tasks.
 - User stories with tasks have hybrid schedule states. If you change the state of a task, Rally ensures that the schedule state of the user story that the task belongs to is consistent with the new set of states of its tasks.
-- You can change the schedule state of a leaf user story, but Rally may override your change later if the state of any of its tasks changes or if the user story acquires or loses tasks.
+- You can change the schedule state of a leaf user story, possibly making it inconsistent with the states of its tasks if it has any. But Rally may override your change later if the state of any of its tasks changes or if the user story acquires or loses tasks.
 
 When you execute the schedule-state operation, or when you copy a tree and specify a schedule state for the copy, RallyTree applies your chosen schedule state only to leaf user stories without tasks. However, in the copy operation, every user-story copy is initially a leaf without tasks, and your schedule-state specification is therefore applied to it, even if it will momentarily acquire tasks copied from its original, and when their states are set the user story’s schedule state may be derivatively modified by Rally.
 
