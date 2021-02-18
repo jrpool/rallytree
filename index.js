@@ -200,28 +200,34 @@ const err = (error, context) => {
 };
 // Shortens a long reference.
 const shorten = (readType, writeType, longRef) => {
-  // If it is already a short reference, return it.
-  const shortTest = new RegExp(`^/${writeType}/\\d+$`);
-  if (shortTest.test(longRef)) {
-    return longRef;
+  if (longRef) {
+    // If it is already a short reference, return it.
+    const shortTest = new RegExp(`^/${writeType}/\\d+$`);
+    if (shortTest.test(longRef)) {
+      return longRef;
+    }
+    // Otherwise, i.e. if it is not yet a short reference:
+    else {
+      // Return its short version.
+      const longReadPrefix = new RegExp(`^http.+(/|%2F)${readType}(/|%2F)(?=\\d+)`);
+      const longWritePrefix = new RegExp(`^http.+(/|%2F)${writeType}(/|%2F)(?=\\d+)`);
+      const num
+        = Number.parseInt(longRef.replace(longReadPrefix, ''))
+        || Number.parseInt(longRef.replace(longWritePrefix, ''));
+      if (num) {
+        return `/${writeType}/${num}`;
+      }
+      else {
+        err(
+          `Invalid Rally URL:\nlong ${longRef}\nshort /${writeType}/${num}`,
+          'shortening URL'
+        );
+        return '';
+      }
+    }
   }
   else {
-    // If not, return its short version.
-    const longReadPrefix = new RegExp(`^http.+(/|%2F)${readType}(/|%2F)(?=\\d+)`);
-    const longWritePrefix = new RegExp(`^http.+(/|%2F)${writeType}(/|%2F)(?=\\d+)`);
-    const num
-      = Number.parseInt(longRef.replace(longReadPrefix, ''))
-      || Number.parseInt(longRef.replace(longWritePrefix, ''));
-    if (num) {
-      return `/${writeType}/${num}`;
-    }
-    else {
-      err(
-        `Invalid Rally URL:\nlong ${longRef}\nshort /${writeType}/${num}`,
-        'shortening URL'
-      );
-      return '';
-    }
+    return '';
   }
 };
 // Returns the long reference of a member of a collection with a formatted ID.
@@ -1502,8 +1508,11 @@ const groupCases = caseRefs => {
                             fetch: ['_ref']
                           })
                           .then(
+                            // When the test case has been linked:
                             () => {
                               report([['changes'], ['setChanges']]);
+                              // Group the remaining test cases.
+                              return groupCases(caseRefs.slice(1));
                             }
                           );
                         }
@@ -1521,8 +1530,11 @@ const groupCases = caseRefs => {
                       fetch: ['_ref']
                     })
                     .then(
+                      // When the test case has been linked:
                       () => {
                         report([['changes'], ['setChanges']]);
+                        // Group the remaining test cases.
+                        return groupCases(caseRefs.slice(1));
                       }
                     );
                   }
