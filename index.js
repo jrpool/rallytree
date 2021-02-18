@@ -1454,24 +1454,6 @@ const caseTree = storyRefs => {
     return Promise.resolve('');
   }
 };
-// Creates a passing test-case result.
-const groupCase = (caseRef, tester, testSet) => {
-  const data = {
-    TestCase: caseRef,
-    Verdict: 'Pass',
-    Build: passBuild,
-    Notes: passNote,
-    Date: new Date(),
-    Tester: tester,
-    TestSet: testSet
-  };
-  // Create a passing result.
-  return restAPI.create({
-    type: 'testcaseresult',
-    fetch: ['_ref'],
-    data
-  });
-};
 // Groups test cases.
 const groupCases = caseRefs => {
   if (caseRefs.length && ! isError) {
