@@ -3024,34 +3024,39 @@ const requestHandler = (request, res) => {
           // OP TEST-CASE GROUPING
           else if (op === 'group') {
             const {groupFolder, groupSet} = bodyObject;
-            // Get a reference to the test folder, if specified.
-            getRef('testfolder', groupFolder, 'test-case grouping')
-            .then(
-              // When the reference or blank arrives:
-              ref => {
-                if (! isError) {
-                  // Set its global variable.
-                  groupFolderRef = ref ? shorten('testfolder', 'testfolder', ref) : '';
+            if (! groupFolder && ! groupSet) {
+              err('Test folder and test set both missing', 'grouping test cases');
+            }
+            else {
+              // Get a reference to the test folder, if specified.
+              getRef('testfolder', groupFolder, 'test-case grouping')
+              .then(
+                // When the reference or blank arrives:
+                ref => {
                   if (! isError) {
-                    // Get a reference to the test set, if specified.
-                    getRef('testset', groupSet, 'test-case grouping')
-                    .then(
-                      // When the reference or blank arrives:
-                      ref => {
-                        if (! isError) {
-                          // Set its global variable.
-                          groupSetRef = ref ? shorten('testset', 'testset', ref) : '';
-                          // Serve a report on test-case creation.
-                          serveGroupReport();
-                        }
-                      },
-                      error => err(error, 'getting reference to test set')
-                    );
+                    // Set its global variable.
+                    groupFolderRef = ref ? shorten('testfolder', 'testfolder', ref) : '';
+                    if (! isError) {
+                      // Get a reference to the test set, if specified.
+                      getRef('testset', groupSet, 'test-case grouping')
+                      .then(
+                        // When the reference or blank arrives:
+                        ref => {
+                          if (! isError) {
+                            // Set its global variable.
+                            groupSetRef = ref ? shorten('testset', 'testset', ref) : '';
+                            // Serve a report on test-case creation.
+                            serveGroupReport();
+                          }
+                        },
+                        error => err(error, 'getting reference to test set')
+                      );
+                    }
                   }
-                }
-              },
-              error => err(error, 'getting reference to test folder')
-            );
+                },
+                error => err(error, 'getting reference to test folder')
+              );
+            }
           }
           // OP PASSING
           else if (op === 'pass') {
