@@ -304,8 +304,38 @@
                   aria-labelledby="caseLabel caseOptionLabel caseProjectLabel"
                 >
               </p>
-              <!--OP PASSING-RESULT CREATION-->
+              <!--OP TEST-CASE GROUPING-->
               <p class="opeven">
+                <input
+                  id="opGroup"
+                  type="radio"
+                  name="op"
+                  value="group"
+                  aria-labelledby="groupLabel"
+                >
+                <span id="groupLabel" class="label">Group test cases</span>
+                <span id="groupInLabel">in one or both of</span>
+                <span id="groupFolderLabel" class="label">test folder</span>
+                <input
+                  id="groupFolder"
+                  name="groupFolder"
+                  size="12"
+                  maxwidth="12"
+                  placeholder="TF"
+                  aria-labelledby="groupLabel groupInLabel groupFolderLabel"
+                >,
+                <span id="groupSetLabel" class="label">test set</span>
+                <input
+                  id="groupSet"
+                  name="groupSet"
+                  size="12"
+                  maxwidth="12"
+                  placeholder="TS"
+                  aria-labelledby="groupLabel groupInLabel groupSetLabel"
+                >
+              </p>
+              <!--OP PASSING-RESULT CREATION-->
+              <p class="opodd">
                 <input
                   id="opPass"
                   type="radio"
@@ -334,12 +364,12 @@
                 >
               </p>
               <!--OP PLANIFY-->
-              <p class="opodd"><label>
+              <p class="opeven"><label>
                 <input id="opPlan" type="radio" name="op" value="plan">
                 <span class="label">Planify</span>
               </label></p>
               <!--OP DOCUMENTATION-->
-              <p class="opeven"><label>
+              <p class="opodd"><label>
                 <input id="opDoc" type="radio" name="op" value="doc">
                 <span class="label">Get tree documentation</span>
               </label></p>

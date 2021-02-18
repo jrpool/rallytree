@@ -38,6 +38,10 @@ This operation adds tasks to each user story with no child user stories in a tre
 
 This operation adds test cases to a tree’s leaf user stories. Generally, each such user story acquires one test case, to which it gives its name, description, and owner. However, the counts and names of test cases can be customized. You can also specify a test folder, a test set, and/or a project that the test cases will all belong to.
 
+## Test-case grouping
+
+This operation makes all test cases in a tree belong to a test folder and/or a test set.
+
 ## Pass creation
 
 This operation creates passing results for all test cases of user stories in a tree, except for test cases that already have results or that have no owner. If a test case is in any test sets, the result is defined as belonging to the first of those test sets. You must specify a build (asRally requires) and may specify a note, to be applied to all of the new results. Whoever is the owner of the test case is defined as the tester of the result.
@@ -280,6 +284,8 @@ Please report bugs, comments, feature suggestions, and questions to Jonathan Poo
 In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdict-acquisition operation from returning correct results. Rally wrongly reported that test cases with defects had defect counts of 0. RallyTree relies on the correctness of this count. This bug caused reports from the verdict-acquisition operation to omit all defects. Broadcom confirmed this bug and stated that we would be notified of progress in its correction. A temporary code change has been introduced to circumvent this bug.
 
 # Version notes
+
+Version 1.8.0 adds the test-case grouping operation.
 
 Version 1.7.4 adds support for feature parents of user stories. In the documentation operation, the output identifies the parent of the root user story, which may be a feature or a user story. In the copy operation, you can choose either a user story or a feature as the parent of the tree copy.
 
