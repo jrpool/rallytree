@@ -12,7 +12,7 @@ RallyTree can perform these operations on a tree:
 
 ## Tree-copy creation
 
-This operation copies a tree. You designate an existing user story or feature as the parent of the root user story of the new tree. If that parent is a user story, must not have any tasks and must not be in the tree that you are copying. User stories, optionally with their tasks and/or test cases, are copied, but not defects. In a copy of a user story, task, or test case, the name, rank, and description are copied from the original; you can choose whether the owner is copied from the original or is set to a particular user; you can choose whether the project affiliation is copied from the designated parent of the root of the tree copy or is set to a particular project; and you can specify a release, an iteration, and/or a schedule state.
+This operation copies a tree. You designate an existing user story or feature as the parent of the root user story of the new tree. That parent, if a user story, must not have any tasks and must not be in the tree that you are copying. User stories, optionally with their tasks and/or test cases, are copied, but not defects. In a copy of a user story, task, or test case, the name, rank, and description are copied from the original; you can choose whether the owner is copied from the original or is set to a particular user; you can choose whether the project affiliation is copied from the designated parent of the root of the tree copy or is set to a particular project; and you can specify a release, an iteration, and/or a schedule state.
 
 ## Scoring
 
@@ -49,6 +49,14 @@ This operation creates a test plan (a tree of test folders and test cases) that 
 ## Documentation
 
 This operation produces a JSON representation of a tree of user stories.
+
+# Parents
+
+In RallyTree, the root of a tree is always a user story. When you copy a tree, you create a new tree, with a user story as its root. You must specify a parent for it, which may be either another user story or a feature.
+
+Technically, when you specify a parent you are actually specifying either the `Parent` property (which must be a user story) or the `PortfolioItem` property (which must be a feature) of the root. If it has one of these properties, it cannot have the other. Confusingly, the Rally UI labels both of these properties as “Parent”.
+
+However, a user story can also have a `Feature` property. If you specify a feature as the `PortfolioItem` property of a user story, then that feature also becomes its `Feature` property, and you cannot change that. If instead you specify user story P as the `Parent` property of user story C, then the `Feature` property of C becomes any ancestor feature that C may have.
 
 # Projects
 
