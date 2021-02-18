@@ -2406,7 +2406,7 @@ const serveGroupReport = () => {
         error => err(error, 'reading report script')
       );
     },
-    error => err(error, 'reading passReport page')
+    error => err(error, 'reading groupReport page')
   );
 };
 // Serves the pass-test-case report page.
