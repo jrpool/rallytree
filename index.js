@@ -101,6 +101,7 @@ let idle = false;
 let isError = false;
 let passBuild = '';
 let passNote = '';
+let planHow = 'use';
 let projectIterationRef = null;
 let projectRef = '';
 let projectReleaseRef = null;
@@ -139,6 +140,7 @@ const reinit = () => {
   isError = false;
   passBuild = '';
   passNote = '';
+  planHow = 'use';
   projectIterationRef = null;
   projectRef = '';
   projectReleaseRef = null;
@@ -1861,48 +1863,70 @@ const passTree = storyRefs => {
     return Promise.resolve('');
   }
 };
-// Sequentially planifies an array of tasks or an array of test cases.
+// Sequentially planifies an array of test cases.
 const planCases = (caseRefs, folderRef) => {
   if (caseRefs.length && ! isError) {
     // Identify and shorten a reference to the first test case.
     const firstRef = shorten('testcase', 'testcase', caseRefs[0]);
     if (! isError) {
-      // Get data on the first test case.
-      return getItemData(
-        firstRef,
-        ['Name', 'Description', 'Owner', 'DragAndDropRank', 'Risk', 'Priority', 'Project'],
-        []
-      )
-      .then(
-        // When the data arrive:
-        data => {
-          // Copy the test case.
-          return restAPI.create({
-            type: 'testcase',
-            fetch: ['_ref'],
-            data: {
-              Name: data.name,
-              Description: data.description,
-              Owner: data.owner,
-              DragAndDropRank: data.dragAndDropRank,
-              Risk: data.risk,
-              Priority: data.priority,
-              Project: data.project,
-              TestFolder: folderRef
-            }
-          })
-          .then(
-            // When the test case has been copied:
-            () => {
-              report([['caseChanges']]);
-              // Copy the remaining test cases in the specified array.
-              return planCases(caseRefs.slice(1), folderRef);
-            },
-            error => err(error, `copying test case ${firstRef}`)
-          );
-        },
-        error => err(error, 'getting data on test case')
-      );
+      // If existing test cases are to be linked to test folders:
+      if (planHow === 'use') {
+        // Link the test case to the specified test folder.
+        return restAPI.update({
+          ref: firstRef,
+          data: {
+            TestFolder: folderRef
+          }
+        })
+        .then(
+          // When it has been linked:
+          () => {
+            report([['caseChanges']]);
+            // Link the remaining test cases.
+            return planCases(caseRefs.slice(1), folderRef);
+          },
+          error => err(error, `linking test case ${firstRef} to test folder`)
+        );
+      }
+      // Otherwise, i.e. if test cases are to be copied into test folders:
+      else {
+        // Get data on the test case.
+        return getItemData(
+          firstRef,
+          ['Name', 'Description', 'Owner', 'DragAndDropRank', 'Risk', 'Priority', 'Project'],
+          []
+        )
+        .then(
+          // When the data arrive:
+          data => {
+            // Copy the test case into the test folder.
+            return restAPI.create({
+              type: 'testcase',
+              fetch: ['_ref'],
+              data: {
+                Name: data.name,
+                Description: data.description,
+                Owner: data.owner,
+                DragAndDropRank: data.dragAndDropRank,
+                Risk: data.risk,
+                Priority: data.priority,
+                Project: data.project,
+                TestFolder: folderRef
+              }
+            })
+            .then(
+              // When the test case has been copied:
+              () => {
+                report([['caseChanges']]);
+                // Copy the remaining test cases.
+                return planCases(caseRefs.slice(1), folderRef);
+              },
+              error => err(error, `copying test case ${firstRef}`)
+            );
+          },
+          error => err(error, 'getting data on test case')
+        );
+      }
     }
     else {
       return Promise.resolve('');
@@ -1914,12 +1938,12 @@ const planCases = (caseRefs, folderRef) => {
 };
 // Get data on test cases and planify them.
 const getAndPlanCases = (data, folderRef) => {
-  // Get data on the tasks or test cases.
+  // Get data on the test cases.
   return getCollectionData(data.testCases.ref, [], [])
   .then(
     // When the data arrive:
     cases => {
-      // Copy the tasks or test cases.
+      // Process the test cases.
       return planCases(cases.map(testCase => testCase.ref), folderRef);
     },
     error => err(error, 'getting data on test cases')
@@ -1945,10 +1969,11 @@ const planTree = (storyRefs, parentRef) => {
             Description: data.description,
             Project: data.project
           };
+          // 
           if (parentRef) {
             properties.Parent = parentRef;
           }
-          // Create a test folder, with the specified parent if any.
+          // Create a test folder, with the specified parent if not the root.
           return restAPI.create({
             type: 'testfolder',
             fetch: ['FormattedID'],
@@ -1965,6 +1990,7 @@ const planTree = (storyRefs, parentRef) => {
               // Identify a short reference to the test folder.
               const folderRef = shorten('testfolder', 'testfolder', folder.Object._ref);
               if (! isError) {
+                // FUNCTION DEFINITION START
                 // Planifies child user stories and remaining user stories.
                 const planChildrenAndSiblings = () => {
                   // If the user story has any child user stories:
@@ -1997,6 +2023,7 @@ const planTree = (storyRefs, parentRef) => {
                     return planTree(storyRefs.slice(1), parentRef);
                   }
                 };
+                // FUNCTION DEFINITION END
                 // If the original has test cases:
                 if (data.testCases.count) {
                   // Get data on them and planify them.
@@ -2447,6 +2474,7 @@ const servePlanReport = () => {
   .then(
     htmlContent => {
       fs.readFile('report.js', 'utf8')
+      .replace('__planHow__', planHow === 'use' ? 'linked to' : 'copied into')
       .then(
         jsContent => {
           const newJSContent = reportScriptPrep(
@@ -3082,8 +3110,9 @@ const requestHandler = (request, res) => {
               servePassReport();
             }
           }
-          // OP PLANIFICITATION
+          // OP PLANIFICATION
           else if (op === 'plan') {
+            planHow = bodyObject.planHow;
             // Planify the tree.
             servePlanReport();
           }

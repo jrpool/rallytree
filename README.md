@@ -48,7 +48,7 @@ This operation creates passing results for all test cases of user stories in a t
 
 ## Planification
 
-This operation creates a test plan (a tree of test folders and test cases) that mirrors a tree of user stories and test cases.
+This operation creates a test plan (a tree of test folders and test cases) that mirrors a tree of user stories and test cases. You can choose whether the test cases in the test plan are the same ones as in the user-story tree or are copied from them.
 
 ## Documentation
 
@@ -284,6 +284,8 @@ Please report bugs, comments, feature suggestions, and questions to Jonathan Poo
 In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdict-acquisition operation from returning correct results. Rally wrongly reported that test cases with defects had defect counts of 0. RallyTree relies on the correctness of this count. This bug caused reports from the verdict-acquisition operation to omit all defects. Broadcom confirmed this bug and stated that we would be notified of progress in its correction. A temporary code change has been introduced to circumvent this bug.
 
 # Version notes
+
+Version 1.8.1 adds an option to the planification operation, to associate the existing test cases with the new test folders rather than copying the test cases into the test-folder tree.
 
 Version 1.8.0 adds the test-case grouping operation.
 
