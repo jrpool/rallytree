@@ -2473,14 +2473,16 @@ const servePlanReport = () => {
   fs.readFile('planReport.html', 'utf8')
   .then(
     htmlContent => {
+      const newHTMLContent = htmlContent.replace(
+        '__planHow__', planHow === 'use' ? 'linked to' : 'copied into'
+      );
       fs.readFile('report.js', 'utf8')
-      .replace('__planHow__', planHow === 'use' ? 'linked to' : 'copied into')
       .then(
         jsContent => {
           const newJSContent = reportScriptPrep(
             jsContent, '/plantally', ['planRoot', 'storyChanges', 'caseChanges', 'error']
           );
-          const newContent = reportPrep(htmlContent, newJSContent);
+          const newContent = reportPrep(newHTMLContent, newJSContent);
           servePage(newContent, true);
         },
         error => err(error, 'reading report script')

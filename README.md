@@ -48,7 +48,7 @@ This operation creates passing results for all test cases of user stories in a t
 
 ## Planification
 
-This operation creates a test plan (a tree of test folders and test cases) that mirrors a tree of user stories and test cases. You can choose whether the test cases in the test plan are the same ones as in the user-story tree or are copied from them.
+This operation creates a test plan (a tree of test folders and test cases) that mirrors a tree of user stories and test cases. You choose whether the test cases in the test plan are the same ones as in the user-story tree or are copied from them. If the existing test cases are used, any test-folder affiliations are replaced by the new test folders, but otherwise the test cases are not changed. If the test cases are copied, each copy acquires its name, description, rank, owner, project, risk, and priority from its original, but any test-set affiliation and results are removed in the copy.
 
 ## Documentation
 
