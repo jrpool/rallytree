@@ -666,6 +666,54 @@ const scoreTree = storyRef => {
   );
 };
 // ==== OWNERSHIP CHANGE OPERATION ====
+// Ensures the ownership of a task or test case.
+const takeItem = (itemType, itemRef, ownerRef) => {
+  // If the ownership of the item needs to be changed:
+  if (ownerRef !== globals.takeWhoRef) {
+    // Change it.
+    return globals.restAPI.update({
+      ref: itemRef,
+      data: {Owner: globals.takeWhoRef}
+    })
+    .then(
+      () => {
+        report([['total'], [`${itemType}Total`], [`${itemType}Changes`]]);
+        return '';
+      },
+      error => err(error, `changing ${itemType} ownership`)
+    );
+  }
+  else {
+    report([['total'], [`${itemType}Total`]]);
+    return Promise.resolve('');
+  }
+};
+// Sequentially ensures the ownership of an array of tasks or test cases.
+const takeItems = (itemType, items) {
+  if (items.length && ! globals.isError) {
+    const firstRef = shorten(itemType, itemType, items[0].ref);
+    if (! globals.isError) {
+      const owner = items[0].owner;
+      const ownerRef = owner ? shorten('user', 'user', owner) : '';
+      if (! globals.isError) {
+        return takeItem(itemType, firstRef, ownerRef)
+        .then(
+          () => takeItems(itemType, items.slice(1)),
+          error => err(error, `changing ownership of ${itemType}`)
+        );
+      }
+      else {
+        return Promise.resolve('');
+      }
+    }
+    else {
+      return Promise.resolve('');
+    }
+  }
+  else {
+    return Promise.resolve('');
+  }
+};
 // Sequentially ensures the ownership of an array of tasks or test cases.
 const takeTasksOrCases = (itemType, items) => {
   if (items.length && ! globals.isError) {
