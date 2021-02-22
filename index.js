@@ -1374,7 +1374,7 @@ const createCases = (names, description, owner, projectRef, storyRef) => {
       () => {
         report([['changes']]);
         // Create the remaining test cases.
-        return createCases(names.slice(1), description, owner, storyRef);
+        return createCases(names.slice(1), description, owner, projectRef, storyRef);
       },
       error => err(error, 'creating and linking test case')
     );
