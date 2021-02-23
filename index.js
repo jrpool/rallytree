@@ -543,14 +543,15 @@ const scoreTree = storyRef => {
   .then(
     // When the data arrive:
     data => {
-      const childCount = data.children.count;
-      const caseCount = data.testCases.count;
-      // If the user story has test cases:
-      if (caseCount) {
-        // Get data on them.
-        getCollectionData(data.testCases.ref, ['LastVerdict', 'Risk', 'Priority'], ['Defects'])
+      if (data && ! globals.isError) {
+        // Get data on the test cases of the user story, if any.
+        getCollectionData(
+          data.testCases.count ? data.testCases.ref : '',
+          ['LastVerdict', 'Risk', 'Priority'],
+          ['Defects']
+        )
         .then(
-          // When the data arrive:
+          // When the data, if any, arrive:
           cases => {
             // Process the test cases in parallel.
             cases.forEach(testCase => {
@@ -642,13 +643,10 @@ const scoreTree = storyRef => {
           },
           error => err(error, `getting data on test cases ${data.testCases.ref}`)
         );
-      }
-      // If the user story has child user stories:
-      if (childCount) {
-        // Get data on its child user stories.
-        getCollectionData(data.children.ref, [], [])
+        // Get data on the child user stories of the user story, if any.
+        getCollectionData(data.children.count ? data.children.ref : [], [])
         .then(
-          // When the data arrive:
+          // When the data, if any, arrive:
           children => {
             // Process the children in parallel.
             children.forEach(child => {
