@@ -416,7 +416,7 @@ const getAndCopyItems = (itemType, itemsType, collectionType, data, copyRef) => 
     .then(
       // When the data arrive:
       items => {
-        // Copy the tasks or test cases.
+        // Copy the items.
         return copyItems(itemType, items.map(item => item.ref), copyRef);
       },
       error => err(error, `getting data on ${collectionType}`)
@@ -957,6 +957,53 @@ const projectTree = storyRefs => {
   }
 };
 // ==== SCHEDULE-STATE CHANGE OPERATION ====
+// Recursively sets the states of an array of tasks.
+const scheduleTasks = taskRefs => {
+  if (taskRefs.length && ! globals.isError) {
+    const firstRef = shorten('task', 'task', taskRefs[0]);
+    if (! globals.isError) {
+      // Get data on the first task.
+      return getItemData(firstRef, ['State'], [])
+      .then(
+        // When the data arrive:
+        data => {
+          // If the task already has the specified state:
+          if (data.state === globals.state.task) {
+            report([['total'], ['taskTotal']]);
+            // Set the states of the remaining tasks.
+            return scheduleTasks(taskRefs.slice(1));
+          }
+          // Otherwise, i.e. if the task does not have the specified state:
+          else {
+            // Change the task’s state.
+            return globals.restAPI.update({
+              ref: firstRef,
+              data: {
+                State: globals.state.task
+              }
+            })
+            .then(
+              // When it has been changed:
+              () => {
+                report([['total'], ['taskTotal'], ['changes'], ['taskChanges']]);
+                // Set the states of the remaining tasks.
+                return scheduleTasks(taskRefs.slice(1));
+              },
+              error => err(error, 'changing state of task')
+            );
+          }
+        },
+        error => err(error, 'getting data on task')
+      );
+    }
+    else {
+      return Promise.resolve('');
+    }
+  }
+  else {
+    return Promise.resolve('');
+  }
+};
 // Recursively sets the schedule state in a tree or subtree of user stories.
 const scheduleTree = storyRefs => {
   if (storyRefs.length && ! globals.isError) {
@@ -967,6 +1014,37 @@ const scheduleTree = storyRefs => {
       .then(
         // When the data arrive:
         data => {
+          report([['total'], ['storyTotal']]);
+          // Get data on the tasks of the user story, if any.
+          return getCollectionData(data.tasks.ref, ['State'], [])
+          .then(
+            // When the data arrive:
+            tasks => {
+              // Change the states of any tasks, if necessary.
+              return scheduleTasks(tasks)
+              .then(
+                // When any changes have been made:
+                () => {
+                  // Get data on the child user stories of the user story, if any.
+                  return getCollectionData(data.children.ref, [], [])
+                  .then(
+                    // When the data arrive:
+                    children => {
+                      // Process the child user stories.
+                      return scheduleTree(children.length ? children.map(child => child.ref) : [])
+                      .then(
+                        // When any child user stories have been processed:
+                        () => {
+                          // Process the remaining user stories.
+                          return scheduleTree(storyRefs.slice(1));
+                        }
+                      )
+                    }
+                  )
+                }
+              )
+            }
+          )
           // If the user story has child user stories, and therefore has no tasks:
           if (data.children.count) {
             report([['total'], ['storyTotal']]);
@@ -990,62 +1068,13 @@ const scheduleTree = storyRefs => {
           }
           // Otherwise, if the user story has tasks, and therefore has no child user stories:
           else if (data.tasks.count) {
-            // FUNCTION DEFINITION START
-            // Recursively sets the states of an array of tasks.
-            const scheduleTasks = taskRefs => {
-              if (taskRefs.length && ! globals.isError) {
-                const firstRef = shorten('task', 'task', taskRefs[0]);
-                if (! globals.isError) {
-                  // Get data on the first task of the array.
-                  return getItemData(firstRef, ['State'], [])
-                  .then(
-                    // When the data arrive:
-                    data => {
-                      // If the task already has the specified state:
-                      if (data.state === globals.state.task) {
-                        report([['total'], ['taskTotal']]);
-                        // Set the states of the remaining tasks.
-                        return scheduleTasks(taskRefs.slice(1));
-                      }
-                      // Otherwise, i.e. if the task does not have the specified state:
-                      else {
-                        // Change the task’s state.
-                        return globals.restAPI.update({
-                          ref: firstRef,
-                          data: {
-                            State: globals.state.task
-                          }
-                        })
-                        .then(
-                          // When it has been changed:
-                          () => {
-                            report([['total'], ['taskTotal'], ['changes'], ['taskChanges']]);
-                            // Set the states of the remaining tasks.
-                            return scheduleTasks(taskRefs.slice(1));
-                          },
-                          error => err(error, 'changing state of task')
-                        );
-                      }
-                    },
-                    error => err(error, 'getting data on task')
-                  );
-                }
-                else {
-                  return Promise.resolve('');
-                }
-              }
-              else {
-                return Promise.resolve('');
-              }
-            };
-            // FUNCTION DEFINITION END.
             report([['total'], ['storyTotal']]);
             // Get data on the tasks.
             return getCollectionData(data.tasks.ref, [], [])
             .then(
               // When the data arrive:
               tasks => {
-                // Change their states.
+                // Change the states of the tasks.
                 return scheduleTasks(tasks.map(task => task.ref))
                 .then(
                   // When they have been changed:
