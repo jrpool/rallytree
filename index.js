@@ -254,27 +254,31 @@ const lc0Of = string => string.length ? `${string[0].toLowerCase()}${string.slic
 // Returns a Promise of data on a work item.
 const getItemData = (ref, facts, collections) => {
   if (ref) {
+    // Get data on the facts and collections of the specified item.
     return globals.restAPI.get({
       ref,
       fetch: facts.concat(collections)
     })
     .then(
+      // When the data arrive:
       item => {
         const obj = item.Object;
+        // Initialize an object of data.
         const data = {};
-        // Get the facts, or, if they are objects, references to them.
+        // Add the item’s facts or, if objects, references to them.
         facts.forEach(fact => {
           data[lc0Of(fact)] = obj[fact] !== null && typeof obj[fact] === 'object'
             ? obj[fact]._ref
             : obj[fact];
         });
-        // Get references to, and sizes of, the collections.
+        // Add references to and the sizes of the item’s collections.
         collections.forEach(collection => {
           data[lc0Of(collection)] = {
             ref: obj[collection]._ref,
             count: obj[collection].Count
           };
         });
+        // Return the object.
         return data;
       },
       error => err(error, `getting data on ${ref}`)
@@ -284,36 +288,49 @@ const getItemData = (ref, facts, collections) => {
     return Promise.resolve('');
   }
 };
-// Returns a Promise of data on a collection.
+// Returns a Promise of data, i.e. an array of member objects, on a collection.
 const getCollectionData = (ref, facts, collections) => {
   if (ref) {
+    // Get data on the facts and collections of the members of the specified collection.
     return globals.restAPI.get({
       ref,
       fetch: facts.concat(collections)
     })
     .then(
+      // When the data arrive:
       collection => {
         const members = collection.Object.Results;
+        // Initialize an array of data.
         const data = [];
+        // For each member of the collection:
         members.forEach(member => {
+          // Initialize an object of member data with property “ref”, a long reference to it.
           const memberData = {
             ref: member._ref
           };
-          // Get the facts, or, if they are objects, references to them.
+          /*
+            Add fact properties to the object. Each has the dromedary-case fact name as its key
+            and the fact’s value if a string or a reference to the fact if an object as its value.
+          */
           facts.forEach(fact => {
             memberData[lc0Of(fact)] = member[fact] !== null && typeof member[fact] === 'object'
               ? member[fact]._ref
               : member[fact];
           });
-          // Get references to, and sizes of, the collections.
+          /*
+            Add collection properties to the object. Each has the dromedary-case collection name
+            as its key and an object with “ref” and “count” properties as its value.
+          */
           collections.forEach(collection => {
             memberData[lc0Of(collection)] = {
               ref: member[collection]._ref,
               count: member[collection].Count
             };
           });
+          // Add the member object to the array.
           data.push(memberData);
         });
+        // Return the array.
         return data;
       },
       error => err(error, `getting data on ${ref}`)
@@ -324,8 +341,8 @@ const getCollectionData = (ref, facts, collections) => {
   }
 };
 // ==== COPY OPERATION ====
-// Sequentially copies an array of tasks or an array of test cases.
-const copyTasksOrCases = (itemType, itemRefs, storyRef) => {
+// Sequentially copies an array of items (tasks or test cases).
+const copyItems = (itemType, itemRefs, storyRef) => {
   if (itemRefs.length && ! globals.isError) {
     // Identify and shorten a reference to the first item.
     const workItemType = ['task', 'testcase'][['task', 'case'].indexOf(itemType)];
@@ -367,7 +384,7 @@ const copyTasksOrCases = (itemType, itemRefs, storyRef) => {
               () => {
                 report([['total'], [`${itemType}Total`]]);
                 // Copy the remaining items.
-                return copyTasksOrCases(itemType, itemRefs.slice(1), storyRef);
+                return copyItems(itemType, itemRefs.slice(1), storyRef);
               },
               error => err(error, `copying ${itemType} ${firstRef}`)
             );
@@ -387,20 +404,20 @@ const copyTasksOrCases = (itemType, itemRefs, storyRef) => {
     return Promise.resolve('');
   }
 };
-// Gets data on tasks or test cases and copy them.
-const getAndCopyTasksOrCases = (itemType, itemsType, collectionType, data, copyRef) => {
+// Gets data on items (tasks or test cases) and copies them.
+const getAndCopyItems = (itemType, itemsType, collectionType, data, copyRef) => {
   // If the original has any specified items and they are to be copied:
   if (
     data[collectionType].count
     && [itemsType, 'both'].includes(globals.copyWhat)
   ) {
-    // Get data on the tasks or test cases.
+    // Get data on the items.
     return getCollectionData(data[collectionType].ref, [], [])
     .then(
       // When the data arrive:
       items => {
         // Copy the tasks or test cases.
-        return copyTasksOrCases(itemType, items.map(item => item.ref), copyRef);
+        return copyItems(itemType, items.map(item => item.ref), copyRef);
       },
       error => err(error, `getting data on ${collectionType}`)
     );
@@ -457,54 +474,41 @@ const copyTree = (storyRefs, parentType, parentRef) => {
               data: properties
             })
             .then(
-              // When the user story has been copied:
+              // When it has been copied:
               copy => {
                 report([['total'], ['storyTotal']]);
-                // Identify a short reference to the copy.
                 const copyRef = shorten('userstory', 'hierarchicalrequirement', copy.Object._ref);
                 if (! globals.isError) {
-                  // FUNCTION DEFINITION START
-                  // Copies child user stories and remaining user stories.
-                  const copyChildrenAndSiblings = () => {
-                    // If the original has any child user stories:
-                    if (data.children.count) {
-                      // Get data on them.
-                      return getCollectionData(data.children.ref, [], [])
-                      .then(
-                        // When the data arrive:
-                        children => {
-                          // Process the child user stories.
-                          return copyTree(children.map(child => child.ref), 'story', copyRef)
-                          .then(
-                            // When they have been processed:
-                            () => {
-                              // Process the remaining user stories.
-                              return copyTree(storyRefs.slice(1), 'story', parentRef);
-                            },
-                            error => err(error,'processing child user stories')
-                          );
-                        },
-                        error => err(error,'getting data on child user stories')
-                      );
-                    }
-                    else {
-                      // Process the remaining user stories.
-                      return copyTree(storyRefs.slice(1), 'story', parentRef);
-                    }
-                  };
-                  // FUNCTION DEFINITION END.
                   // Get data on any test cases and copy them, if required.
-                  return getAndCopyTasksOrCases('case', 'cases', 'testCases', data, copyRef)
+                  return getAndCopyItems('case', 'cases', 'testCases', data, copyRef)
                   .then(
                     // When any test cases have been copied:
                     () => {
                       // Get data on any tasks and copy them, if required.
-                      return getAndCopyTasksOrCases('task', 'tasks', 'tasks', data, copyRef)
+                      return getAndCopyItems('task', 'tasks', 'tasks', data, copyRef)
                       .then(
                         // When any tasks have been copied:
                         () => {
-                          // Process any child user stories and the remaining user stories.
-                          return copyChildrenAndSiblings();
+                          // Get data on the child user stories of the user story.
+                          return getCollectionData(data.children.ref, [], [])
+                          .then(
+                            // When the data arrive:
+                            children => {
+                              // Process the child user stories, if any.
+                              return copyTree(
+                                children ? children.map(child => child.ref) : [], 'story', copyRef
+                              )
+                              .then(
+                                // When any have been processed:
+                                () => {
+                                  // Process the remaining user stories.
+                                  return copyTree(storyRefs.slice(1), 'story', parentRef);
+                                },
+                                error => err(error,'processing child user stories')
+                              );
+                            },
+                            error => err(error,'getting data on child user stories')
+                          );
                         },
                         error => err(error, 'copying tasks')
                       );
@@ -666,62 +670,46 @@ const scoreTree = storyRef => {
   );
 };
 // ==== OWNERSHIP CHANGE OPERATION ====
-// Ensures the ownership of a work item (task or test case).
-const takeItem = (itemType, itemRef, ownerRef) => {
-  // If the ownership of the item needs to be changed:
-  if (ownerRef !== globals.takeWhoRef) {
-    // Change it.
-    return globals.restAPI.update({
-      ref: itemRef,
-      data: {Owner: globals.takeWhoRef}
-    })
-    .then(
-      () => {
-        report([['total'], [`${itemType}Total`], [`${itemType}Changes`]]);
-        return '';
-      },
-      error => err(error, `changing ${itemType} ownership`)
-    );
-  }
-  else {
-    report([['total'], [`${itemType}Total`]]);
-    return Promise.resolve('');
-  }
-};
 // Sequentially ensures the ownership of an array of work items (tasks or test cases).
-const takeItems = (itemType, collection) => {
+const takeItems = (longItemType, shortItemType, items) => {
   // If there are any items:
-  if (collection.count) {
-    // Get data on them.
-    return getCollectionData(collection.ref, ['Owner'], [])
-    .then(
-      // When the data arrive:
-      items => {
-        const firstRef = shorten(itemType, itemType, items[0].ref);
-        if (! globals.isError) {
-          const owner = items[0].owner;
-          const ownerRef = owner ? shorten('user', 'user', owner) : '';
-          if (! globals.isError) {
-            // Change the owner of the first item if necessary.
-            return takeItem(
-              ['task', 'case'][['task', 'testcase'].indexOf(itemType)], firstRef, ownerRef
-            )
-            .then(
-              // When any owner change has been made, process the remaining work items.
-              () => takeItems(itemType, items.slice(1)),
-              error => err(error, `changing ownership of ${itemType}`)
-            );
-          }
-          else {
-            return Promise.resolve('');
-          }
+  if (items.length) {
+    const firstRef = shorten(longItemType, longItemType, items[0].ref);
+    if (! globals.isError) {
+      const owner = items[0].owner;
+      const ownerRef = owner ? shorten('user', 'user', owner) : '';
+      if (! globals.isError) {
+        // If the ownership of the item needs to be changed:
+        if (ownerRef !== globals.takeWhoRef) {
+          // Change it.
+          return globals.restAPI.update({
+            ref: firstRef,
+            data: {Owner: globals.takeWhoRef}
+          })
+          .then(
+            // When it has been changed:
+            () => {
+              report([['total'], [`${shortItemType}Total`], [`${shortItemType}Changes`]]);
+              // Process the remaining items.
+              return takeItems(longItemType, shortItemType, items.slice(1));
+            },
+            error => err(error, `changing ${longItemType} ownership`)
+          );
         }
+        // Otherwise, i.e. if the ownership of the item does not need to be changed:
         else {
-          return Promise.resolve('');
+          report([['total'], [`${shortItemType}Total`]]);
+          // Process the remaining items.
+          return takeItems(longItemType, shortItemType, items.slice(1));
         }
-      },
-      error => err(error, `getting data on ${itemType} collection`)
-    );
+      }
+      else {
+        return Promise.resolve('');
+      }
+    }
+    else {
+      return Promise.resolve('');
+    }
   }
   else {
     return Promise.resolve('');
@@ -754,33 +742,49 @@ const takeTree = storyRefs => {
             .then(
               // When any change has been made:
               () => {
-                // Change the owner of any test cases of the user story if necessary.
-                return takeItems('testcase', data.testCases)
+                // Get data on the test cases of the user story.
+                return getCollectionData(data.testCases.ref, ['Owner'], [])
                 .then(
-                  // When any changes have been made:
-                  () => {
-                    // Change the owner of any tasks of the user story if necessary.
-                    return takeItems('task', data.tasks)
+                  // When the data arrive:
+                  cases => {
+                    // Change the owner of any of them if necessary.
+                    return takeItems('testcase', 'case', cases)
                     .then(
                       // When any changes have been made:
                       () => {
-                        // Process any child user stories of the user story.
-                        return data.children.count ? takeTree(
-                          data.children.map(child => child.ref)
-                        ) : Promise.resolve('')
+                        // Get data on the tasks of the user story.
+                        return getCollectionData(data.tasks.ref, ['Owner'], [])
                         .then(
-                          // When they have been processed:
-                          () => {
-                            // Process the remaining user stories.
-                            return takeTree(storyRefs.slice(1));
+                          // When the data arrive:
+                          tasks => {
+                            // Change the owner of any of them if necessary.
+                            return takeItems('task', 'task', tasks)
+                            .then(
+                              // When any changes have been made:
+                              () => {
+                                // Process any child user stories of the user story.
+                                return takeTree(
+                                  data.children.count ? data.children.map(child => child.ref) : []
+                                )
+                                .then(
+                                  // When they have been processed:
+                                  () => {
+                                    // Process the remaining user stories.
+                                    return takeTree(storyRefs.slice(1));
+                                  },
+                                  error => err(error, 'changing owner of child user stories')
+                                );
+                              },
+                              error => err(error, 'changing owner of tasks')
+                            );
                           },
-                          error => err(error, 'changing owner of child user stories')
+                          error => err(error, 'getting data on tasks')
                         );
                       },
-                      error => err(error, 'changing owner of tasks')
+                      error => err(error, 'changing owner of test cases')
                     );
                   },
-                  error => err(error, 'changing owner of test cases')
+                  error => err(error, 'getting data on test cases')
                 );
               },
               error => err(error, 'changing owner of user story')
@@ -1242,7 +1246,7 @@ const createCases = (names, description, owner, projectRef, storyRef) => {
       () => {
         report([['changes']]);
         // Create the remaining test cases.
-        return createCases(names.slice(1), description, owner, storyRef);
+        return createCases(names.slice(1), description, owner, projectRef, storyRef);
       },
       error => err(error, 'creating and linking test case')
     );
