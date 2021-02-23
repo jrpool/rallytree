@@ -812,7 +812,7 @@ const projectTree = storyRefs => {
   if (storyRefs.length && ! globals.isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! globals.isError) {
-      // Get data on the first user story of the specified array.
+      // Get data on the first user story.
       return getItemData(firstRef, ['Project', 'Release', 'Iteration'], ['Children', 'TestCases'])
       .then(
         // When the data arrive:
