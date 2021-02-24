@@ -263,15 +263,15 @@ const getItemData = (ref, facts, collections) => {
       // When the data arrive:
       item => {
         const obj = item.Object;
-        // Initialize an object of data.
+        // Initialize an object of data, to contain a property for each fact and collection.
         const data = {};
-        // Add the item’s facts or, if objects, references to them.
+        // Add the fact properties with string values: value if a string or reference if an object.
         facts.forEach(fact => {
           data[lc0Of(fact)] = obj[fact] !== null && typeof obj[fact] === 'object'
             ? obj[fact]._ref
             : obj[fact];
         });
-        // Add references to and the sizes of the item’s collections.
+        // Add the collection properties with object values having reference and count properties.
         collections.forEach(collection => {
           data[lc0Of(collection)] = {
             ref: obj[collection]._ref,
@@ -663,9 +663,10 @@ const scoreTree = storyRef => {
 const takeItems = (longItemType, shortItemType, items) => {
   // If there are any items:
   if (items.length) {
-    const firstRef = shorten(longItemType, longItemType, items[0].ref);
+    const firstItem = items[0];
+    const firstRef = shorten(longItemType, longItemType, firstItem.ref);
     if (! globals.isError) {
-      const owner = items[0].owner;
+      const owner = firstItem.owner;
       const ownerRef = owner ? shorten('user', 'user', owner) : '';
       if (! globals.isError) {
         // If the ownership of the item needs to be changed:
@@ -950,7 +951,7 @@ const projectTree = storyRefs => {
 const scheduleTasks = tasks => {
   if (tasks.length && ! globals.isError) {
     const firstTask = tasks[0];
-    const firstRef = shorten('task', 'task', tasks[0].ref);
+    const firstRef = shorten('task', 'task', firstTask.ref);
     if (! globals.isError) {
       // If the task’s state needs to be changed:
       if (firstTask.state !== globals.state.task) {
@@ -1143,7 +1144,7 @@ const createCases = (names, description, owner, projectRef, storyRef) => {
     .then(
       // After it has been created:
       newCase => {
-        // Link it to the specified user story.
+        // Add it to the specified user story’s test cases.
         const caseRef = shorten('testcase', 'testcase', newCase.Object._ref);
         if (! globals.isError) {
           return globals.restAPI.add({
@@ -1155,7 +1156,7 @@ const createCases = (names, description, owner, projectRef, storyRef) => {
           .then(
             // After it has been linked:
             () => {
-              // Link it to the specified test set, if any.
+              // Add it to the specified test set, if any.
               return (
                 globals.caseSetRef ? globals.restAPI.add({
                   ref: caseRef,
@@ -1165,14 +1166,16 @@ const createCases = (names, description, owner, projectRef, storyRef) => {
                 }) : Promise.resolve('')
               )
               .then(
+                // After it may have been added:
                 () => {
                   report([['changes']]);
                   // Create the remaining test cases.
                   return createCases(names.slice(1), description, owner, projectRef, storyRef);
-                }
+                },
+                error => err(error, 'adding test case to test set')
               );
             },
-            error => err(error, 'linking test case to user story')
+            error => err(error, 'adding test case to test cases of user story')
           );
         }
         else {
@@ -1197,62 +1200,36 @@ const caseTree = storyRefs => {
         // When the data arrive:
         data => {
           report([['total']]);
-          // If the user story is a leaf or all user stories are to get test cases:
+          // Determine the names and project of the test cases to be created, if any.
+          let names = [];
+          let projectRef = '';
           if (globals.caseTarget === 'all' || ! data.children.count) {
-            // Determine the default or customized names of its test cases.
-            const names = caseData ? caseData[data.name] || [data.name] : [data.name];
-            // Determine the default or customized project of the test cases.
-            const projectRef = globals.caseProjectRef || data.project;
-            // Create the test cases.
-            return createCases(names, data.description, data.owner, projectRef, firstRef)
-            .then(
-              // When they have been created:
-              () => {
-                // If the user story has child user stories:
-                if (data.children.count) {
-                  // Get data on them.
-                  return getCollectionData(data.children.ref, [], [])
+            names = caseData ? caseData[data.name] || [data.name] : [data.name];
+            projectRef = globals.caseProjectRef || data.project;
+          }
+          // Create the test cases, if any.
+          return createCases(names, data.description, data.owner, projectRef, firstRef)
+          .then(
+            // When any have been created:
+            () => {
+              // Get data on any child user stories.
+              return getCollectionData(data.children.count ? data.children.ref : '', [], [])
+              .then(
+                // When any data arrive:
+                children => {
+                  // Process any children sequentially.
+                  return caseTree(children.length ? children.map(child => child.ref) : [])
                   .then(
-                    // When the data arrive:
-                    children => {
-                      // Process the children sequentially.
-                      return caseTree(children.map(child => child.ref))
-                      .then(
-                        // After they are processed, process the remaining user stories.
-                        () => caseTree(storyRefs.slice(1)),
-                        error => err(error, 'creating test cases for child user stories')
-                      );
-                    },
-                    error => err(error, 'getting data on child user stories')
+                    // After any are processed, process the remaining user stories.
+                    () => caseTree(storyRefs.slice(1)),
+                    error => err(error, 'creating test cases for child user stories')
                   );
-                }
-                // Otherwise, i.e. if the user story has no child user stories:
-                else {
-                  // Process the remaining user stories.
-                  return caseTree(storyRefs.slice(1));
-                }
-              },
-              error => err(error, 'creating test cases')
-            );
-          }
-          // Otherwise, i.e. if the user story has child user stories and is not to get test cases:
-          else {
-            // Get data on its child user stories.
-            return getCollectionData(data.children.ref, [], [])
-            .then(
-              // When the data arrive:
-              children => {
-                // Process the children sequentially.
-                return caseTree(children.map(child => child.ref))
-                .then(
-                  // After they are processed, process the remaining user stories.
-                  () => caseTree(storyRefs.slice(1)),
-                  error => err(error, 'creating test cases for child user stories')
-                );
-              },
-              error => err(error, 'getting data on child user stories')
-            );
-          }
+                },
+                error => err(error, 'getting data on child user stories')
+              );
+            },
+            error => err(error, 'creating test cases')
+          );
         },
         error => err(error, 'getting data on user story')
       );
@@ -1267,68 +1244,67 @@ const caseTree = storyRefs => {
 };
 // ==== TEST-CASE GROUPING OPERATION ====
 // Groups test cases.
-const groupCases = caseRefs => {
-  if (caseRefs.length && ! globals.isError) {
-    const firstRef = shorten('testcase', 'testcase', caseRefs[0]);
+const groupCases = cases => {
+  if (cases.length && ! globals.isError) {
+    const firstCase = cases[0];
+    const firstRef = shorten('testcase', 'testcase', firstCase.ref);
     if (! globals.isError) {
-      // Get data on the first test case of the specified array.
-      return getItemData(firstRef, ['TestFolder'], ['TestSets'])
+      report([['total']]);
+      const folderRef = shorten('testfolder', 'testfolder', firstCase.testFolder);
+      // Determine what groupings, if any, are needed.
+      const needsFolder = globals.groupFolderRef && folderRef !== globals.groupFolderRef;
+      let needsSet = globals.groupSetRef && ! firstCase.testSets.count;
+      return (globals.groupSetRef && firstCase.testSets.count ? getCollectionData(
+        firstCase.testSets.ref, [], []
+      ) : Promise.resolve([]))
       .then(
-        // When the data arrive:
-        data => {
-          report([['total']]);
-          const folderRef = shorten('testfolder', 'testfolder', data.testFolder);
-          // If a test folder has been specified and the test case is not in it:
-          if (globals.groupFolderRef && folderRef !== globals.groupFolderRef) {
-            // Link the test case to the test folder.
-            return globals.restAPI.update({
-              ref: firstRef,
-              data: {
-                TestFolder: globals.groupFolderRef
-              }
-            })
-            .then(
-              // When the test case has been linked:
-              () => {
-                report([['changes'], ['folderChanges']]);
-                // If a test set has been specified:
-                if (globals.groupSetRef) {
-                  // If the test case is in any test sets:
-                  if (data.testSets.count) {
-                    // Get data on the test sets.
-                    return getCollectionData(data.testSets.ref, [], [])
-                    .then(
-                      // When the data arrive:
-                      testSets => {
-                        // If the test case is not in the specified test set:
-                        if (
-                          ! testSets.map(
-                            testSet => shorten('testset', 'testset', testSet.ref)
-                          ).includes(globals.groupSetRef)
-                        ) {
-                          // Link the test case to it.
-                          return globals.restAPI.add({
-                            ref: firstRef,
-                            collection: 'TestSets',
-                            data: [{_ref: globals.groupSetRef}],
-                            fetch: ['_ref']
-                          })
-                          .then(
-                            // When the test case has been linked:
-                            () => {
-                              report([['changes'], ['setChanges']]);
-                              // Group the remaining test cases.
-                              return groupCases(caseRefs.slice(1));
-                            }
-                          );
-                        }
-                      },
-                      error => err(error, 'getting data on test sets')
-                    );
-                  }
-                  // Otherwise, i.e. if the test case is in no test sets:
-                  else {
-                    // Link the test case to the specified test set.
+        sets => {
+          
+        }
+      )
+      )
+      // Assign the specified test folder to the test case, if necessary.
+      return (
+        needsFolder ? globals.restAPI.update({
+          ref: firstRef,
+          data: {
+            TestFolder: globals.groupFolderRef
+          }
+        }) : Promise.resolve('')
+      )
+      .then(
+        // When any assignment has been made:
+        () => {
+          if (needsFolder) {
+            report([['changes'], ['folderChanges']]);
+          }
+          return (
+            
+          )
+          .then(
+            () => {
+
+            }
+          )
+          const needsSet = globals.groupSetRef && 
+          // Add the test case to the specified test set, if necessary.
+
+          // If a test set has been specified:
+          if (globals.groupSetRef) {
+            // If the test case is in any test sets:
+            if (data.testSets.count) {
+              // Get data on the test sets.
+              return getCollectionData(data.testSets.ref, [], [])
+              .then(
+                // When the data arrive:
+                testSets => {
+                  // If the test case is not in the specified test set:
+                  if (
+                    ! testSets.map(
+                      testSet => shorten('testset', 'testset', testSet.ref)
+                    ).includes(globals.groupSetRef)
+                  ) {
+                    // Link the test case to it.
                     return globals.restAPI.add({
                       ref: firstRef,
                       collection: 'TestSets',
@@ -1344,59 +1320,81 @@ const groupCases = caseRefs => {
                       }
                     );
                   }
+                },
+                error => err(error, 'getting data on test sets')
+              );
+            }
+            // Otherwise, i.e. if the test case is in no test sets:
+            else {
+              // Link the test case to the specified test set.
+              return globals.restAPI.add({
+                ref: firstRef,
+                collection: 'TestSets',
+                data: [{_ref: globals.groupSetRef}],
+                fetch: ['_ref']
+              })
+              .then(
+                // When the test case has been linked:
+                () => {
+                  report([['changes'], ['setChanges']]);
+                  // Group the remaining test cases.
+                  return groupCases(caseRefs.slice(1));
+                }
+              );
+            }
+          }
+        },
+        error => err(error, 'setting test folder of test case')
+      );
+      }
+      // Otherwise, i.e. if the test case is not to be grouped in a test folder:
+      else {
+        // If a test set has been specified:
+        if (globals.groupSetRef) {
+          // If the test case is in any test sets:
+          if (data.testSets.count) {
+            // Get data on the test sets.
+            return getCollectionData(data.testSets.ref, [], [])
+            .then(
+              // When the data arrive:
+              testSets => {
+                // If the test case is not in the specified test set:
+                if (
+                  ! testSets.map(
+                    testSet => shorten('testset', 'testset', testSet.ref)
+                  ).includes(globals.groupSetRef)
+                ) {
+                  // Link the test case to it.
+                  return globals.restAPI.add({
+                    ref: firstRef,
+                    collection: 'TestSets',
+                    data: [{_ref: globals.groupSetRef}],
+                    fetch: ['_ref']
+                  })
+                  .then(
+                    () => {
+                      report([['changes'], ['setChanges']]);
+                    }
+                  );
                 }
               },
-              error => err(error, 'setting test folder of test case')
+              error => err(error, 'getting data on test sets')
             );
           }
-          // Otherwise, i.e. if the test case is not to be grouped in a test folder:
+          // Otherwise, i.e. if the test case is in no test sets:
           else {
-            // If a test set has been specified:
-            if (globals.groupSetRef) {
-              // If the test case is in any test sets:
-              if (data.testSets.count) {
-                // Get data on the test sets.
-                return getCollectionData(data.testSets.ref, [], [])
-                .then(
-                  // When the data arrive:
-                  testSets => {
-                    // If the test case is not in the specified test set:
-                    if (
-                      ! testSets.map(
-                        testSet => shorten('testset', 'testset', testSet.ref)
-                      ).includes(globals.groupSetRef)
-                    ) {
-                      // Link the test case to it.
-                      return globals.restAPI.add({
-                        ref: firstRef,
-                        collection: 'TestSets',
-                        data: [{_ref: globals.groupSetRef}],
-                        fetch: ['_ref']
-                      })
-                      .then(
-                        () => {
-                          report([['changes'], ['setChanges']]);
-                        }
-                      );
-                    }
-                  },
-                  error => err(error, 'getting data on test sets')
-                );
+            // Link the test case to the specified test set.
+            return globals.restAPI.add({
+              ref: firstRef,
+              collection: 'TestSets',
+              data: [{_ref: globals.groupSetRef}],
+              fetch: ['_ref']
+            })
+            .then(
+              () => {
+                report([['changes'], ['setChanges']]);
               }
-              // Otherwise, i.e. if the test case is in no test sets:
-              else {
-                // Link the test case to the specified test set.
-                return globals.restAPI.add({
-                  ref: firstRef,
-                  collection: 'TestSets',
-                  data: [{_ref: globals.groupSetRef}],
-                  fetch: ['_ref']
-                })
-                .then(
-                  () => {
-                    report([['changes'], ['setChanges']]);
-                  }
-                );
+            );
               }
             }
           }
@@ -1453,12 +1451,12 @@ const groupTree = storyRefs => {
           // If the user story has test cases:
           if (data.testCases.count) {
             // Get data on them.
-            return getCollectionData(data.testCases.ref, [], [])
+            return getCollectionData(data.testCases.ref, ['TestFolder'], ['TestSets'])
             .then(
               // When the data arrive:
               cases => {
                 // Process the test cases sequentially.
-                return groupCases(cases.map(testCase => testCase.ref))
+                return groupCases(cases)
                 .then(
                   // After they are processed:
                   () => {
