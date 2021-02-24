@@ -342,54 +342,43 @@ const getCollectionData = (ref, facts, collections) => {
 };
 // ==== COPY OPERATION ====
 // Sequentially copies an array of items (tasks or test cases).
-const copyItems = (itemType, itemRefs, storyRef) => {
-  if (itemRefs.length && ! globals.isError) {
-    // Identify and shorten a reference to the first item.
+const copyItems = (itemType, items, storyRef) => {
+  if (items.length && ! globals.isError) {
     const workItemType = ['task', 'testcase'][['task', 'case'].indexOf(itemType)];
     if (workItemType) {
-      const firstRef = shorten(workItemType, workItemType, itemRefs[0]);
+      const firstItem = items[0];
+      const firstRef = shorten(workItemType, workItemType, firstItem.ref);
       if (! globals.isError) {
-        // Get data on the first item.
-        return getItemData(firstRef, ['Name', 'Description', 'Owner', 'DragAndDropRank'], [])
+        // Specify properties for the copy of the first item.
+        const config = {
+          Name: firstItem.name,
+          Description: firstItem.description,
+          Owner: globals.copyOwnerRef || firstItem.owner,
+          DragAndDropRank: firstItem.dragAndDropRank,
+          WorkProduct: storyRef
+        };
+        // If the item is a task and a state has been specified, apply it.
+        if (itemType === 'task' && globals.state.task) {
+          config.State = globals.state.task;
+        }
+        // If the item is a test case and thus does not inherit a project, specify one.
+        if (itemType === 'case') {
+          config.Project = globals.copyProjectRef;
+        }
+        // Copy the item.
+        return globals.restAPI.create({
+          type: workItemType,
+          fetch: ['_ref'],
+          data: config
+        })
         .then(
-          // When the data arrive:
-          data => {
-            // Specify properties for the copy.
-            const config = {
-              Name: data.name,
-              Description: data.description,
-              Owner: globals.copyOwnerRef || data.owner,
-              DragAndDropRank: data.dragAndDropRank,
-              WorkProduct: storyRef
-            };
-            // If the item is a task and a state has been specified, apply it.
-            if (itemType === 'task' && globals.state.task) {
-              config.State = globals.state.task;
-            }
-            /*
-              If the item is a test case, it will not automatically inherit the project of its
-              user story, so specify its project.
-            */
-            if (itemType === 'case') {
-              config.Project = globals.copyProjectRef;
-            }
-            // Copy the item.
-            return globals.restAPI.create({
-              type: workItemType,
-              fetch: ['_ref'],
-              data: config
-            })
-            .then(
-              // When the item has been copied:
-              () => {
-                report([['total'], [`${itemType}Total`]]);
-                // Copy the remaining items.
-                return copyItems(itemType, itemRefs.slice(1), storyRef);
-              },
-              error => err(error, `copying ${itemType} ${firstRef}`)
-            );
+          // When the item has been copied:
+          () => {
+            report([['total'], [`${itemType}Total`]]);
+            // Copy the remaining items.
+            return copyItems(itemType, items.slice(1), storyRef);
           },
-          error => err(error, `getting data on ${itemType}`)
+          error => err(error, `copying ${itemType} ${firstRef}`)
         );
       }
       else {
@@ -397,7 +386,7 @@ const copyItems = (itemType, itemRefs, storyRef) => {
       }
     }
     else {
-      return Promise.resolve(err('invalid item type', 'copying task or test case'));
+      return Promise.resolve(err('invalid item type', `copying ${itemType}`));
     }
   }
   else {
@@ -412,12 +401,14 @@ const getAndCopyItems = (itemType, itemsType, collectionType, data, copyRef) => 
     && [itemsType, 'both'].includes(globals.copyWhat)
   ) {
     // Get data on the items.
-    return getCollectionData(data[collectionType].ref, [], [])
+    return getCollectionData(
+      data[collectionType].ref, ['Name', 'Description', 'Owner', 'DragAndDropRank'], []
+    )
     .then(
       // When the data arrive:
       items => {
         // Copy the items.
-        return copyItems(itemType, items.map(item => item.ref), copyRef);
+        return copyItems(itemType, items, copyRef);
       },
       error => err(error, `getting data on ${collectionType}`)
     );
@@ -1766,10 +1757,10 @@ const passTree = storyRefs => {
 };
 // ==== PLANIFICATION OPERATION ====
 // Sequentially planifies an array of test cases.
-const planCases = (caseRefs, folderRef) => {
-  if (caseRefs.length && ! globals.isError) {
-    // Identify and shorten a reference to the first test case.
-    const firstRef = shorten('testcase', 'testcase', caseRefs[0]);
+const planCases = (cases, folderRef) => {
+  if (cases.length && ! globals.isError) {
+    const firstCase = cases[0];
+    const firstRef = shorten('testcase', 'testcase', firstCase.ref);
     if (! globals.isError) {
       // If existing test cases are to be linked to test folders:
       if (globals.planHow === 'use') {
@@ -1785,48 +1776,36 @@ const planCases = (caseRefs, folderRef) => {
           () => {
             report([['caseChanges']]);
             // Link the remaining test cases.
-            return planCases(caseRefs.slice(1), folderRef);
+            return planCases(cases.slice(1), folderRef);
           },
           error => err(error, `linking test case ${firstRef} to test folder`)
         );
       }
       // Otherwise, i.e. if test cases are to be copied into test folders:
       else {
-        // Get data on the test case.
-        return getItemData(
-          firstRef,
-          ['Name', 'Description', 'Owner', 'DragAndDropRank', 'Risk', 'Priority', 'Project'],
-          []
-        )
+        // Copy the test case into the test folder.
+        return globals.restAPI.create({
+          type: 'testcase',
+          fetch: ['_ref'],
+          data: {
+            Name: firstCase.name,
+            Description: firstCase.description,
+            Owner: firstCase.owner,
+            DragAndDropRank: firstCase.dragAndDropRank,
+            Risk: firstCase.risk,
+            Priority: firstCase.priority,
+            Project: firstCase.project,
+            TestFolder: folderRef
+          }
+        })
         .then(
-          // When the data arrive:
-          data => {
-            // Copy the test case into the test folder.
-            return globals.restAPI.create({
-              type: 'testcase',
-              fetch: ['_ref'],
-              data: {
-                Name: data.name,
-                Description: data.description,
-                Owner: data.owner,
-                DragAndDropRank: data.dragAndDropRank,
-                Risk: data.risk,
-                Priority: data.priority,
-                Project: data.project,
-                TestFolder: folderRef
-              }
-            })
-            .then(
-              // When the test case has been copied:
-              () => {
-                report([['caseChanges']]);
-                // Copy the remaining test cases.
-                return planCases(caseRefs.slice(1), folderRef);
-              },
-              error => err(error, `copying test case ${firstRef}`)
-            );
+          // When the test case has been copied:
+          () => {
+            report([['caseChanges']]);
+            // Copy the remaining test cases.
+            return planCases(cases.slice(1), folderRef);
           },
-          error => err(error, 'getting data on test case')
+          error => err(error, `copying test case ${firstRef}`)
         );
       }
     }
@@ -1840,13 +1819,17 @@ const planCases = (caseRefs, folderRef) => {
 };
 // Get data on test cases and planify them.
 const getAndPlanCases = (data, folderRef) => {
+  // Determine the required case facts.
+  const requiredFacts = globals.planHow === 'use' ? [
+    'Name', 'Description', 'Owner', 'DragAndDropRank', 'Risk', 'Priority', 'Project'
+  ] : [];
   // Get data on the test cases.
-  return getCollectionData(data.testCases.ref, [], [])
+  return getCollectionData(data.testCases.ref, requiredFacts, [])
   .then(
     // When the data arrive:
     cases => {
       // Process the test cases.
-      return planCases(cases.map(testCase => testCase.ref), folderRef);
+      return planCases(cases, folderRef);
     },
     error => err(error, 'getting data on test cases')
   );
