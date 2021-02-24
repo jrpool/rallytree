@@ -1045,7 +1045,7 @@ const scheduleTree = storyRefs => {
   }
 };
 // ==== TASK-CREATION OPERATION ====
-// Sequentially creates tasks with a specified owner and names for a user story.
+// Sequentially creates tasks for a user story.
 const createTasks = (storyRef, owner, names) => {
   if (names.length && ! globals.isError) {
     // Create a task with the first name.
@@ -1073,20 +1073,20 @@ const taskTree = storyRefs => {
   if (storyRefs.length && ! globals.isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! globals.isError) {
-      // Get data on the first user story of the specified array.
+      // Get data on the first user story.
       return getItemData(firstRef, ['Owner'], ['Children'])
       .then(
         // When the data arrive:
         data => {
-          // If the user story has any child user stories, it does not need tasks, so:
+          // If the user story has any child user stories:
           if (data.children.count) {
             report([['total']]);
-            // Get data on its child user stories.
+            // Get data on them.
             return getCollectionData(data.children.ref, [], [])
             .then(
               // When the data arrive:
               children => {
-                // Process the children sequentially.
+                // Process the child user stories sequentially.
                 return taskTree(children.map(child => child.ref))
                 .then(
                   // After they are processed, process the remaining user stories.
@@ -1094,15 +1094,12 @@ const taskTree = storyRefs => {
                   error => err(error, 'creating tasks for child user stories')
                 );
               },
-              error => err(
-                error,
-                'getting data on child user stories for task creation'
-              )
+              error => err(error, 'getting data on child user stories')
             );
           }
-          // Otherwise the user story needs tasks, so:
+          // Otherwise, i.e. if the user story has no child user stories:
           else {
-            // Create them sequentially.
+            // Create tasks for the user story sequentially.
             return createTasks(firstRef, data.owner, globals.taskNames)
             .then(
               // When they have been created:
@@ -1118,7 +1115,7 @@ const taskTree = storyRefs => {
           }
         },
         error => err(
-          error, 'getting data on first user story for task creation'
+          error, 'getting data on user story'
         )
       );
     }
@@ -1128,72 +1125,61 @@ const taskTree = storyRefs => {
   }
 };
 // ==== TEST-CASE CREATION OPERATION ====
-// Creates a test case.
-const createCase = (name, description, owner, projectRef, storyRef) => {
-  // Create a test case.
-  return globals.restAPI.create({
-    type: 'testcase',
-    fetch: ['_ref'],
-    data: {
-      Name: name,
-      Description: description,
-      Owner: owner,
-      Project: projectRef,
-      TestFolder: globals.caseFolderRef || null
-    }
-  })
-  .then(
-    // After it is created:
-    newCase => {
-      // Link it to the specified user story.
-      const caseRef = shorten('testcase', 'testcase', newCase.Object._ref);
-      if (! globals.isError) {
-        return globals.restAPI.add({
-          ref: storyRef,
-          collection: 'TestCases',
-          data: [{_ref: caseRef}],
-          fetch: ['_ref']
-        })
-        .then(
-          // After it is linked:
-          () => {
-            // If a test set was specified:
-            if (globals.caseSetRef) {
-              // Link the test case to it.
-              return globals.restAPI.add({
-                ref: caseRef,
-                collection: 'TestSets',
-                data: [{_ref: globals.caseSetRef}],
-                fetch: ['_ref']
-              });
-            }
-            else {
-              return '';
-            }
-          },
-          error => err(error, 'linking test case to user story')
-        );
-      }
-      else {
-        return '';
-      }
-    },
-    error => err(error, 'creating test case')
-  );
-};
 // Creates test cases.
 const createCases = (names, description, owner, projectRef, storyRef) => {
-  if (names.length) {
+  if (names.length && ! globals.isError) {
     // Create the first test case.
-    return createCase(names[0], description, owner, projectRef, storyRef)
+    return globals.restAPI.create({
+      type: 'testcase',
+      fetch: ['_ref'],
+      data: {
+        Name: names[0],
+        Description: description,
+        Owner: owner,
+        Project: projectRef,
+        TestFolder: globals.caseFolderRef || null
+      }
+    })
     .then(
-      // When it has been created:
-      () => {
-        report([['changes']]);
-        // Create the remaining test cases.
-        return createCases(names.slice(1), description, owner, projectRef, storyRef);
+      // After it has been created:
+      newCase => {
+        // Link it to the specified user story.
+        const caseRef = shorten('testcase', 'testcase', newCase.Object._ref);
+        if (! globals.isError) {
+          return globals.restAPI.add({
+            ref: storyRef,
+            collection: 'TestCases',
+            data: [{_ref: caseRef}],
+            fetch: ['_ref']
+          })
+          .then(
+            // After it has been linked:
+            () => {
+              // Link it to the specified test set, if any.
+              return (
+                globals.caseSetRef ? globals.restAPI.add({
+                  ref: caseRef,
+                  collection: 'TestSets',
+                  data: [{_ref: globals.caseSetRef}],
+                  fetch: ['_ref']
+                }) : Promise.resolve('')
+              )
+              .then(
+                () => {
+                  report([['changes']]);
+                  // Create the remaining test cases.
+                  return createCases(names.slice(1), description, owner, projectRef, storyRef);
+                }
+              );
+            },
+            error => err(error, 'linking test case to user story')
+          );
+        }
+        else {
+          return '';
+        }
       },
-      error => err(error, 'creating and linking test case')
+      error => err(error, 'creating test case')
     );
   }
   else {
@@ -1205,7 +1191,7 @@ const caseTree = storyRefs => {
   if (storyRefs.length && ! globals.isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! globals.isError) {
-      // Get data on the first user story of the specified array.
+      // Get data on the first user story.
       return getItemData(firstRef, ['Name', 'Description', 'Owner', 'Project'], ['Children'])
       .then(
         // When the data arrive:
@@ -1213,7 +1199,7 @@ const caseTree = storyRefs => {
           report([['total']]);
           // If the user story is a leaf or all user stories are to get test cases:
           if (globals.caseTarget === 'all' || ! data.children.count) {
-            // Determine the default or customized names of the test cases.
+            // Determine the default or customized names of its test cases.
             const names = caseData ? caseData[data.name] || [data.name] : [data.name];
             // Determine the default or customized project of the test cases.
             const projectRef = globals.caseProjectRef || data.project;
