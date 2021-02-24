@@ -947,43 +947,36 @@ const projectTree = storyRefs => {
 };
 // ==== SCHEDULE-STATE CHANGE OPERATION ====
 // Recursively sets the states of an array of tasks.
-const scheduleTasks = taskRefs => {
-  if (taskRefs.length && ! globals.isError) {
-    const firstRef = shorten('task', 'task', taskRefs[0]);
+const scheduleTasks = tasks => {
+  if (tasks.length && ! globals.isError) {
+    const firstTask = tasks[0];
+    const firstRef = shorten('task', 'task', tasks[0].ref);
     if (! globals.isError) {
-      // Get data on the first task.
-      return getItemData(firstRef, ['State'], [])
-      .then(
-        // When the data arrive:
-        data => {
-          // If the task already has the specified state:
-          if (data.state === globals.state.task) {
-            report([['total'], ['taskTotal']]);
-            // Set the states of the remaining tasks.
-            return scheduleTasks(taskRefs.slice(1));
+      // If the task’s state needs to be changed:
+      if (firstTask.state !== globals.state.task) {
+        // Change it.
+        return globals.restAPI.update({
+          ref: firstRef,
+          data: {
+            State: globals.state.task
           }
-          // Otherwise, i.e. if the task does not have the specified state:
-          else {
-            // Change the task’s state.
-            return globals.restAPI.update({
-              ref: firstRef,
-              data: {
-                State: globals.state.task
-              }
-            })
-            .then(
-              // When it has been changed:
-              () => {
-                report([['total'], ['taskTotal'], ['changes'], ['taskChanges']]);
-                // Set the states of the remaining tasks.
-                return scheduleTasks(taskRefs.slice(1));
-              },
-              error => err(error, 'changing state of task')
-            );
-          }
-        },
-        error => err(error, 'getting data on task')
-      );
+        })
+        .then(
+          // When it has been changed:
+          () => {
+            report([['total'], ['taskTotal'], ['changes'], ['taskChanges']]);
+            // Process the remaining tasks.
+            return scheduleTasks(tasks.slice(1));
+          },
+          error => err(error, 'changing state of task')
+        );
+      }
+      // Otherwise, i.e. if the task’s state does not need to be changed:
+      else {
+        report([['total'], ['taskTotal']]);
+        // Process the remaining tasks.
+        return scheduleTasks(tasks.slice(1));
+      }
     }
     else {
       return Promise.resolve('');
@@ -1027,86 +1020,20 @@ const scheduleTree = storyRefs => {
                           // Process the remaining user stories.
                           return scheduleTree(storyRefs.slice(1));
                         }
-                      )
-                    }
-                  )
-                }
-              )
-            }
-          )
-          // If the user story has child user stories, and therefore has no tasks:
-          if (data.children.count) {
-            report([['total'], ['storyTotal']]);
-            // Get data on them.
-            return getCollectionData(data.children.ref, [], [])
-            .then(
-              // When the data arrive:
-              children => {
-                // Process the child user stories sequentially.
-                return scheduleTree(children.map(child => child.ref))
-                .then(
-                  // After they are processed, process the remaining user stories.
-                  () => scheduleTree(storyRefs.slice(1)),
-                  error => err(error, 'changing schedule state of child user stories')
-                );
-              },
-              error => err(
-                error, 'getting data on child user stories'
-              )
-            );
-          }
-          // Otherwise, if the user story has tasks, and therefore has no child user stories:
-          else if (data.tasks.count) {
-            report([['total'], ['storyTotal']]);
-            // Get data on the tasks.
-            return getCollectionData(data.tasks.ref, [], [])
-            .then(
-              // When the data arrive:
-              tasks => {
-                // Change the states of the tasks.
-                return scheduleTasks(tasks.map(task => task.ref))
-                .then(
-                  // When they have been changed:
-                  () => {
-                    // Set the schedule states of the remaining user stories.
-                    return scheduleTree(storyRefs.slice(1));
-                  },
-                  error => err(error, 'changing states of tasks')
-                );
-              },
-              error => err(error, 'getting data on tasks')
-            );
-          }
-          // Otherwise, i.e. if the user story has no child user stories and no tasks:
-          else {
-            // If it needs a schedule-state change:
-            if (data.scheduleState !== globals.state.story) {
-              // Perform it.
-              return globals.restAPI.update({
-                ref: firstRef,
-                data: {
-                  ScheduleState: globals.state.story
-                }
-              })
-              .then(
-                // When its schedule state has been changed:
-                () => {
-                  report([['total'], ['storyTotal'], ['changes'], ['storyChanges']]);
-                  // Process the remaining user stories.
-                  return scheduleTree(storyRefs.slice(1));
+                      );
+                    },
+                    error => err(
+                      error, 'getting data on child user stories'
+                    )
+                  );
                 },
-                error => err(error, 'changing schedule state of user story')
+                error => err(error, 'changing states of tasks')
               );
-            }
-            // Otherwise, i.e. if the user story does not need a schedule-state change:
-            else {
-              report([['total'], ['storyTotal']]);
-              // Process the remaining user stories.
-              return scheduleTree(storyRefs.slice(1));
-            }
-          }
+            },
+            error => err(error, 'getting data on tasks')
+          );
         },
-        error => err(error, 'getting data on user story for schedule-state change')
+        error => err(error, 'getting data on user story')
       );
     }
     else {
@@ -1817,22 +1744,27 @@ const planCases = (cases, folderRef) => {
     return Promise.resolve('');
   }
 };
-// Get data on test cases and planify them.
+// Gets data on test cases and planifies them.
 const getAndPlanCases = (data, folderRef) => {
-  // Determine the required case facts.
-  const requiredFacts = globals.planHow === 'use' ? [
-    'Name', 'Description', 'Owner', 'DragAndDropRank', 'Risk', 'Priority', 'Project'
-  ] : [];
-  // Get data on the test cases.
-  return getCollectionData(data.testCases.ref, requiredFacts, [])
-  .then(
-    // When the data arrive:
-    cases => {
-      // Process the test cases.
-      return planCases(cases, folderRef);
-    },
-    error => err(error, 'getting data on test cases')
-  );
+  if (data && data.testCases && data.testCases.count) {
+    // Determine the required case facts.
+    const requiredFacts = globals.planHow === 'use' ? [
+      'Name', 'Description', 'Owner', 'DragAndDropRank', 'Risk', 'Priority', 'Project'
+    ] : [];
+    // Get data on the test cases.
+    return getCollectionData(data.testCases.ref, requiredFacts, [])
+    .then(
+      // When the data arrive:
+      cases => {
+        // Process the test cases.
+        return planCases(cases, folderRef);
+      },
+      error => err(error, 'getting data on test cases')
+    );
+  }
+  else {
+    return Promise.resolve('');
+  }
 };
 // Recursively planifies a tree or subtrees of user stories.
 const planTree = (storyRefs, parentRef) => {
@@ -1842,13 +1774,12 @@ const planTree = (storyRefs, parentRef) => {
     if (! globals.isError) {
       // Get data on the first user story.
       return getItemData(
-        firstRef,
-        ['Name', 'Description', 'Project'],
-        ['Children', 'TestCases']
+        firstRef, ['Name', 'Description', 'Project'], ['Children', 'TestCases']
       )
       .then(
         // When the data arrive:
         data => {
+          // Define the options for creation of a corresponding test folder.
           const properties = {
             Name: data.name,
             Description: data.description,
@@ -1865,14 +1796,13 @@ const planTree = (storyRefs, parentRef) => {
             data: properties
           })
           .then(
-            // When the user story has been planified:
+            // When the test folder has been created:
             folder => {
               // If the test folder is the root, report its formatted ID.
               if (! parentRef) {
                 response.write(`event: planRoot\ndata: ${folder.Object.FormattedID}\n\n`);
               }
               report([['storyChanges']]);
-              // Identify a short reference to the test folder.
               const folderRef = shorten('testfolder', 'testfolder', folder.Object._ref);
               if (! globals.isError) {
                 // FUNCTION DEFINITION START
@@ -1909,24 +1839,16 @@ const planTree = (storyRefs, parentRef) => {
                   }
                 };
                 // FUNCTION DEFINITION END
-                // If the original has test cases:
-                if (data.testCases.count) {
-                  // Get data on them and planify them.
-                  return getAndPlanCases(data, folderRef)
-                  .then(
-                    // When the test cases have been planified:
-                    () => {
-                      // Process any child user stories of the original and remaining user stories.
-                      return planChildrenAndSiblings();
-                    },
-                    error => err(error, 'getting data on test cases and planifying them')
-                  );
-                }
-                // Otherwise, i.e. if the original has no test cases:
-                else {
-                  // Process any of its child user stories and the remaining user stories.
-                  return planChildrenAndSiblings();
-                }
+                // Get data on the test cases of the user story, if any, and planify them.
+                return getAndPlanCases(data, folderRef)
+                .then(
+                  // When the test cases, if any, have been planified:
+                  () => {
+                    // Process any child user stories and the remaining user stories.
+                    return planChildrenAndSiblings();
+                  },
+                  error => err(error, 'planifying test cases')
+                );
               }
               else {
                 return '';
