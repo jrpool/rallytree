@@ -285,7 +285,7 @@ const getItemData = (ref, facts, collections) => {
     );
   }
   else {
-    return Promise.resolve('');
+    return Promise.resolve({});
   }
 };
 // Returns a Promise of data, i.e. an array of member objects, on a collection.
@@ -487,7 +487,9 @@ const copyTree = (storyRefs, parentType, parentRef) => {
                             children => {
                               // Process the child user stories, if any.
                               return copyTree(
-                                children ? children.map(child => child.ref) : [], 'story', copyRef
+                                children.length ? children.map(child => child.ref) : [],
+                                'story',
+                                copyRef
                               )
                               .then(
                                 // When any have been processed:
@@ -1399,24 +1401,6 @@ const groupTree = storyRefs => {
   }
 };
 // ==== PASSING-RESULT CREATION OPERATION ====
-// Creates a passing test-case result.
-const createPass = (caseRef, tester, testSet) => {
-  const data = {
-    TestCase: caseRef,
-    Verdict: 'Pass',
-    Build: globals.passBuild,
-    Notes: globals.passNote,
-    Date: new Date(),
-    Tester: tester,
-    TestSet: testSet
-  };
-  // Create a passing result.
-  return globals.restAPI.create({
-    type: 'testcaseresult',
-    fetch: ['_ref'],
-    data
-  });
-};
 // Creates passing results for test cases.
 const passCases = cases => {
   if (cases.length && ! globals.isError) {
@@ -1440,7 +1424,19 @@ const passCases = cases => {
           // When the test set, if any, has been determined:
           testSet => {
             // Create a passing result for the test case.
-            return createPass(firstRef, firstCase.owner, testSet)
+            return globals.restAPI.create({
+              type: 'testcaseresult',
+              fetch: ['_ref'],
+              data: {
+                TestCase: firstRef,
+                Verdict: 'Pass',
+                Build: globals.passBuild,
+                Notes: globals.passNote,
+                Date: new Date(),
+                Tester: firstCase.owner,
+                TestSet: testSet
+              }
+            })
             .then(
               // When it has been created:
               () => {
@@ -1468,70 +1464,49 @@ const passTree = storyRefs => {
   if (storyRefs.length && ! globals.isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! globals.isError) {
-      // Get data on the first user story of the specified array.
+      // Get data on the first user story.
       return getItemData(firstRef, [], ['Children', 'TestCases'])
       .then(
         // When the data arrive:
         data => {
-          // FUNCTION DEFINITION START
-          // Processes child user stories and remaining user stories.
-          const passChildrenAndSiblings = () => {
-            // If the user story has child user stories:
-            if (data.children.count) {
-              // Get data on them.
-              return getCollectionData(data.children.ref, [], [])
+          // Get data on the test cases, if any, of the user story.
+          return getCollectionData(
+            data.testCases.count ? data.testCases.ref : '', ['Owner'], ['Results', 'TestSets']
+          )
+          .then(
+            // When the data arrive:
+            cases => {
+              // Process the test cases, if any, sequentially.
+              return passCases(cases)
               .then(
-                // When the data arrive:
-                children => {
-                  // Process the child user stories.
-                  return passTree(children.map(child => child.ref))
-                  .then(
-                    // After they are processed, process the remaining user stories.
-                    () => passTree(storyRefs.slice(1)),
-                    error => err(error, 'creating passing results for child user stories')
-                  );
+                // After any are processed:
+                () => {
+                  if (! globals.isError) {
+                    // Get data on the child user stories, if any, of the user story.
+                    return getCollectionData(data.children.count ? data.children.ref : '', [], [])
+                    .then(
+                      // When the data, if any, arrive:
+                      children => {
+                        // Process the child user stories, if any.
+                        return passTree(children.map(child => child.ref))
+                        .then(
+                          // When any have been processed, process the remaining user stories.
+                          () => passTree(storyRefs.slice(1)),
+                          error => err(error, 'creating passing results for child user stories')
+                        );
+                      },
+                      error => err(error, 'getting data on child user stories')
+                    );
+                  }
+                  else {
+                    return '';
+                  }
                 },
-                error => err(error, 'getting data on child user stories')
+                error => err(error, 'creating passing results for test cases of user story')
               );
-            }
-            // Otherwise, i.e. if the user story has no child user stories:
-            else {
-              // Process the remaining user stories.
-              return passTree(storyRefs.slice(1));
-            }      
-          };
-          // FUNCTION DEFINITION END
-          // If the user story has test cases:
-          if (data.testCases.count) {
-            // Get data on them.
-            return getCollectionData(data.testCases.ref, ['Owner'], ['Results', 'TestSets'])
-            .then(
-              // When the data arrive:
-              cases => {
-                // Process the test cases sequentially.
-                return passCases(cases)
-                .then(
-                  // After they are processed:
-                  () => {
-                    if (! globals.isError) {
-                      // Process child user stories and the remaining user stories.
-                      return passChildrenAndSiblings();
-                    }
-                    else {
-                      return '';
-                    }
-                  },
-                  error => err(error, 'creating passing results')
-                );
-              },
-              error => err(error, 'getting data on test cases')
-            );
-          }
-          // Otherwise, i.e. if the user story has no test cases:
-          else {
-            // Process child user stories and the remaining user stories.
-            return passChildrenAndSiblings();
-          }
+            },
+            error => err(error, 'getting data on test cases of user story')
+          );
         },
         error => err(error, 'getting data on user story')
       );
@@ -1606,28 +1581,6 @@ const planCases = (cases, folderRef) => {
     return Promise.resolve('');
   }
 };
-// Gets data on test cases and planifies them.
-const getAndPlanCases = (data, folderRef) => {
-  if (data && data.testCases && data.testCases.count) {
-    // Determine the required case facts.
-    const requiredFacts = globals.planHow === 'use' ? [
-      'Name', 'Description', 'Owner', 'DragAndDropRank', 'Risk', 'Priority', 'Project'
-    ] : [];
-    // Get data on the test cases.
-    return getCollectionData(data.testCases.ref, requiredFacts, [])
-    .then(
-      // When the data arrive:
-      cases => {
-        // Process the test cases.
-        return planCases(cases, folderRef);
-      },
-      error => err(error, 'getting data on test cases')
-    );
-  }
-  else {
-    return Promise.resolve('');
-  }
-};
 // Recursively planifies a tree or subtrees of user stories.
 const planTree = (storyRefs, parentRef) => {
   if (storyRefs.length && ! globals.isError) {
@@ -1667,49 +1620,47 @@ const planTree = (storyRefs, parentRef) => {
               report([['storyChanges']]);
               const folderRef = shorten('testfolder', 'testfolder', folder.Object._ref);
               if (! globals.isError) {
-                // FUNCTION DEFINITION START
-                // Planifies child user stories and remaining user stories.
-                const planChildrenAndSiblings = () => {
-                  // If the user story has any child user stories:
-                  if (data.children.count) {
-                    // Get data on them.
-                    return getCollectionData(data.children.ref, [], [])
+                // Determine the required case facts.
+                const requiredFacts = globals.planHow === 'use' ? [
+                  'Name', 'Description', 'Owner', 'DragAndDropRank', 'Risk', 'Priority', 'Project'
+                ] : [];
+                // Get data on the test cases, if any, of the user story.
+                return getCollectionData(
+                  data.testCases.count ? data.testCases.ref : '', requiredFacts, []
+                )
+                .then(
+                  // When the data, if any, arrive:
+                  cases => {
+                    // Process any test cases.
+                    return planCases(cases, folderRef)
                     .then(
-                      // When the data arrive:
-                      children => {
-                        // Process the child user stories.
-                        return planTree(children.map(child => child.ref), folderRef)
+                      // When the test cases, if any, have been processed:
+                      () => {
+                        // Get data on the child user stories, if any, of the user story.
+                        return getCollectionData(
+                          data.children.count ? data.children.ref : '', [], []
+                        )
                         .then(
-                          // When they have been processed:
-                          () => {
-                            // Process the remaining user stories.
-                            return planTree(storyRefs.slice(1), parentRef);
+                          // When the data, if any, arrive:
+                          children => {
+                            // Process the child user stories, if any.
+                            return planTree(children.map(child => child.ref), folderRef)
+                            .then(
+                              // When any have been processed:
+                              () => {
+                                // Process the remaining user stories.
+                                return planTree(storyRefs.slice(1), parentRef);
+                              },
+                              error => err(error, 'planifying child user stories')
+                            );
                           },
-                          error => err(
-                            error,
-                            'processing child user stories'
-                          )
+                          error => err(error, 'getting data on child user stories')
                         );
                       },
-                      error => err(error, 'getting data on child user stories')
+                      error => err(error, 'planifying test cases of user story')
                     );
-                  }
-                  // Otherwise, i.e. if the user story has no child user stories:
-                  else {
-                    // Process the remaining user stories.
-                    return planTree(storyRefs.slice(1), parentRef);
-                  }
-                };
-                // FUNCTION DEFINITION END
-                // Get data on the test cases of the user story, if any, and planify them.
-                return getAndPlanCases(data, folderRef)
-                .then(
-                  // When the test cases, if any, have been planified:
-                  () => {
-                    // Process any child user stories and the remaining user stories.
-                    return planChildrenAndSiblings();
                   },
-                  error => err(error, 'planifying test cases')
+                  error => err(error, 'getting data on test cases of user story')
                 );
               }
               else {
@@ -1753,7 +1704,7 @@ const outDoc = () => {
   );
 };
 /*
-  Recursively documents as an object in JSON format a tree or subtree of user stories, specifying
+  Recursively documents as a JSON object a tree or subtree of user stories, specifying
   the array of the objects of the root user story and its siblings, the index of the root user
   story’s object in that array, and an array of the objects of the ancestors of the user story.
 */
@@ -1788,13 +1739,13 @@ const docTree = (storyRef, storyArray, index, ancestors) => {
           getItemData(data.portfolioItem, ['FormattedID'], [])
           .then(
             data => {
-              storyArray[index].featureParent = data ? data.formattedID : '';
+              storyArray[index].featureParent = data.formattedID || '';
             }
           );
           getItemData(data.parent, ['FormattedID'], [])
           .then(
             data => {
-              storyArray[index].storyParent = data ? data.formattedID : '';
+              storyArray[index].storyParent = data.formattedID || '';
             }
           );
         }
@@ -2704,7 +2655,7 @@ const requestHandler = (request, res) => {
               ref => {
                 if (! globals.isError) {
                   // Set its global variable.
-                  globals.caseProjectRef = ref ? shorten('project', 'project', ref) : '';
+                  globals.caseProjectRef = shorten('project', 'project', ref);
                   if (! globals.isError) {
                     // Get a reference to the test folder, if specified.
                     getRef('testfolder', caseFolder, 'test-case creation')
@@ -2713,7 +2664,7 @@ const requestHandler = (request, res) => {
                       ref => {
                         if (! globals.isError) {
                           // Set its global variable.
-                          globals.caseFolderRef = ref ? shorten('testfolder', 'testfolder', ref) : '';
+                          globals.caseFolderRef = shorten('testfolder', 'testfolder', ref);
                           if (! globals.isError) {
                             // Get a reference to the test set, if specified.
                             getRef('testset', caseSet, 'test-case creation')
@@ -2722,7 +2673,7 @@ const requestHandler = (request, res) => {
                               ref => {
                                 if (! globals.isError) {
                                   // Set its global variable.
-                                  globals.caseSetRef = ref ? shorten('testset', 'testset', ref) : '';
+                                  globals.caseSetRef = shorten('testset', 'testset', ref);
                                   // Serve a report on test-case creation.
                                   serveCaseReport();
                                 }
@@ -2754,7 +2705,7 @@ const requestHandler = (request, res) => {
                 ref => {
                   if (! globals.isError) {
                     // Set its global variable.
-                    globals.groupFolderRef = ref ? shorten('testfolder', 'testfolder', ref) : '';
+                    globals.groupFolderRef = shorten('testfolder', 'testfolder', ref);
                     if (! globals.isError) {
                       // Get a reference to the test set, if specified.
                       getRef('testset', groupSet, 'test-case grouping')
@@ -2763,7 +2714,7 @@ const requestHandler = (request, res) => {
                         ref => {
                           if (! globals.isError) {
                             // Set its global variable.
-                            globals.groupSetRef = ref ? shorten('testset', 'testset', ref) : '';
+                            globals.groupSetRef = shorten('testset', 'testset', ref);
                             // Serve a report on test-case creation.
                             serveGroupReport();
                           }
