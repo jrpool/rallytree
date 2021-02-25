@@ -637,7 +637,7 @@ const scoreTree = storyRef => {
           error => err(error, `getting data on test cases ${data.testCases.ref}`)
         );
         // Get data on the child user stories of the user story, if any.
-        getCollectionData(data.children.count ? data.children.ref : [], [])
+        getCollectionData(data.children.count ? data.children.ref : [], [], [])
         .then(
           // When the data, if any, arrive:
           children => {
@@ -2221,6 +2221,47 @@ const getGlobalNameRef = (name, type, key) => {
     return Promise.resolve('');
   }
 };
+// Assigns values to global variables for handling POST requests.
+const setGlobals = rootID => {
+  // Get a long reference to the root user story.
+  return getRef('hierarchicalrequirement', rootID, 'tree root')
+  .then(
+    // When it arrives:
+    ref => {
+      if (ref) {
+        if (! globals.isError) {
+          // Set its global variable.
+          globals.rootRef = shorten('userstory', 'hierarchicalrequirement', ref);
+          if (! globals.isError) {
+            // Get a reference to the user.
+            return getGlobalNameRef(globals.userName, 'user', 'UserName')
+            .then(
+              // When it arrives:
+              ref => {
+                if (! globals.isError) {
+                  // Set its global variable.
+                  globals.userRef = ref;
+                  return '';
+                }
+              },
+              error => err(error, 'getting reference to user')
+            );
+          }
+          else {
+            return '';
+          }
+        }
+        else {
+          return '';
+        }
+      }
+      else {
+        return '';
+      }
+    },
+    error => err(error, 'getting reference to root user story')
+  );
+};
 // Sets the global state variable.
 const setState = scheduleState => {
   globals.state.story = scheduleState;
@@ -2247,7 +2288,7 @@ const requestHandler = (request, res) => {
   })
   .on('end', () => {
     const requestURL = request.url;
-    // If the request requests a resource:
+    // METHOD GET: If the request requests a resource:
     if (method === 'GET') {
       // If the requested resource is a file, serve it.
       if (requestURL === '/do.html') {
@@ -2315,7 +2356,7 @@ const requestHandler = (request, res) => {
         docTree(globals.rootRef, globals.doc, 0, []);
       }
     }
-    // Otherwise, if the request submits the request form:
+    // METHOD POST: Otherwise, if the request submits the request form:
     else if (method === 'POST' && requestURL === '/do.html') {
       reinit();
       // Permit an event stream to be started.
@@ -2336,49 +2377,8 @@ const requestHandler = (request, res) => {
         pass: password,
         requestOptions
       });
-      // Assigns values to global variables for handling POST requests.
-      const setGlobals = () => {
-        // Get a long reference to the root user story.
-        return getRef('hierarchicalrequirement', rootID, 'tree root')
-        .then(
-          // When it arrives:
-          ref => {
-            if (ref) {
-              if (! globals.isError) {
-                // Set its global variable.
-                globals.rootRef = shorten('userstory', 'hierarchicalrequirement', ref);
-                if (! globals.isError) {
-                  // Get a reference to the user.
-                  return getGlobalNameRef(globals.userName, 'user', 'UserName')
-                  .then(
-                    // When it arrives:
-                    ref => {
-                      if (! globals.isError) {
-                        // Set its global variable.
-                        globals.userRef = ref;
-                        return '';
-                      }
-                    },
-                    error => err(error, 'getting reference to user')
-                  );
-                }
-                else {
-                  return '';
-                }
-              }
-              else {
-                return '';
-              }
-            }
-            else {
-              return err('Root ID missing', 'submitting request');
-            }
-          },
-          error => err(error, 'getting reference to root user story')
-        );
-      };
       // Get a long reference to the root user story.
-      setGlobals()
+      setGlobals(rootID)
       .then(
         () => {
           if (globals.isError) {
