@@ -536,7 +536,7 @@ const scoreTree = storyRef => {
   .then(
     // When the data arrive:
     data => {
-      if (data && ! globals.isError) {
+      if (! globals.isError) {
         // Get data on the test cases of the user story, if any.
         getCollectionData(
           data.testCases.count ? data.testCases.ref : '',
@@ -598,7 +598,7 @@ const scoreTree = storyRef => {
                   .then(
                     // When the data arrive:
                     defects => {
-                      // Notify user if 
+                      // Notify the user whether the defect count bug has been corrected.
                       if (defects.length) {
                         if (defectsCollection.count) {
                           console.log(
@@ -637,7 +637,7 @@ const scoreTree = storyRef => {
           error => err(error, `getting data on test cases ${data.testCases.ref}`)
         );
         // Get data on the child user stories of the user story, if any.
-        getCollectionData(data.children.count ? data.children.ref : [], [], [])
+        getCollectionData(data.children.count ? data.children.ref : '', [], [])
         .then(
           // When the data, if any, arrive:
           children => {
@@ -681,7 +681,9 @@ const takeItems = (longItemType, shortItemType, items) => {
           .then(
             // When it has been changed:
             () => {
-              report([['total'], [`${shortItemType}Total`], [`${shortItemType}Changes`]]);
+              report(
+                [['total'], ['changes'], [`${shortItemType}Total`], [`${shortItemType}Changes`]]
+              );
               // Process the remaining items.
               return takeItems(longItemType, shortItemType, items.slice(1));
             },
@@ -725,19 +727,21 @@ const takeTree = storyRefs => {
             if (ownerWrong) {
               report([['changes'], ['storyChanges']]);
             }
-            return ownerWrong ? globals.restAPI.update({
+            return (ownerWrong ? globals.restAPI.update({
               ref: firstRef,
               data: {
                 Owner: globals.takeWhoRef
               }
-            }) : Promise.resolve('')
+            }) : Promise.resolve(''))
             .then(
               // When the change, if any, has been made:
               () => {
-                // Get data on the test cases of the user story.
-                return getCollectionData(data.testCases.ref, ['Owner'], [])
+                // Get data on the test cases, if any, of the user story.
+                return getCollectionData(
+                  data.testCases.count ? data.testCases.ref : '', ['Owner'], []
+                )
                 .then(
-                  // When the data arrive:
+                  // When the data, if any, arrive:
                   cases => {
                     // Change the owner of any of them if necessary.
                     return takeItems('testcase', 'case', cases)
@@ -745,26 +749,36 @@ const takeTree = storyRefs => {
                       // When the changes, if any, have been made:
                       () => {
                         // Get data on the tasks of the user story.
-                        return getCollectionData(data.tasks.ref, ['Owner'], [])
+                        return getCollectionData(
+                          data.tasks.count ? data.tasks.ref : '', ['Owner'], []
+                        )
                         .then(
-                          // When the data arrive:
+                          // When the data, if any, arrive:
                           tasks => {
                             // Change the owner of any of them if necessary.
                             return takeItems('task', 'task', tasks)
                             .then(
                               // When the changes, if any, have been made:
                               () => {
-                                // Process the child user stories, if any, of the user story.
-                                return takeTree(
-                                  data.children.count ? data.children.map(child => child.ref) : []
+                                // Get references to the child user stories of the user story.
+                                return getCollectionData(
+                                  data.children.count ? data.children.ref : '', [], []
                                 )
                                 .then(
-                                  /*
-                                    When they have been processed, process the remaining user
-                                    stories.
-                                  */
-                                  () => takeTree(storyRefs.slice(1)),
-                                  error => err(error, 'changing owner of child user stories')
+                                  // When the references, if any, arrive:
+                                  children => {
+                                    // Process the child user stories, if any.
+                                    return takeTree(children.map(child => child.ref))
+                                    .then(
+                                      /*
+                                        When any have been processed, process the remaining user
+                                        stories.
+                                      */
+                                      () => takeTree(storyRefs.slice(1)),
+                                      error => err(error, 'changing owner of child user stories')
+                                    );
+                                  },
+                                  error => err(error, 'getting references to child user stories')
                                 );
                               },
                               error => err(error, 'changing owner of tasks')
