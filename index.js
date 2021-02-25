@@ -1251,155 +1251,62 @@ const groupCases = cases => {
     if (! globals.isError) {
       report([['total']]);
       const folderRef = shorten('testfolder', 'testfolder', firstCase.testFolder);
-      // Determine what groupings, if any, are needed.
+      // Determine what test-folder and test-set groupings are already known to be needed.
       const needsFolder = globals.groupFolderRef && folderRef !== globals.groupFolderRef;
       let needsSet = globals.groupSetRef && ! firstCase.testSets.count;
+      // If the need for a test-set grouping is still unknown, get data to determine it.
       return (globals.groupSetRef && firstCase.testSets.count ? getCollectionData(
         firstCase.testSets.ref, [], []
       ) : Promise.resolve([]))
       .then(
+        // When the data, if needed, arrive:
         sets => {
-          
-        }
-      )
-      )
-      // Assign the specified test folder to the test case, if necessary.
-      return (
-        needsFolder ? globals.restAPI.update({
-          ref: firstRef,
-          data: {
-            TestFolder: globals.groupFolderRef
+          // Update the need for a test-set grouping if necessary.
+          if (sets.length && ! sets.map(
+            set => shorten('testset','testset', set.ref).includes(globals.groupSetRef)
+          )) {
+            needsSet = true;
           }
-        }) : Promise.resolve('')
-      )
-      .then(
-        // When any assignment has been made:
-        () => {
-          if (needsFolder) {
-            report([['changes'], ['folderChanges']]);
-          }
+          // Group the test case into a test folder if necessary.
           return (
-            
+            needsFolder ? globals.restAPI.update({
+              ref: firstRef,
+              data: {
+                TestFolder: globals.groupFolderRef
+              }
+            }) : Promise.resolve('')
           )
           .then(
+            // When any test-folder grouping has been made:
             () => {
-
-            }
-          )
-          const needsSet = globals.groupSetRef && 
-          // Add the test case to the specified test set, if necessary.
-
-          // If a test set has been specified:
-          if (globals.groupSetRef) {
-            // If the test case is in any test sets:
-            if (data.testSets.count) {
-              // Get data on the test sets.
-              return getCollectionData(data.testSets.ref, [], [])
+              // Group the test case into a test set if necessary.
+              return (
+                needsSet ? globals.restAPI.add({
+                  ref: firstRef,
+                  collection: 'TestSets',
+                  data: [{_ref: globals.groupSetRef}],
+                  fetch: ['_ref']
+                }) : Promise.resolve('')
+              )
               .then(
-                // When the data arrive:
-                testSets => {
-                  // If the test case is not in the specified test set:
-                  if (
-                    ! testSets.map(
-                      testSet => shorten('testset', 'testset', testSet.ref)
-                    ).includes(globals.groupSetRef)
-                  ) {
-                    // Link the test case to it.
-                    return globals.restAPI.add({
-                      ref: firstRef,
-                      collection: 'TestSets',
-                      data: [{_ref: globals.groupSetRef}],
-                      fetch: ['_ref']
-                    })
-                    .then(
-                      // When the test case has been linked:
-                      () => {
-                        report([['changes'], ['setChanges']]);
-                        // Group the remaining test cases.
-                        return groupCases(caseRefs.slice(1));
-                      }
-                    );
-                  }
-                },
-                error => err(error, 'getting data on test sets')
-              );
-            }
-            // Otherwise, i.e. if the test case is in no test sets:
-            else {
-              // Link the test case to the specified test set.
-              return globals.restAPI.add({
-                ref: firstRef,
-                collection: 'TestSets',
-                data: [{_ref: globals.groupSetRef}],
-                fetch: ['_ref']
-              })
-              .then(
-                // When the test case has been linked:
+                // When any test-set grouping has been made:
                 () => {
-                  report([['changes'], ['setChanges']]);
-                  // Group the remaining test cases.
-                  return groupCases(caseRefs.slice(1));
-                }
+                  if (needsFolder) {
+                    report(['changes'], ['folderChanges']);
+                  }
+                  if (needsSet) {
+                    report([['changes'], ['setChanges']]);
+                  }
+                  // Process the remaining test cases.
+                  return groupCases(cases.slice(1));
+                },
+                error => err(error, 'grouping test case into test set')
               );
-            }
-          }
+            },
+            error => err(error, 'grouping test case into test folder')
+          );
         },
-        error => err(error, 'setting test folder of test case')
-      );
-      }
-      // Otherwise, i.e. if the test case is not to be grouped in a test folder:
-      else {
-        // If a test set has been specified:
-        if (globals.groupSetRef) {
-          // If the test case is in any test sets:
-          if (data.testSets.count) {
-            // Get data on the test sets.
-            return getCollectionData(data.testSets.ref, [], [])
-            .then(
-              // When the data arrive:
-              testSets => {
-                // If the test case is not in the specified test set:
-                if (
-                  ! testSets.map(
-                    testSet => shorten('testset', 'testset', testSet.ref)
-                  ).includes(globals.groupSetRef)
-                ) {
-                  // Link the test case to it.
-                  return globals.restAPI.add({
-                    ref: firstRef,
-                    collection: 'TestSets',
-                    data: [{_ref: globals.groupSetRef}],
-                    fetch: ['_ref']
-                  })
-                  .then(
-                    () => {
-                      report([['changes'], ['setChanges']]);
-                    }
-                  );
-                }
-              },
-              error => err(error, 'getting data on test sets')
-            );
-          }
-          // Otherwise, i.e. if the test case is in no test sets:
-          else {
-            // Link the test case to the specified test set.
-            return globals.restAPI.add({
-              ref: firstRef,
-              collection: 'TestSets',
-              data: [{_ref: globals.groupSetRef}],
-              fetch: ['_ref']
-            })
-            .then(
-              () => {
-                report([['changes'], ['setChanges']]);
-              }
-            );
-              }
-            }
-          }
-        },
-        error => err(error, 'getting data on test case')
+        error => err(error, 'getting initial data on grouping need')
       );
     }
     else {
@@ -1511,71 +1418,42 @@ const createPass = (caseRef, tester, testSet) => {
   });
 };
 // Creates passing results for test cases.
-const passCases = caseRefs => {
-  if (caseRefs.length && ! globals.isError) {
-    const firstRef = shorten('testcase', 'testcase', caseRefs[0]);
+const passCases = cases => {
+  if (cases.length && ! globals.isError) {
+    const firstCase = cases[0];
+    const firstRef = shorten('testcase', 'testcase', firstCase.ref);
     if (! globals.isError) {
-      // Get data on the first test case of the specified array.
-      return getItemData(firstRef, ['Owner'], ['Results', 'TestSets'])
-      .then(
-        // When the data arrive:
-        data => {
-          report([['total']]);
-          // If the test case already has results:
-          if (data.results.count) {
-            // Process the remaining test cases.
-            return passCases(caseRefs.slice(1));
-          }
-          /*
-            Otherwise, if the test case has no results yet but has an owner, it is eligible
-            for passing-result creation, so:
-          */
-          else if (data.owner) {
-            // If the test case is in any test sets:
-            if (data.testSets.count) {
-              // Get data on the test sets.
-              return getCollectionData(data.testSets.ref, [], [])
-              .then(
-                // When the data arrive:
-                testSets => {
-                  // Create a passing result for the test case in its first test set.
-                  return createPass(firstRef, data.owner, testSets[0].ref)
-                  .then(
-                    // When the result has been created:
-                    () => {
-                      report([['changes']]);
-                      // Process the remaining test cases.
-                      return passCases(caseRefs.slice(1));
-                    },
-                    error => err(error, 'creating passing result in test set')
-                  );
-                },
-                error => err(error, 'getting data on test sets')
-              );
-            }
-            // Otherwise, i.e. if the test case is not in any test set:
-            else {
-              // Create a passing result for the test case.
-              return createPass(firstRef, data.owner, null)
-              .then(
-                // When the result has been created:
-                () => {
-                  report([['changes']]);
-                  // Process the remaining test cases.
-                  return passCases(caseRefs.slice(1));
-                },
-                error => err(error, 'creating passing result in no test set')
-              );
-            }
-          }
-          // Otherwise, i.e. if the test case has no results and no owner:
-          else {
-            // Process the remaining test cases.
-            return passCases(caseRefs.slice(1));
-          }
-        },
-        error => err(error, 'getting data on test case')
-      );
+      report([['total']]);
+      // If the test case already has results or has no owner:
+      if (firstCase.results.count || ! firstCase.owner) {
+        // Skip it and process the remaining test cases.
+        return passCases(cases.slice(1));
+      }
+      // Otherwise, i.e. if it has no results and has an owner:
+      else {
+        // Determine which test set, if any, the new result will be in.
+        return (firstCase.testSets.count ? (
+          getCollectionData(firstCase.testSets.ref, [], [])
+          .then(testSets => testSets[0].ref)
+        ) : Promise.resolve(null))
+        .then(
+          // When the test set, if any, has been determined:
+          testSet => {
+            // Create a passing result for the test case.
+            return createPass(firstRef, firstCase.owner, testSet)
+            .then(
+              // When it has been created:
+              () => {
+                report(['changes']);
+                // Process the remaining test cases.
+                return passCases(cases.slice(1));
+              },
+              error => err(error, 'creating passing result for test case')
+            );
+          },
+          error => err(error,'determining test set for passing result')
+        );
+      }
     }
     else {
       return Promise.resolve('');
@@ -1626,12 +1504,12 @@ const passTree = storyRefs => {
           // If the user story has test cases:
           if (data.testCases.count) {
             // Get data on them.
-            return getCollectionData(data.testCases.ref, [], [])
+            return getCollectionData(data.testCases.ref, ['Owner'], ['Results', 'TestSets'])
             .then(
               // When the data arrive:
               cases => {
                 // Process the test cases sequentially.
-                return passCases(cases.map(testCase => testCase.ref))
+                return passCases(cases)
                 .then(
                   // After they are processed:
                   () => {
