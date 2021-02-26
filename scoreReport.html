@@ -14,9 +14,12 @@
       <section class="flex">
         <section class="even">
           <h2>Results</h2>
-          <p>Test cases run: <span id="total" role="status">0</span></p>
-          <p class="more">Passed on last run: <span id="passes" role="status">0</span></p>
-          <p class="more">Failed on last run: <span id="fails" role="status">0</span></p>
+          <h3>Verdicts</h3>
+          <p>Test cases: <span id="total" role="status">0</span></p>
+          <p>Test cases with verdicts: <span id="verdicts" role="status">0</span></p>
+          <p>Test cases with pass/fail verdicts: <span id="scoreVerdicts" role="status">0</span></p>
+          <p class="more">Last verdict passing: <span id="passes" role="status">0</span></p>
+          <p class="more">Last verdict failing: <span id="fails" role="status">0</span></p>
           <p class="more">Score:
             <span id="score" role="status">0</span>%
             (<span
@@ -27,9 +30,10 @@
               role="status"
             >0</span>)
           </p>
-          <p class="more">Total defects: <span id="defects" role="status">0</span></p>
-          <p class="more">Major defects: <span id="major" role="status">0</span></p>
-          <p class="more">Minor defects: <span id="minor" role="status">0</span></p>
+          <h3>Defects</h3>
+          <p class="more">Total: <span id="defects" role="status">0</span></p>
+          <p class="more">Major: <span id="major" role="status">0</span></p>
+          <p class="more">Minor: <span id="minor" role="status">0</span></p>
           <div id="error" class="error" role="alert"></div>
         </section>
         <section class="odd">

@@ -63,13 +63,15 @@ const totalInit = {
   projectChanges: 0,
   releaseChanges: 0,
   score: 0,
+  scoreVerdicts: 0,
   setChanges: 0,
   setTotal: 0,
   storyChanges: 0,
   storyTotal: 0,
   taskChanges: 0,
   taskTotal: 0,
-  total: 0
+  total: 0,
+  verdicts: 0
 };
 const totals = Object.assign({}, totalInit);
 const globalInit = {
@@ -555,10 +557,12 @@ const scoreTree = storyRef => {
                 const weight = Number.parseInt(riskWeight) + Number.parseInt(priorityWeight);
                 const defectsCollection = testCase.defects;
                 let newNumerator;
+                report([['total']]);
                 if (verdict === 'Pass') {
                   newNumerator = totals.numerator + weight;
                   report([
-                    ['total'],
+                    ['verdicts'],
+                    ['scoreVerdicts'],
                     ['passes'],
                     [
                       'score',
@@ -573,7 +577,8 @@ const scoreTree = storyRef => {
                 else if (verdict === 'Fail') {
                   newNumerator = totals.numerator;
                   report([
-                    ['total'],
+                    ['verdicts'],
+                    ['scoreVerdicts'],
                     ['fails'],
                     [
                       'score',
@@ -585,7 +590,7 @@ const scoreTree = storyRef => {
                   ]);
                 }
                 else if (verdict !== null) {
-                  report([['total']]);
+                  report([['verdicts']]);
                 }
                 // If the test case has any defects:
                 /*
@@ -860,7 +865,7 @@ const projectTree = storyRefs => {
             // Initialize a configuration object for an update to the user story.
             const config = {};
             // Initialize an array of events reportable for the user story.
-            const events = [['total']];
+            const events = [['total'], ['storyTotal']];
             // Add necessary events to the configuration and array.
             if (oldProjectRef && oldProjectRef !== globals.projectRef || ! oldProjectRef) {
               config.Project = globals.projectRef;
@@ -890,7 +895,7 @@ const projectTree = storyRefs => {
                 .then(
                   // When the data, if any, arrive:
                   cases => {
-                    cases.length && report([['total', cases.length]]);
+                    cases.length && report([['total', cases.length], ['caseTotal', cases.length]]);
                     // Process sequentially the test cases needing a project change.
                     return projectCases(
                       cases.filter(
@@ -1901,6 +1906,8 @@ const serveScoreReport = () => {
         jsContent => {
           const newJSContent = reportScriptPrep(jsContent, '/scoretally', [
             'total',
+            'verdicts',
+            'scoreVerdicts',
             'passes',
             'fails',
             'defects',
@@ -1962,11 +1969,16 @@ const serveProjectReport = (projectWhich, projectRelease, projectIteration) => {
       fs.readFile('report.js', 'utf8')
       .then(
         jsContent => {
-          const newJSContent = reportScriptPrep(
-            jsContent,
-            '/projecttally',
-            ['total', 'changes', 'projectChanges', 'releaseChanges', 'iterationChanges', 'error']
-          );
+          const newJSContent = reportScriptPrep(jsContent, '/projecttally', [
+            'total',
+            'storyTotal',
+            'caseTotal',
+            'changes',
+            'projectChanges',
+            'releaseChanges',
+            'iterationChanges',
+            'error'
+          ]);
           const newContent = reportPrep(htmlContent, newJSContent)
           .replace('__projectWhich__', projectWhich)
           .replace('__projectRef__', globals.projectRef)
@@ -2119,9 +2131,7 @@ const serveDocReport = () => {
       fs.readFile('report.js', 'utf8')
       .then(
         jsContent => {
-          const newJSContent = reportScriptPrep(
-            jsContent, '/doc', ['doc', 'error']
-          );
+          const newJSContent = reportScriptPrep(jsContent, '/doc', ['doc', 'error']);
           const newContent = reportPrep(htmlContent, newJSContent);
           servePage(newContent, true);
         },
