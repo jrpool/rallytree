@@ -36,7 +36,7 @@ This operation adds tasks to each user story with no child user stories in a tre
 
 ## Test-case creation
 
-This operation adds test cases to a tree’s leaf user stories. Generally, each such user story acquires one test case, to which it gives its name, description, and owner. However, the counts and names of test cases can be customized. You can also specify a test folder, a test set, and/or a project that the test cases will all belong to.
+This operation adds test cases to user stories. Generally, each such user story acquires one test case, to which it gives its name, description, and owner. However, the counts and names of test cases can be customized. You choose whether all user stories, or only leaf user stories (those without child user stories), will receive test cases. You can also specify a test folder, a test set, and/or a project that the test cases will all belong to.
 
 ## Test-case grouping
 
