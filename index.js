@@ -1291,7 +1291,7 @@ const groupCases = cases => {
                 // When the test-set grouping, if any, has been made:
                 () => {
                   if (needsFolder) {
-                    report(['changes'], ['folderChanges']);
+                    report([['changes'], ['folderChanges']]);
                   }
                   if (needsSet) {
                     report([['changes'], ['setChanges']]);
@@ -1437,7 +1437,7 @@ const passCases = cases => {
             .then(
               // When it has been created:
               () => {
-                report(['changes']);
+                report([['changes']]);
                 // Process the remaining test cases.
                 return passCases(cases.slice(1));
               },
