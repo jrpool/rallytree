@@ -285,6 +285,8 @@ In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdi
 
 # Version notes
 
+Version 1.8.2 improves and corrects some operation reports and pervasively refactors the code in the `index.js` file.
+
 Version 1.8.1 adds an option to the planification operation, to associate the existing test cases with the new test folders rather than copying the test cases into the test-folder tree.
 
 Version 1.8.0 adds the test-case grouping operation.
