@@ -36,7 +36,7 @@ This operation adds tasks to each user story with no child user stories in a tre
 
 ## Test-case creation
 
-This operation adds test cases to a tree’s leaf user stories. Generally, each such user story acquires one test case, to which it gives its name, description, and owner. However, the counts and names of test cases can be customized. You can also specify a test folder, a test set, and/or a project that the test cases will all belong to.
+This operation adds test cases to user stories. Generally, each such user story acquires one test case, to which it gives its name, description, and owner. However, the counts and names of test cases can be customized. You choose whether all user stories, or only leaf user stories (those without child user stories), will receive test cases. You can also specify a test folder, a test set, and/or a project that the test cases will all belong to.
 
 ## Test-case grouping
 
@@ -284,6 +284,8 @@ Please report bugs, comments, feature suggestions, and questions to Jonathan Poo
 In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdict-acquisition operation from returning correct results. Rally wrongly reported that test cases with defects had defect counts of 0. RallyTree relies on the correctness of this count. This bug caused reports from the verdict-acquisition operation to omit all defects. Broadcom confirmed this bug and stated that we would be notified of progress in its correction. A temporary code change has been introduced to circumvent this bug.
 
 # Version notes
+
+Version 1.8.2 improves and corrects some operation reports and pervasively refactors the code in the `index.js` file.
 
 Version 1.8.1 adds an option to the planification operation, to associate the existing test cases with the new test folders rather than copying the test cases into the test-folder tree.
 
