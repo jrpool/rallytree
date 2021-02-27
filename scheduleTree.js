@@ -52,19 +52,17 @@ const scheduleTree = (op, storyRefs) => {
         data => {
           report([['total'], ['storyTotal']]);
           // Change the schedule state of the user story if necessary.
-          return (
-            ! data.children.count
+          const changeNeeded = ! data.children.count
             && ! data.tasks.count
-            && data.scheduleState !== globals.state.story
-              ? globals.restAPI.update({
-                ref: firstRef,
-                ScheduleState: globals.state.story
-              }) : Promise.resolve('')
-          )
+            && data.scheduleState !== globals.state.story;
+          return (changeNeeded ? globals.restAPI.update({
+            ref: firstRef,
+            ScheduleState: globals.state.story
+          }) : Promise.resolve(''))
           .then(
             // When the change, if any, has been made:
-            changed => {
-              changed && report([['changes'], ['storyChanges']]);
+            () => {
+              changeNeeded && report([['changes'], ['storyChanges']]);
               // Get data on the tasks of the user story, if any.
               return getCollectionData(data.tasks.ref, ['State'], [])
               .then(
@@ -102,7 +100,7 @@ const scheduleTree = (op, storyRefs) => {
                 error => err(error, 'getting data on tasks')
               );
             }
-          )
+          );
         },
         error => err(error, 'getting data on user story')
       );
