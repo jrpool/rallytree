@@ -1,3 +1,4 @@
+// Reports scores and tallies of test results and defects.
 const scoreTree = (op, storyRef) => {
   const {globals, totals, err, shorten, report, getItemData, getCollectionData} = op;
   // Get data on the user story.
