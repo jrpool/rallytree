@@ -41,7 +41,6 @@ const scheduleTasks = (op, tasks) => {
 };
 // Recursively sets the schedule state in a tree or subtree of user stories.
 const scheduleTree = (op, storyRefs) => {
-  console.log(`About to process ${JSON.stringify(storyRefs, null, 2)}`);
   const {globals, err, shorten, report, getItemData, getCollectionData} = op;
   if (storyRefs.length && ! globals.isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
