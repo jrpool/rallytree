@@ -1635,7 +1635,7 @@ const planTree = (storyRefs, parentRef) => {
               const folderRef = shorten('testfolder', 'testfolder', folder.Object._ref);
               if (! globals.isError) {
                 // Determine the required case facts.
-                const requiredFacts = globals.planHow === 'use' ? [
+                const requiredFacts = globals.planHow === 'copy' ? [
                   'Name', 'Description', 'Owner', 'DragAndDropRank', 'Risk', 'Priority', 'Project'
                 ] : [];
                 // Get data on the test cases, if any, of the user story.
