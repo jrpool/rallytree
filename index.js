@@ -1005,7 +1005,9 @@ const scheduleTree = storyRefs => {
             && data.scheduleState !== globals.state.story;
           return (changeNeeded ? globals.restAPI.update({
             ref: firstRef,
-            ScheduleState: globals.state.story
+            data: {
+              ScheduleState: globals.state.story
+            }
           }) : Promise.resolve(''))
           .then(
             // When the change, if any, has been made:
