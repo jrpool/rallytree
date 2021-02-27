@@ -1048,7 +1048,7 @@ const scheduleTree = storyRefs => {
                 error => err(error, 'getting data on tasks')
               );
             }
-          )
+          );
         },
         error => err(error, 'getting data on user story')
       );
