@@ -2207,7 +2207,7 @@ const requestHandler = (request, res) => {
       }
       else if (requestURL === '/scoretally' && globals.idle) {
         streamInit();
-        const scoreTree = require('scoreTree');
+        const scoreTree = require('./scoreTree').scoreTree;
         scoreTree(op, globals.rootRef);
       }
       else if (requestURL === '/taketally' && globals.idle) {

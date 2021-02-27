@@ -120,7 +120,7 @@ const scoreTree = (op, storyRef) => {
                   'hierarchicalrequirement', 'hierarchicalrequirement', child.ref
                 );
                 if (! globals.isError) {
-                  scoreTree(childRef);
+                  scoreTree(op, childRef);
                 }
               }
             });
@@ -132,4 +132,4 @@ const scoreTree = (op, storyRef) => {
     error => err(error, 'getting data on user story')
   );
 };
-module.exports = [scoreTree];
+exports.scoreTree = scoreTree;
