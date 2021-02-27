@@ -285,7 +285,9 @@ In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdi
 
 # Version notes
 
-Version 1.8.2 improves and corrects some operation reports and pervasively refactors the code in the `index.js` file.
+Version 1.9.0 modularizes the code by moving the operation routines into distinct operation modules, such as `copyTree.js`. For each operation request, only that operation’s module is imported. Some bugs in the previous `master` branch are also corrected. In case of undiscovered bugs or incompatibilities, the previous `master` branch has been preserved as the `unitary` branch.
+
+Version 1.8.2 improves and corrects some operation reports and pervasively refactors the code in the `index.js` file. In case of undiscovered bugs or incompatibilities, the previous `master` branch has been preserved as the `oldmaster` branch.
 
 Version 1.8.1 adds an option to the planification operation, to associate the existing test cases with the new test folders rather than copying the test cases into the test-folder tree.
 
