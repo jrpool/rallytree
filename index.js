@@ -998,40 +998,55 @@ const scheduleTree = storyRefs => {
         // When the data arrive:
         data => {
           report([['total'], ['storyTotal']]);
-          // Get data on the tasks of the user story, if any.
-          return getCollectionData(data.tasks.ref, ['State'], [])
+          // Change the schedule state of the user story if necessary.
+          const changeNeeded =
+            ! data.children.count
+            && ! data.tasks.count
+            && data.scheduleState !== globals.state.story;
+          return (changeNeeded ? globals.restAPI.update({
+            ref: firstRef,
+            ScheduleState: globals.state.story
+          }) : Promise.resolve(''))
           .then(
-            // When the data arrive:
-            tasks => {
-              // Change the states of any tasks, if necessary.
-              return scheduleTasks(tasks)
+            // When the change, if any, has been made:
+            () => {
+              changeNeeded && report([['changes'], ['storyChanges']]);
+              // Get data on the tasks of the user story, if any.
+              return getCollectionData(data.tasks.ref, ['State'], [])
               .then(
-                // When the changes, if any, have been made:
-                () => {
-                  // Get data on the child user stories of the user story, if any.
-                  return getCollectionData(data.children.ref, [], [])
+                // When the data arrive:
+                tasks => {
+                  // Change the states of any tasks, if necessary.
+                  return scheduleTasks(tasks)
                   .then(
-                    // When the data arrive:
-                    children => {
-                      // Process the child user stories.
-                      return scheduleTree(children.length ? children.map(child => child.ref) : [])
+                    // When the changes, if any, have been made:
+                    () => {
+                      // Get data on the child user stories of the user story, if any.
+                      return getCollectionData(data.children.ref, [], [])
                       .then(
-                        /*
-                          When the child user stories, if any, have been processed, process
-                          the remaining user stories.
-                        */
-                        () => scheduleTree(storyRefs.slice(1)),
-                        error => err(error, 'changing schedule states of child user stories')
+                        // When the data arrive:
+                        children => {
+                          // Process the child user stories.
+                          return scheduleTree(children.length ? children.map(child => child.ref) : [])
+                          .then(
+                            /*
+                              When the child user stories, if any, have been processed, process
+                              the remaining user stories.
+                            */
+                            () => scheduleTree(storyRefs.slice(1)),
+                            error => err(error, 'changing schedule states of child user stories')
+                          );
+                        },
+                        error => err(error, 'getting data on child user stories')
                       );
                     },
-                    error => err(error, 'getting data on child user stories')
+                    error => err(error, 'changing states of tasks')
                   );
                 },
-                error => err(error, 'changing states of tasks')
+                error => err(error, 'getting data on tasks')
               );
-            },
-            error => err(error, 'getting data on tasks')
-          );
+            }
+          )
         },
         error => err(error, 'getting data on user story')
       );
