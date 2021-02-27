@@ -1881,7 +1881,8 @@ const requestHandler = (request, res) => {
       }
       else if (requestURL === '/projecttally' && globals.idle) {
         streamInit();
-        projectTree([globals.rootRef]);
+        const {projectTree} = require('./projectTree');
+        projectTree(op, [globals.rootRef]);
       }
       else if (requestURL === '/scheduletally' && globals.idle) {
         streamInit();
