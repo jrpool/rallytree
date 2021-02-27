@@ -95,7 +95,7 @@ const docTree = (op, storyRef, storyArray, index, ancestors) => {
                     'hierarchicalrequirement', 'hierarchicalrequirement', children[i].ref
                   );
                   if (! globals.isError) {
-                    docTree(childRef, childArray, i, childAncestors);
+                    docTree(op, childRef, childArray, i, childAncestors);
                   }
                 }
               }
@@ -104,7 +104,7 @@ const docTree = (op, storyRef, storyArray, index, ancestors) => {
           );
         }
         // Send the documentation, after it is apparently complete, to the client.
-        outDoc();
+        outDoc(op);
       },
       error => err(error, 'getting data on user story')
     );

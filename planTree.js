@@ -19,7 +19,7 @@ const planCases = (op, cases, folderRef) => {
           () => {
             report([['caseChanges']]);
             // Link the remaining test cases.
-            return planCases(cases.slice(1), folderRef);
+            return planCases(op, cases.slice(1), folderRef);
           },
           error => err(error, `linking test case ${firstRef} to test folder`)
         );
@@ -46,7 +46,7 @@ const planCases = (op, cases, folderRef) => {
           () => {
             report([['caseChanges']]);
             // Copy the remaining test cases.
-            return planCases(cases.slice(1), folderRef);
+            return planCases(op, cases.slice(1), folderRef);
           },
           error => err(error, `copying test case ${firstRef}`)
         );
@@ -62,7 +62,7 @@ const planCases = (op, cases, folderRef) => {
 };
 // Recursively planifies a tree or subtrees of user stories.
 const planTree = (op, storyRefs, parentRef) => {
-  const {globals, err, shorten, report, getItemData, getCollectionData} = op;
+  const {globals, err, response, shorten, report, getItemData, getCollectionData} = op;
   if (storyRefs.length && ! globals.isError) {
     // Identify and shorten the reference to the first user story.
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
@@ -112,7 +112,7 @@ const planTree = (op, storyRefs, parentRef) => {
                   // When the data, if any, arrive:
                   cases => {
                     // Process any test cases.
-                    return planCases(cases, folderRef)
+                    return planCases(op, cases, folderRef)
                     .then(
                       // When the test cases, if any, have been processed:
                       () => {
@@ -124,13 +124,13 @@ const planTree = (op, storyRefs, parentRef) => {
                           // When the data, if any, arrive:
                           children => {
                             // Process the child user stories, if any.
-                            return planTree(children.map(child => child.ref), folderRef)
+                            return planTree(op, children.map(child => child.ref), folderRef)
                             .then(
                               /*
                                 When the child user stories, if any, have been processed, process
                                 the remaining user stories.
                               */
-                              () => planTree(storyRefs.slice(1), parentRef),
+                              () => planTree(op, storyRefs.slice(1), parentRef),
                               error => err(error, 'planifying child user stories')
                             );
                           },

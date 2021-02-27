@@ -43,7 +43,7 @@ const createCases = (op, names, description, owner, projectRef, storyRef) => {
                 () => {
                   report([['changes']]);
                   // Create the remaining test cases.
-                  return createCases(names.slice(1), description, owner, projectRef, storyRef);
+                  return createCases(op, names.slice(1), description, owner, projectRef, storyRef);
                 },
                 error => err(error, 'adding test case to test set')
               );
@@ -82,7 +82,7 @@ const caseTree = (op, storyRefs) => {
             projectRef = globals.caseProjectRef || data.project;
           }
           // Create the test cases, if any.
-          return createCases(names, data.description, data.owner, projectRef, firstRef)
+          return createCases(op, names, data.description, data.owner, projectRef, firstRef)
           .then(
             // When any have been created:
             () => {
@@ -92,10 +92,10 @@ const caseTree = (op, storyRefs) => {
                 // When the data, if any, arrive:
                 children => {
                   // Process any children sequentially.
-                  return caseTree(children.length ? children.map(child => child.ref) : [])
+                  return caseTree(op, children.length ? children.map(child => child.ref) : [])
                   .then(
                     // After any are processed, process the remaining user stories.
-                    () => caseTree(storyRefs.slice(1)),
+                    () => caseTree(op, storyRefs.slice(1)),
                     error => err(error, 'creating test cases for child user stories')
                   );
                 },

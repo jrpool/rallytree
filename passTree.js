@@ -9,7 +9,7 @@ const passCases = (op, cases) => {
       // If the test case already has results or has no owner:
       if (firstCase.results.count || ! firstCase.owner) {
         // Skip it and process the remaining test cases.
-        return passCases(cases.slice(1));
+        return passCases(op, cases.slice(1));
       }
       // Otherwise, i.e. if it has no results and has an owner:
       else {
@@ -40,7 +40,7 @@ const passCases = (op, cases) => {
               () => {
                 report([['changes']]);
                 // Process the remaining test cases.
-                return passCases(cases.slice(1));
+                return passCases(op, cases.slice(1));
               },
               error => err(error, 'creating passing result for test case')
             );
@@ -76,7 +76,7 @@ const passTree = (op, storyRefs) => {
             // When the data arrive:
             cases => {
               // Process the test cases, if any, sequentially.
-              return passCases(cases)
+              return passCases(op, cases)
               .then(
                 // After any are processed:
                 () => {
@@ -87,10 +87,10 @@ const passTree = (op, storyRefs) => {
                       // When the data, if any, arrive:
                       children => {
                         // Process the child user stories, if any.
-                        return passTree(children.map(child => child.ref))
+                        return passTree(op, children.map(child => child.ref))
                         .then(
                           // When any have been processed, process the remaining user stories.
-                          () => passTree(storyRefs.slice(1)),
+                          () => passTree(op, storyRefs.slice(1)),
                           error => err(error, 'creating passing results for child user stories')
                         );
                       },

@@ -54,7 +54,7 @@ const groupCases = (op, cases) => {
                     report([['changes'], ['setChanges']]);
                   }
                   // Process the remaining test cases.
-                  return groupCases(cases.slice(1));
+                  return groupCases(op, cases.slice(1));
                 },
                 error => err(error, 'grouping test case into test set')
               );
@@ -95,10 +95,10 @@ const groupTree = (op, storyRefs) => {
                 // When the data arrive:
                 children => {
                   // Process the child user stories.
-                  return groupTree(children.map(child => child.ref))
+                  return groupTree(op, children.map(child => child.ref))
                   .then(
                     // After they are processed, process the remaining user stories.
-                    () => groupTree(storyRefs.slice(1)),
+                    () => groupTree(op, storyRefs.slice(1)),
                     error => err(error, 'grouping test cases of child user stories')
                   );
                 },
@@ -108,7 +108,7 @@ const groupTree = (op, storyRefs) => {
             // Otherwise, i.e. if the user story has no child user stories:
             else {
               // Process the remaining user stories.
-              return groupTree(storyRefs.slice(1));
+              return groupTree(op, storyRefs.slice(1));
             }      
           };
           // FUNCTION DEFINITION END
@@ -120,7 +120,7 @@ const groupTree = (op, storyRefs) => {
               // When the data arrive:
               cases => {
                 // Process the test cases sequentially.
-                return groupCases(cases)
+                return groupCases(op, cases)
                 .then(
                   // After they are processed:
                   () => {
