@@ -45,7 +45,7 @@ const taskTree = (op, storyRefs) => {
                 return taskTree(op, children.map(child => child.ref))
                 .then(
                   // After they are processed, process the remaining user stories.
-                  () => taskTree(storyRefs.slice(1)),
+                  () => taskTree(op, storyRefs.slice(1)),
                   error => err(error, 'creating tasks for child user stories')
                 );
               },
