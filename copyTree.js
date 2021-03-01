@@ -1,3 +1,130 @@
+// Serves the copy report page.
+const serveCopyReport = op => {
+  const {globals, err, fs, reportPrep, reportScriptPrep, servePage} = op;
+  fs.readFile('copyReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('report.js', 'utf8')
+      .then(
+        jsContent => {
+          const newJSContent = reportScriptPrep(
+            jsContent, '/copytally', ['total', 'storyTotal', 'taskTotal', 'caseTotal', 'error']
+          );
+          const newContent = reportPrep(htmlContent, newJSContent)
+          .replace('__parentRef__', globals.copyParentRef);
+          servePage(newContent, true);
+        },
+        error => err(error, 'reading report script')
+      );
+    },
+    error => err(error, 'reading copyReport page')
+  );
+};
+// Handles copy requests.
+const copyHandle = (op, bodyObject) => {
+  const {globals, setState, getRef, shorten, getItemData, getGlobalNameRef, err, getProjectNameRef} = op;
+  // Set the operation’s global variables.
+  setState(bodyObject.copyState);
+  globals.copyWhat = bodyObject.copyWhat;
+  let copyParentReadType = 'userstory';
+  if (bodyObject.copyParentType === 'feature') {
+    globals.copyParentType = 'portfolioitem';
+    copyParentReadType = 'portfolioitem/feature';
+  }
+  // Get a reference to the copy parent.
+  getRef(globals.copyParentType, bodyObject.copyParent, 'parent of tree copy')
+  .then(
+    // When it arrives:
+    ref => {
+      if (! globals.isError) {
+        if (ref) {
+          // Set its global variable. 
+          globals.copyParentRef = shorten(copyParentReadType, globals.copyParentType, ref);
+          if (! globals.isError) {
+            // Get data on the copy parent.
+            getItemData(
+              globals.copyParentRef,
+              ['Project'],
+              globals.copyParentType === 'hierarchicalrequirement' ? ['Tasks'] : []
+            )
+            .then(
+              // When the data arrive:
+              data => {
+                // If the copy parent has tasks:
+                if (globals.copyParentType === 'hierarchicalrequirement' && data.tasks.count) {
+                  // Reject the request.
+                  err('Attempt to copy to a user story with tasks', 'copying tree');
+                }
+                // Otherwise, i.e. if the copy parent has no tasks:
+                else {
+                  // Get a reference to the specified project, if any.
+                  getGlobalNameRef(bodyObject.copyProject, 'project', 'Name')
+                  .then(
+                    // When any arrives:
+                    ref => {
+                      if (! globals.isError) {
+                        // Set its global variable.
+                        globals.copyProjectRef = ref || data.project;
+                        // Get a reference to the specified owner, if any.
+                        getGlobalNameRef(bodyObject.copyOwner, 'user', 'UserName')
+                        .then(
+                          // When any arrives:
+                          ref => {
+                            if (! globals.isError) {
+                              // Set its global variable.
+                              globals.copyOwnerRef = ref;
+                              // Get a reference to the specified release, if any.
+                              getProjectNameRef(
+                                globals.copyProjectRef, 'release', bodyObject.copyRelease, 'copy'
+                              )
+                              .then(
+                                // When any arrives:
+                                ref => {
+                                  if (! globals.isError) {
+                                    // Set its global variable.
+                                    globals.copyReleaseRef = ref;
+                                    // Get a reference to the specified iteration, if any.
+                                    getProjectNameRef(
+                                      globals.copyProjectRef, 'iteration', bodyObject.copyIteration, 'copy'
+                                    )
+                                    .then(
+                                      // When any arrives:
+                                      ref => {
+                                        if (! globals.isError) {
+                                          // Set its global variable.
+                                          globals.copyIterationRef = ref;
+                                          // Copy the tree.
+                                          serveCopyReport(op);
+                                        }
+                                      },
+                                      error => err(error, 'getting reference to iteration')
+                                    );
+                                  }
+                                },
+                                error => err(error, 'getting reference to release')
+                              );
+                            }
+                          },
+                          error => err(error, 'getting reference to owner')
+                        );
+                      }
+                    },
+                    error => err(error, 'getting reference to project')
+                  );
+                }
+              },
+              error => err(error, 'getting data on copy parent')
+            );
+          }
+        }
+        else {
+          err('Missing copy-parent ID', 'submitting request');
+        }
+      }
+    },
+    error => err(error, 'getting reference to copy parent')
+  );
+};
 // Copies an array of items (tasks or test cases).
 const copyItems = (op, itemType, items, storyRef) => {
   const {globals,  err, shorten, report} = op;
@@ -189,4 +316,5 @@ const copyTree = (op, storyRefs, parentType, parentRef) => {
     return Promise.resolve('');
   }
 };
+exports.copyHandle = copyHandle;
 exports.copyTree = copyTree;

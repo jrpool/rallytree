@@ -429,27 +429,6 @@ const reportScriptPrep = (content, eventSource, events) => {
     'let __events__', `let __events__ = [${events.map(event => '\'' + event + '\'').join(', ')}]`
   );
 };
-// Serves the copy report page.
-const serveCopyReport = () => {
-  fs.readFile('copyReport.html', 'utf8')
-  .then(
-    htmlContent => {
-      fs.readFile('report.js', 'utf8')
-      .then(
-        jsContent => {
-          const newJSContent = reportScriptPrep(
-            jsContent, '/copytally', ['total', 'storyTotal', 'taskTotal', 'caseTotal', 'error']
-          );
-          const newContent = reportPrep(htmlContent, newJSContent)
-          .replace('__parentRef__', globals.copyParentRef);
-          servePage(newContent, true);
-        },
-        error => err(error, 'reading report script')
-      );
-    },
-    error => err(error, 'reading copyReport page')
-  );
-};
 // Serves the score report page.
 const serveScoreReport = () => {
   fs.readFile('scoreReport.html', 'utf8')
@@ -867,16 +846,24 @@ const requestHandler = (request, res) => {
   .on('end', () => {
     const requestURL = request.url;
     const op = {
-      globals,
-      totals,
       caseData,
       docWait,
-      response,
       err,
-      shorten,
-      report,
+      fs,
+      getCollectionData,
+      getGlobalNameRef,
+      getProjectNameRef,
       getItemData,
-      getCollectionData
+      getRef,
+      globals,
+      report,
+      reportPrep,
+      reportScriptPrep,
+      response,
+      servePage,
+      setState,
+      shorten,
+      totals
     };
     // METHOD GET: If the request requests a resource:
     if (method === 'GET') {
@@ -988,107 +975,8 @@ const requestHandler = (request, res) => {
           }
           // OP COPYING
           else if (op === 'copy') {
-            // Set the operation’s global variables.
-            setState(bodyObject.copyState);
-            globals.copyWhat = bodyObject.copyWhat;
-            let copyParentReadType = 'userstory';
-            if (bodyObject.copyParentType === 'feature') {
-              globals.copyParentType = 'portfolioitem';
-              copyParentReadType = 'portfolioitem/feature';
-            }
-            // Get a reference to the copy parent.
-            getRef(globals.copyParentType, bodyObject.copyParent, 'parent of tree copy')
-            .then(
-              // When it arrives:
-              ref => {
-                if (! globals.isError) {
-                  if (ref) {
-                    // Set its global variable. 
-                    globals.copyParentRef = shorten(copyParentReadType, globals.copyParentType, ref);
-                    if (! globals.isError) {
-                      // Get data on the copy parent.
-                      getItemData(
-                        globals.copyParentRef,
-                        ['Project'],
-                        globals.copyParentType === 'hierarchicalrequirement' ? ['Tasks'] : []
-                      )
-                      .then(
-                        // When the data arrive:
-                        data => {
-                          // If the copy parent has tasks:
-                          if (globals.copyParentType === 'hierarchicalrequirement' && data.tasks.count) {
-                            // Reject the request.
-                            err('Attempt to copy to a user story with tasks', 'copying tree');
-                          }
-                          // Otherwise, i.e. if the copy parent has no tasks:
-                          else {
-                            // Get a reference to the specified project, if any.
-                            getGlobalNameRef(bodyObject.copyProject, 'project', 'Name')
-                            .then(
-                              // When any arrives:
-                              ref => {
-                                if (! globals.isError) {
-                                  // Set its global variable.
-                                  globals.copyProjectRef = ref || data.project;
-                                  // Get a reference to the specified owner, if any.
-                                  getGlobalNameRef(bodyObject.copyOwner, 'user', 'UserName')
-                                  .then(
-                                    // When any arrives:
-                                    ref => {
-                                      if (! globals.isError) {
-                                        // Set its global variable.
-                                        globals.copyOwnerRef = ref;
-                                        // Get a reference to the specified release, if any.
-                                        getProjectNameRef(
-                                          globals.copyProjectRef, 'release', bodyObject.copyRelease, 'copy'
-                                        )
-                                        .then(
-                                          // When any arrives:
-                                          ref => {
-                                            if (! globals.isError) {
-                                              // Set its global variable.
-                                              globals.copyReleaseRef = ref;
-                                              // Get a reference to the specified iteration, if any.
-                                              getProjectNameRef(
-                                                globals.copyProjectRef, 'iteration', bodyObject.copyIteration, 'copy'
-                                              )
-                                              .then(
-                                                // When any arrives:
-                                                ref => {
-                                                  if (! globals.isError) {
-                                                    // Set its global variable.
-                                                    globals.copyIterationRef = ref;
-                                                    // Copy the tree.
-                                                    serveCopyReport();
-                                                  }
-                                                },
-                                                error => err(error, 'getting reference to iteration')
-                                              );
-                                            }
-                                          },
-                                          error => err(error, 'getting reference to release')
-                                        );
-                                      }
-                                    },
-                                    error => err(error, 'getting reference to owner')
-                                  );
-                                }
-                              },
-                              error => err(error, 'getting reference to project')
-                            );
-                          }
-                        },
-                        error => err(error, 'getting data on copy parent')
-                      );
-                    }
-                  }
-                  else {
-                    err('Missing copy-parent ID', 'submitting request');
-                  }
-                }
-              },
-              error => err(error, 'getting reference to copy parent')
-            );
+            const {copyHandle} = require('copyTree');
+            copyHandle(op, bodyObject);
           }
           // OP SCORING
           else if (op === 'score') {
@@ -1175,7 +1063,9 @@ const requestHandler = (request, res) => {
                         // Set its global variable.
                         globals.projectReleaseRef = ref || null;
                         // Get a reference to the named iteration.
-                        getProjectNameRef(globals.projectRef, 'iteration', projectIteration, 'project change')
+                        getProjectNameRef(
+                          globals.projectRef, 'iteration', projectIteration, 'project change'
+                        )
                         .then(
                           // When it arrives:
                           ref => {
