@@ -1,3 +1,95 @@
+// Serves the score report page.
+const serveScoreReport = op => {
+  const {
+    err,
+    fs,
+    globals,
+    reportPrep,
+    reportScriptPrep,
+    scorePriorities,
+    scoreRisks,
+    servePage
+  } = op;
+  fs.readFile('scoreReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('report.js', 'utf8')
+      .then(
+        jsContent => {
+          const newJSContent = reportScriptPrep(jsContent, '/scoretally', [
+            'total',
+            'verdicts',
+            'scoreVerdicts',
+            'passes',
+            'fails',
+            'defects',
+            'major',
+            'minor',
+            'score',
+            'numerator',
+            'denominator',
+            'error'
+          ]);
+          const newContent = reportPrep(htmlContent, newJSContent)
+          .replace('__riskMin__', globals.scoreWeights.risk[scoreRisks[0]])
+          .replace('__priorityMin__', globals.scoreWeights.priority[scorePriorities[0]])
+          .replace('__riskMax__', globals.scoreWeights.risk[scoreRisks.slice(-1)])
+          .replace('__priorityMax__', globals.scoreWeights.priority[scorePriorities.slice(-1)]);
+          servePage(newContent, true);
+        },
+        error => err(error, 'reading report script')
+      );
+    },
+    error => err(error, 'reading scoreReport page')
+  );
+};
+// Handles score requests.
+const scoreHandle = (op, bodyObject) => {
+  const {
+    err,
+    globals,
+    scorePriorities,
+    scoreRisks
+  } = op;
+  // Checks for weight errors.
+  const validateWeights = (name, min, max) => {
+    const context = 'retrieving score';
+    const minNumber = Number.parseInt(min);
+    const maxNumber = Number.parseInt(max);
+    if (Number.isNaN(minNumber) || Number.isNaN(maxNumber)) {
+      err(`Nonnumeric ${name} weight`, context);
+    }
+    else if (minNumber < 0 || maxNumber < 0) {
+      err(`Negative ${name} weight`, context);
+    }
+    else if (maxNumber < minNumber) {
+      err(`Maximum ${name} weight smaller than minimum`, context);
+    }
+  };
+  // Sets the score weights.
+  const setScoreWeights = (key, values, min, max) => {
+    const minNumber = Number.parseInt(min, 10);
+    globals.scoreWeights[key] = {};
+    for (let i = 0; i < values.length; i++) {
+      globals.scoreWeights[key][values[i]]
+        = minNumber
+        + i * (Number.parseInt(max, 10) - minNumber) / (values.length - 1);
+    }
+  };
+  const {scoreRiskMin, scoreRiskMax, scorePriorityMin, scorePriorityMax} = bodyObject;
+  // Validate the weights.
+  validateWeights('risk', scoreRiskMin, scoreRiskMax);
+  if (! globals.isError) {
+    validateWeights('priority', scorePriorityMin, scorePriorityMax);
+    if (! globals.isError) {
+      // Set the score weights.
+      setScoreWeights('risk', scoreRisks, scoreRiskMin, scoreRiskMax);
+      setScoreWeights('priority', scorePriorities, scorePriorityMin, scorePriorityMax);
+      // Serve a report of the scores.
+      serveScoreReport(op);
+    }
+  }
+};
 // Reports scores and tallies of test results and defects.
 const scoreTree = (op, storyRef) => {
   const {globals, totals, err, shorten, report, getItemData, getCollectionData} = op;
@@ -133,4 +225,5 @@ const scoreTree = (op, storyRef) => {
     error => err(error, 'getting data on user story')
   );
 };
+exports.scoreHandle = scoreHandle;
 exports.scoreTree = scoreTree;

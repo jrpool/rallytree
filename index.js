@@ -429,71 +429,6 @@ const reportScriptPrep = (content, eventSource, events) => {
     'let __events__', `let __events__ = [${events.map(event => '\'' + event + '\'').join(', ')}]`
   );
 };
-// Serves the score report page.
-const serveScoreReport = () => {
-  fs.readFile('scoreReport.html', 'utf8')
-  .then(
-    htmlContent => {
-      fs.readFile('report.js', 'utf8')
-      .then(
-        jsContent => {
-          const newJSContent = reportScriptPrep(jsContent, '/scoretally', [
-            'total',
-            'verdicts',
-            'scoreVerdicts',
-            'passes',
-            'fails',
-            'defects',
-            'major',
-            'minor',
-            'score',
-            'numerator',
-            'denominator',
-            'error'
-          ]);
-          const newContent = reportPrep(htmlContent, newJSContent)
-          .replace('__riskMin__', globals.scoreWeights.risk[scoreRisks[0]])
-          .replace('__priorityMin__', globals.scoreWeights.priority[scorePriorities[0]])
-          .replace('__riskMax__', globals.scoreWeights.risk[scoreRisks.slice(-1)])
-          .replace('__priorityMax__', globals.scoreWeights.priority[scorePriorities.slice(-1)]);
-          servePage(newContent, true);
-        },
-        error => err(error, 'reading report script')
-      );
-    },
-    error => err(error, 'reading scoreReport page')
-  );
-};
-// Serves the change-owner report page.
-const serveTakeReport = name => {
-  fs.readFile('takeReport.html', 'utf8')
-  .then(
-    htmlContent => {
-      fs.readFile('report.js', 'utf8')
-      .then(
-        jsContent => {
-          const newJSContent = reportScriptPrep(jsContent, '/taketally', [
-            'total',
-            'storyTotal',
-            'taskTotal',
-            'caseTotal',
-            'changes',
-            'storyChanges',
-            'taskChanges',
-            'caseChanges',
-            'error'
-          ]);
-          const newContent = reportPrep(htmlContent, newJSContent)
-          .replace('__takeWhoName__', name)
-          .replace('__takeWhoRef__', globals.takeWhoRef);
-          servePage(newContent, true);
-        },
-        error => err(error, 'reading report script')
-      );
-    },
-    error => err(error, 'reading takeReport page')
-  );
-};
 // Serves the change-project report page.
 const serveProjectReport = (projectWhich, projectRelease, projectIteration) => {
   fs.readFile('projectReport.html', 'utf8')
@@ -860,6 +795,8 @@ const requestHandler = (request, res) => {
       reportPrep,
       reportScriptPrep,
       response,
+      scorePriorities,
+      scoreRisks,
       servePage,
       setState,
       shorten,
@@ -980,68 +917,13 @@ const requestHandler = (request, res) => {
           }
           // OP SCORING
           else if (doOp === 'score') {
-            // Checks for weight errors.
-            const validateWeights = (name, min, max) => {
-              const context = 'retrieving score';
-              const minNumber = Number.parseInt(min);
-              const maxNumber = Number.parseInt(max);
-              if (Number.isNaN(minNumber) || Number.isNaN(maxNumber)) {
-                err(`Nonnumeric ${name} weight`, context);
-              }
-              else if (minNumber < 0 || maxNumber < 0) {
-                err(`Negative ${name} weight`, context);
-              }
-              else if (maxNumber < minNumber) {
-                err(`Maximum ${name} weight smaller than minimum`, context);
-              }
-            };
-            // Sets the score weights.
-            const setScoreWeights = (key, values, min, max) => {
-              const minNumber = Number.parseInt(min, 10);
-              globals.scoreWeights[key] = {};
-              for (let i = 0; i < values.length; i++) {
-                globals.scoreWeights[key][values[i]]
-                  = minNumber
-                  + i * (Number.parseInt(max, 10) - minNumber) / (values.length - 1);
-              }
-            };
-            const {scoreRiskMin, scoreRiskMax, scorePriorityMin, scorePriorityMax} = bodyObject;
-            // Validate the weights.
-            validateWeights('risk', scoreRiskMin, scoreRiskMax);
-            if (! globals.isError) {
-              validateWeights('priority', scorePriorityMin, scorePriorityMax);
-              if (! globals.isError) {
-                // Set the score weights.
-                setScoreWeights('risk', scoreRisks, scoreRiskMin, scoreRiskMax);
-                setScoreWeights('priority', scorePriorities, scorePriorityMin, scorePriorityMax);
-                // Serve a report of the scores.
-                serveScoreReport();
-              }
-            }
+            const {scoreHandle} = require('./scoreTree');
+            scoreHandle(op, bodyObject);
           }
           // OP OWNERSHIP CHANGE
           else if (doOp === 'take') {
-            const {takeWho} = bodyObject;
-            // If an owner other than the user was specified:
-            if (takeWho) {
-              // Serve a report identifying the new owner.
-              getGlobalNameRef(takeWho, 'user', 'UserName')
-              .then(
-                ref => {
-                  if (! globals.isError) {
-                    globals.takeWhoRef = ref;
-                    serveTakeReport(takeWho);
-                  }
-                },
-                error => err(error, 'getting reference to new owner')
-              );
-            }
-            // Otherwise, the new owner will be the user, so:
-            else {
-              globals.takeWhoRef = globals.userRef;
-              // Serve a report identifying the user as new owner.
-              serveTakeReport(globals.userName);
-            }
+            const {takeHandle} = require('./takeTree');
+            takeHandle(op, bodyObject);
           }
           // OP PROJECT CHANGE
           else if (doOp === 'project') {

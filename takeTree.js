@@ -1,3 +1,70 @@
+// Serves the change-owner report page.
+const serveTakeReport = (op, name) => {
+  const {
+    err,
+    fs,
+    globals,
+    reportPrep,
+    reportScriptPrep,
+    servePage
+  } = op;
+  fs.readFile('takeReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('report.js', 'utf8')
+      .then(
+        jsContent => {
+          const newJSContent = reportScriptPrep(jsContent, '/taketally', [
+            'total',
+            'storyTotal',
+            'taskTotal',
+            'caseTotal',
+            'changes',
+            'storyChanges',
+            'taskChanges',
+            'caseChanges',
+            'error'
+          ]);
+          const newContent = reportPrep(htmlContent, newJSContent)
+          .replace('__takeWhoName__', name)
+          .replace('__takeWhoRef__', globals.takeWhoRef);
+          servePage(newContent, true);
+        },
+        error => err(error, 'reading report script')
+      );
+    },
+    error => err(error, 'reading takeReport page')
+  );
+};
+// Handles ownership change requests.
+const takeHandle = (op, bodyObject) => {
+  const {
+    err,
+    getGlobalNameRef,
+    globals
+  } = op;
+  const {takeWho} = bodyObject;
+  // If an owner other than the user was specified:
+  if (takeWho) {
+    // Serve a report identifying the new owner.
+    getGlobalNameRef(takeWho, 'user', 'UserName')
+    .then(
+      ref => {
+        if (! globals.isError) {
+          globals.takeWhoRef = ref;
+          serveTakeReport(takeWho);
+        }
+      },
+      error => err(error, 'getting reference to new owner')
+    );
+  }
+  // Otherwise, the new owner will be the user, so:
+  else {
+    globals.takeWhoRef = globals.userRef;
+    // Serve a report identifying the user as new owner.
+    serveTakeReport(op, globals.userName);
+  }
+};
 // Sequentially ensures the ownership of an array of work items (tasks or test cases).
 const takeItems = (op, longItemType, shortItemType, items) => {
   const {globals, err, shorten, report} = op;
@@ -150,4 +217,5 @@ const takeTree = (op, storyRefs) => {
     return Promise.resolve('');
   }
 };
+exports.takeHandle = takeHandle;
 exports.takeTree = takeTree;
