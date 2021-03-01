@@ -1,4 +1,43 @@
-// Recursively sets the states of an array of tasks.
+// Serves the schedule-state report page.
+const serveScheduleReport = op => {
+  const {
+    err,
+    fs,
+    globals,
+    reportPrep,
+    reportScriptPrep,
+    servePage
+  } = op;
+  fs.readFile('scheduleReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('report.js', 'utf8')
+      .then(
+        jsContent => {
+          const newJSContent = reportScriptPrep(
+            jsContent,
+            '/scheduletally',
+            ['total', 'changes', 'storyTotal', 'storyChanges', 'taskTotal', 'taskChanges', 'error']
+          );
+          const newContent = reportPrep(htmlContent, newJSContent)
+          .replace('__scheduleState__', globals.state.story);
+          servePage(newContent, true);
+        },
+        error => err(error, 'reading scheduleReport script')
+      );
+    },
+    error => err(error, 'reading scheduleReport page')
+  );
+};
+// Handles project change requests.
+const scheduleHandle = (op, bodyObject) => {
+  const {setState} = op;
+  // Set the global state variable.
+  setState(bodyObject.scheduleState);
+  // Serve a report.
+  serveScheduleReport(op);
+};
+  // Recursively sets the states of an array of tasks.
 const scheduleTasks = (op, tasks) => {
   const {globals, err, shorten, report} = op;
   if (tasks.length && ! globals.isError) {
@@ -115,4 +154,5 @@ const scheduleTree = (op, storyRefs) => {
     return Promise.resolve('');
   }
 };
+exports.scheduleHandle = scheduleHandle;
 exports.scheduleTree = scheduleTree;

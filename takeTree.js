@@ -52,7 +52,7 @@ const takeHandle = (op, bodyObject) => {
       ref => {
         if (! globals.isError) {
           globals.takeWhoRef = ref;
-          serveTakeReport(takeWho);
+          serveTakeReport(op, takeWho);
         }
       },
       error => err(error, 'getting reference to new owner')

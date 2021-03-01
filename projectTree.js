@@ -1,3 +1,92 @@
+// Serves the change-project report page.
+const serveProjectReport = (op, projectWhich, projectRelease, projectIteration) => {
+  const {
+    err,
+    fs,
+    globals,
+    reportPrep,
+    reportScriptPrep,
+    servePage
+  } = op;
+  fs.readFile('projectReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('report.js', 'utf8')
+      .then(
+        jsContent => {
+          const newJSContent = reportScriptPrep(jsContent, '/projecttally', [
+            'total',
+            'storyTotal',
+            'caseTotal',
+            'changes',
+            'projectChanges',
+            'releaseChanges',
+            'iterationChanges',
+            'error'
+          ]);
+          const newContent = reportPrep(htmlContent, newJSContent)
+          .replace('__projectWhich__', projectWhich)
+          .replace('__projectRef__', globals.projectRef)
+          .replace('__projectRelease__', projectRelease)
+          .replace('__projectIteration__', projectIteration);
+          servePage(newContent, true);
+        },
+        error => err(error, 'reading report script')
+      );
+    },
+    error => err(error, 'reading projectReport page')
+  );
+};
+// Handles project change requests.
+const projectHandle = (op, bodyObject) => {
+  const {
+    err,
+    getGlobalNameRef,
+    getProjectNameRef,
+    globals
+  } = op;
+  const {projectWhich, projectRelease, projectIteration} = bodyObject;
+  // Get a reference to the named project.
+  getGlobalNameRef(projectWhich, 'project', 'Name')
+  .then(
+    // When it arrives:
+    ref => {
+      if (! globals.isError) {
+        // Set its global variable.
+        globals.projectRef = ref;
+        // Get a reference to the named release.
+        getProjectNameRef(globals.projectRef, 'release', projectRelease, 'project change')
+        .then(
+          // When it arrives:
+          ref => {
+            if (! globals.isError) {
+              // Set its global variable.
+              globals.projectReleaseRef = ref || null;
+              // Get a reference to the named iteration.
+              getProjectNameRef(
+                globals.projectRef, 'iteration', projectIteration, 'project change'
+              )
+              .then(
+                // When it arrives:
+                ref => {
+                  if (! globals.isError) {
+                    // Set its global variable.
+                    globals.projectIterationRef = ref || null;
+                    // Serve a report identifying the project, release, and iteration.
+                    serveProjectReport(op, projectWhich, projectRelease, projectIteration);
+                  }
+                },
+                error => err(error, 'getting reference to iteration')
+              );
+            }
+          },
+          error => err(error, 'getting reference to release')
+        );
+      }
+    },
+    error => err(error, 'getting reference to new project')
+  );
+};
 // Recursively changes project affiliations of an array of test cases.
 const projectCases = (op, caseRefs) => {
   const {globals, err, shorten, report} = op;
@@ -129,4 +218,5 @@ const projectTree = (op, storyRefs) => {
     return Promise.resolve('');
   }
 };
+exports.projectHandle = projectHandle;
 exports.projectTree = projectTree;

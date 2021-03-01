@@ -429,60 +429,6 @@ const reportScriptPrep = (content, eventSource, events) => {
     'let __events__', `let __events__ = [${events.map(event => '\'' + event + '\'').join(', ')}]`
   );
 };
-// Serves the change-project report page.
-const serveProjectReport = (projectWhich, projectRelease, projectIteration) => {
-  fs.readFile('projectReport.html', 'utf8')
-  .then(
-    htmlContent => {
-      fs.readFile('report.js', 'utf8')
-      .then(
-        jsContent => {
-          const newJSContent = reportScriptPrep(jsContent, '/projecttally', [
-            'total',
-            'storyTotal',
-            'caseTotal',
-            'changes',
-            'projectChanges',
-            'releaseChanges',
-            'iterationChanges',
-            'error'
-          ]);
-          const newContent = reportPrep(htmlContent, newJSContent)
-          .replace('__projectWhich__', projectWhich)
-          .replace('__projectRef__', globals.projectRef)
-          .replace('__projectRelease__', projectRelease)
-          .replace('__projectIteration__', projectIteration);
-          servePage(newContent, true);
-        },
-        error => err(error, 'reading report script')
-      );
-    },
-    error => err(error, 'reading projectReport page')
-  );
-};
-// Serves the schedule-state report page.
-const serveScheduleReport = () => {
-  fs.readFile('scheduleReport.html', 'utf8')
-  .then(
-    htmlContent => {
-      fs.readFile('report.js', 'utf8')
-      .then(
-        jsContent => {
-          const newJSContent = reportScriptPrep(
-            jsContent,
-            '/scheduletally',
-            ['total', 'changes', 'storyTotal', 'storyChanges', 'taskTotal', 'taskChanges', 'error']
-          );
-          const newContent = reportPrep(htmlContent, newJSContent)
-          .replace('__scheduleState__', globals.state.story);
-          servePage(newContent, true);
-        },
-        error => err(error, 'reading scheduleReport script')
-      );
-    },
-    error => err(error, 'reading scheduleReport page')
-  );
-};
 // Serves the add-tasks report page.
 const serveTaskReport = () => {
   fs.readFile('taskReport.html', 'utf8')
@@ -912,69 +858,23 @@ const requestHandler = (request, res) => {
           }
           // OP COPYING
           else if (doOp === 'copy') {
-            const {copyHandle} = require('./copyTree');
-            copyHandle(op, bodyObject);
+            require('./copyTree').copyHandle(op, bodyObject);
           }
           // OP SCORING
           else if (doOp === 'score') {
-            const {scoreHandle} = require('./scoreTree');
-            scoreHandle(op, bodyObject);
+            require('./scoreTree').scoreHandle(op, bodyObject);
           }
           // OP OWNERSHIP CHANGE
           else if (doOp === 'take') {
-            const {takeHandle} = require('./takeTree');
-            takeHandle(op, bodyObject);
+            require('./takeTree').takeHandle(op, bodyObject);
           }
           // OP PROJECT CHANGE
           else if (doOp === 'project') {
-            const {projectWhich, projectRelease, projectIteration} = bodyObject;
-            // Get a reference to the named project.
-            getGlobalNameRef(projectWhich, 'project', 'Name')
-            .then(
-              // When it arrives:
-              ref => {
-                if (! globals.isError) {
-                  // Set its global variable.
-                  globals.projectRef = ref;
-                  // Get a reference to the named release.
-                  getProjectNameRef(globals.projectRef, 'release', projectRelease, 'project change')
-                  .then(
-                    // When it arrives:
-                    ref => {
-                      if (! globals.isError) {
-                        // Set its global variable.
-                        globals.projectReleaseRef = ref || null;
-                        // Get a reference to the named iteration.
-                        getProjectNameRef(
-                          globals.projectRef, 'iteration', projectIteration, 'project change'
-                        )
-                        .then(
-                          // When it arrives:
-                          ref => {
-                            if (! globals.isError) {
-                              // Set its global variable.
-                              globals.projectIterationRef = ref || null;
-                              // Serve a report identifying the project, release, and iteration.
-                              serveProjectReport(projectWhich, projectRelease, projectIteration);
-                            }
-                          },
-                          error => err(error, 'getting reference to iteration')
-                        );
-                      }
-                    },
-                    error => err(error, 'getting reference to release')
-                  );
-                }
-              },
-              error => err(error, 'getting reference to new project')
-            );
+            require('./projectTree').projectHandle(op, bodyObject);
           }
           // OP SCHEDULING
           else if (doOp === 'schedule') {
-            // Set the global state variable.
-            setState(bodyObject.scheduleState);
-            // Serve a report.
-            serveScheduleReport();
+            require('./scheduleTree').scheduleHandle(op, bodyObject);
           }
           // OP TASK CREATION
           else if (doOp === 'task') {
