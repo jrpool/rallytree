@@ -22,7 +22,16 @@ const serveCopyReport = op => {
 };
 // Handles copy requests.
 const copyHandle = (op, bodyObject) => {
-  const {globals, setState, getRef, shorten, getItemData, getGlobalNameRef, err, getProjectNameRef} = op;
+  const {
+    err,
+    getGlobalNameRef,
+    getItemData,
+    getProjectNameRef,
+    getRef,
+    globals,
+    setState,
+    shorten
+  } = op;
   // Set the operation’s global variables.
   setState(bodyObject.copyState);
   globals.copyWhat = bodyObject.copyWhat;

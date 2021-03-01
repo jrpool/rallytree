@@ -951,7 +951,7 @@ const requestHandler = (request, res) => {
       // Permit an event stream to be started.
       globals.idle = true;
       const bodyObject = parse(Buffer.concat(bodyParts).toString());
-      const {cookie, op, password, rootID} = bodyObject;
+      const {cookie, doOp, password, rootID} = bodyObject;
       globals.userName = bodyObject.userName;
       RALLY_USERNAME = globals.userName;
       RALLY_PASSWORD = password;
@@ -974,12 +974,12 @@ const requestHandler = (request, res) => {
             return '';
           }
           // OP COPYING
-          else if (op === 'copy') {
-            const {copyHandle} = require('copyTree');
+          else if (doOp === 'copy') {
+            const {copyHandle} = require('./copyTree');
             copyHandle(op, bodyObject);
           }
           // OP SCORING
-          else if (op === 'score') {
+          else if (doOp === 'score') {
             // Checks for weight errors.
             const validateWeights = (name, min, max) => {
               const context = 'retrieving score';
@@ -1020,7 +1020,7 @@ const requestHandler = (request, res) => {
             }
           }
           // OP OWNERSHIP CHANGE
-          else if (op === 'take') {
+          else if (doOp === 'take') {
             const {takeWho} = bodyObject;
             // If an owner other than the user was specified:
             if (takeWho) {
@@ -1044,7 +1044,7 @@ const requestHandler = (request, res) => {
             }
           }
           // OP PROJECT CHANGE
-          else if (op === 'project') {
+          else if (doOp === 'project') {
             const {projectWhich, projectRelease, projectIteration} = bodyObject;
             // Get a reference to the named project.
             getGlobalNameRef(projectWhich, 'project', 'Name')
@@ -1088,14 +1088,14 @@ const requestHandler = (request, res) => {
             );
           }
           // OP SCHEDULING
-          else if (op === 'schedule') {
+          else if (doOp === 'schedule') {
             // Set the global state variable.
             setState(bodyObject.scheduleState);
             // Serve a report.
             serveScheduleReport();
           }
           // OP TASK CREATION
-          else if (op === 'task') {
+          else if (doOp === 'task') {
             const {taskName} = bodyObject;
             if (taskName.length < 2) {
               err('Task name(s) missing', 'creating tasks');
@@ -1115,7 +1115,7 @@ const requestHandler = (request, res) => {
             }
           }
           // OP TEST-CASE CREATION
-          else if (op === 'case') {
+          else if (doOp === 'case') {
             globals.caseTarget = bodyObject.caseTarget;
             const {caseFolder, caseSet, caseProject} = bodyObject;
             // Get a reference to the project, if specified.
@@ -1162,7 +1162,7 @@ const requestHandler = (request, res) => {
             );
           }
           // OP TEST-CASE GROUPING
-          else if (op === 'group') {
+          else if (doOp === 'group') {
             const {groupFolder, groupSet} = bodyObject;
             if (! groupFolder && ! groupSet) {
               err('Test folder and test set both missing', 'grouping test cases');
@@ -1199,7 +1199,7 @@ const requestHandler = (request, res) => {
             }
           }
           // OP PASSING
-          else if (op === 'pass') {
+          else if (doOp === 'pass') {
             globals.passBuild = bodyObject.passBuild;
             if (! globals.passBuild) {
               err('Build blank', 'passing test cases');
@@ -1211,13 +1211,13 @@ const requestHandler = (request, res) => {
             }
           }
           // OP PLANIFICATION
-          else if (op === 'plan') {
+          else if (doOp === 'plan') {
             globals.planHow = bodyObject.planHow;
             // Planify the tree.
             servePlanReport();
           }
           // OP DOCUMENTATION
-          else if (op === 'doc') {
+          else if (doOp === 'doc') {
             // Serve a report of the tree documentation.
             serveDocReport();
           }
