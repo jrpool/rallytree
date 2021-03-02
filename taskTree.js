@@ -45,7 +45,7 @@ const taskHandle = (op, bodyObject) => {
       globals.taskNames[i] = globals.taskNames[i].trim();
     }
     if (globals.taskNames.every(taskName => taskName.length)) {
-      serveTaskReport();
+      serveTaskReport(op);
     }
     else {
       err('Empty task name(s)', 'creating tasks');
