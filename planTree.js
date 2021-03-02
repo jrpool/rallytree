@@ -1,3 +1,34 @@
+// Serves the planification report page.
+const servePlanReport = op => {
+  const {err, fs, globals, reportPrep, reportScriptPrep, servePage} = op;
+  fs.readFile('planReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      const newHTMLContent = htmlContent.replace(
+        '__planHow__', globals.planHow === 'use' ? 'linked to' : 'copied into'
+      );
+      fs.readFile('report.js', 'utf8')
+      .then(
+        jsContent => {
+          const newJSContent = reportScriptPrep(
+            jsContent, '/plantally', ['planRoot', 'storyChanges', 'caseChanges', 'error']
+          );
+          const newContent = reportPrep(newHTMLContent, newJSContent);
+          servePage(newContent, true);
+        },
+        error => err(error, 'reading report script')
+      );
+    },
+    error => err(error, 'reading planReport page')
+  );
+};
+// Handles task-creation requests.
+const planHandle = (op, bodyObject) => {
+  const {globals} = op;
+  globals.planHow = bodyObject.planHow;
+  // Planify the tree.
+  servePlanReport(op);
+};
 // Sequentially planifies an array of test cases.
 const planCases = (op, cases, folderRef) => {
   const {globals, err, shorten, report} = op;
@@ -161,4 +192,5 @@ const planTree = (op, storyRefs, parentRef) => {
     return Promise.resolve('');
   }
 };
+exports.planHandle = planHandle;
 exports.planTree = planTree;

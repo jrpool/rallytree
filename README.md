@@ -127,7 +127,7 @@ The `caseData` object can have any user-story names as property keys. For each s
 
 RallyTree is a `node.js` application that can be installed locally. It creates a web server running on `localhost:3000`.
 
-The core functionality of RallyTree is performed by the functions `copyTree()`, `verdictTree()`, `takeTree()`, `projectTree()`, `scheduleTree()`, `taskTree()`, `caseTree()`, `passTree()`, and `docTree()` in the `index.js` file. These functions recursively perform operations on a specified user story and its applicable descendants.
+The core functionality of RallyTree is performed by the code in the `index.js` file. Each operation is powered additionally by code in an operation-specific file, such as `copyTree.js`. That code displays and dynamically modifies a report page located in a companion file, such as `copyReport.html`.
 
 ## Server-client interactions
 
@@ -285,6 +285,8 @@ In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdi
 
 # Version notes
 
+Version 1.9.1 increases the modularization of the application by moving two additional operation-specific blocks of code from `index.js` to the operation-specific code files.
+
 Version 1.9.0 modularizes the code by moving the operation routines into distinct operation modules, such as `copyTree.js`. For each operation request, only that operation’s module is imported. Some bugs in the previous `master` branch are also corrected. In case of undiscovered bugs or incompatibilities, the previous `master` branch has been preserved as the `unitary` branch.
 
 Version 1.8.2 improves and corrects some operation reports and pervasively refactors the code in the `index.js` file. In case of undiscovered bugs or incompatibilities, the previous `master` branch has been preserved as the `oldmaster` branch.
@@ -392,3 +394,17 @@ Version 1.0.7 makes two improvements over version 1.0.6:
 
 - The URL of a user story no longer needs to have its basic minimal format. It can now also be one of the longer URLs associated with a user story, such as when the user story is displayed in a filtered search output.
 - A defect in the application logic that caused some user stories to be overlooked has been corrected.
+
+Version 1.0.6 makes the verdict operation more informative and adds a documentation operation.
+
+Version 1.0.5 adds a verdict operation.
+
+Version 1.0.4 adds documentation and corrected bugs.
+
+Version 1.0.3 adds a task-creation operation and improves error reporting.
+
+Version 1.0.2 adds a copy operation.
+
+Version 1.0.1 adds a test-case-creation operation.
+
+Version 1.0.0 includes only one operation: ownership change.

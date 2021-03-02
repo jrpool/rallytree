@@ -429,132 +429,6 @@ const reportScriptPrep = (content, eventSource, events) => {
     'let __events__', `let __events__ = [${events.map(event => '\'' + event + '\'').join(', ')}]`
   );
 };
-// Serves the add-tasks report page.
-const serveTaskReport = () => {
-  fs.readFile('taskReport.html', 'utf8')
-  .then(
-    htmlContent => {
-      fs.readFile('report.js', 'utf8')
-      .then(
-        jsContent => {
-          const newJSContent = reportScriptPrep(
-            jsContent, '/tasktally', ['total', 'changes', 'error']
-          );
-          const taskCount = `${globals.taskNames.length} task${
-            globals.taskNames.length > 1 ? 's' : ''
-          }`;
-          const newContent = reportPrep(htmlContent, newJSContent)
-          .replace('__taskCount__', taskCount)
-          .replace('__taskNames__', globals.taskNames.join('\n'));
-          servePage(newContent, true);
-        },
-        error => err(error, 'reading report script')
-      );
-    },
-    error => err(error, 'reading taskReport page')
-  );
-};
-// Serves the add-test-cases report page.
-const serveCaseReport = () => {
-  fs.readFile('caseReport.html', 'utf8')
-  .then(
-    htmlContent => {
-      fs.readFile('report.js', 'utf8')
-      .then(
-        jsContent => {
-          const newJSContent = reportScriptPrep(
-            jsContent, '/casetally', ['total', 'changes', 'error']
-          );
-          const newContent = reportPrep(htmlContent, newJSContent);
-          servePage(newContent, true);
-        },
-        error => err(error, 'reading report script')
-      );
-    },
-    error => err(error, 'reading caseReport page')
-  );
-};
-// Serves the group-test-case report page.
-const serveGroupReport = () => {
-  fs.readFile('groupReport.html', 'utf8')
-  .then(
-    htmlContent => {
-      fs.readFile('report.js', 'utf8')
-      .then(
-        jsContent => {
-          const newJSContent = reportScriptPrep(
-            jsContent, '/grouptally', ['total', 'changes', 'folderChanges', 'setChanges']
-          );
-          const newContent = reportPrep(htmlContent, newJSContent);
-          servePage(newContent, true);
-        },
-        error => err(error, 'reading report script')
-      );
-    },
-    error => err(error, 'reading groupReport page')
-  );
-};
-// Serves the pass-test-case report page.
-const servePassReport = () => {
-  fs.readFile('passReport.html', 'utf8')
-  .then(
-    htmlContent => {
-      fs.readFile('report.js', 'utf8')
-      .then(
-        jsContent => {
-          const newJSContent = reportScriptPrep(
-            jsContent, '/passtally', ['total', 'changes']
-          );
-          const newContent = reportPrep(htmlContent, newJSContent);
-          servePage(newContent, true);
-        },
-        error => err(error, 'reading report script')
-      );
-    },
-    error => err(error, 'reading passReport page')
-  );
-};
-// Serves the planification report page.
-const servePlanReport = () => {
-  fs.readFile('planReport.html', 'utf8')
-  .then(
-    htmlContent => {
-      const newHTMLContent = htmlContent.replace(
-        '__planHow__', globals.planHow === 'use' ? 'linked to' : 'copied into'
-      );
-      fs.readFile('report.js', 'utf8')
-      .then(
-        jsContent => {
-          const newJSContent = reportScriptPrep(
-            jsContent, '/plantally', ['planRoot', 'storyChanges', 'caseChanges', 'error']
-          );
-          const newContent = reportPrep(newHTMLContent, newJSContent);
-          servePage(newContent, true);
-        },
-        error => err(error, 'reading report script')
-      );
-    },
-    error => err(error, 'reading planReport page')
-  );
-};
-// Serves the documentation report page.
-const serveDocReport = () => {
-  fs.readFile('docReport.html', 'utf8')
-  .then(
-    htmlContent => {
-      fs.readFile('report.js', 'utf8')
-      .then(
-        jsContent => {
-          const newJSContent = reportScriptPrep(jsContent, '/doc', ['doc', 'error']);
-          const newContent = reportPrep(htmlContent, newJSContent);
-          servePage(newContent, true);
-        },
-        error => err(error, 'reading report script')
-      );
-    },
-    error => err(error, 'reading docReport page')
-  );
-};
 // Serves the stylesheet.
 const serveStyles = () => {
   fs.readFile('style.css', 'utf8')
@@ -878,130 +752,27 @@ const requestHandler = (request, res) => {
           }
           // OP TASK CREATION
           else if (doOp === 'task') {
-            const {taskName} = bodyObject;
-            if (taskName.length < 2) {
-              err('Task name(s) missing', 'creating tasks');
-            }
-            else {
-              const delimiter = taskName[0];
-              globals.taskNames.push(...taskName.slice(1).split(delimiter));
-              for (let i = 0; i < globals.taskNames.length; i++) {
-                globals.taskNames[i] = globals.taskNames[i].trim();
-              }
-              if (globals.taskNames.every(taskName => taskName.length)) {
-                serveTaskReport();
-              }
-              else {
-                err('Empty task name(s)', 'creating tasks');
-              }
-            }
+            require('./taskTree').taskHandle(op, bodyObject);
           }
           // OP TEST-CASE CREATION
           else if (doOp === 'case') {
-            globals.caseTarget = bodyObject.caseTarget;
-            const {caseFolder, caseSet, caseProject} = bodyObject;
-            // Get a reference to the project, if specified.
-            getGlobalNameRef(caseProject, 'project', 'Name')
-            .then(
-              // When the reference, if any, arrives:
-              ref => {
-                if (! globals.isError) {
-                  // Set its global variable.
-                  globals.caseProjectRef = shorten('project', 'project', ref);
-                  if (! globals.isError) {
-                    // Get a reference to the test folder, if specified.
-                    getRef('testfolder', caseFolder, 'test-case creation')
-                    .then(
-                      // When the reference, if any, arrives:
-                      ref => {
-                        if (! globals.isError) {
-                          // Set its global variable.
-                          globals.caseFolderRef = shorten('testfolder', 'testfolder', ref);
-                          if (! globals.isError) {
-                            // Get a reference to the test set, if specified.
-                            getRef('testset', caseSet, 'test-case creation')
-                            .then(
-                              // When the reference, if any, arrives:
-                              ref => {
-                                if (! globals.isError) {
-                                  // Set its global variable.
-                                  globals.caseSetRef = shorten('testset', 'testset', ref);
-                                  // Serve a report on test-case creation.
-                                  serveCaseReport();
-                                }
-                              },
-                              error => err(error, 'getting reference to test set')
-                            );
-                          }
-                        }
-                      },
-                      error => err(error, 'getting reference to test folder')
-                    );
-                  }
-                }
-              },
-              error => err(error, 'getting reference to project')
-            );
+            require('./caseTree').caseHandle(op, bodyObject);
           }
           // OP TEST-CASE GROUPING
           else if (doOp === 'group') {
-            const {groupFolder, groupSet} = bodyObject;
-            if (! groupFolder && ! groupSet) {
-              err('Test folder and test set both missing', 'grouping test cases');
-            }
-            else {
-              // Get a reference to the test folder, if specified.
-              getRef('testfolder', groupFolder, 'test-case grouping')
-              .then(
-                // When the reference, if any, arrives:
-                ref => {
-                  if (! globals.isError) {
-                    // Set its global variable.
-                    globals.groupFolderRef = shorten('testfolder', 'testfolder', ref);
-                    if (! globals.isError) {
-                      // Get a reference to the test set, if specified.
-                      getRef('testset', groupSet, 'test-case grouping')
-                      .then(
-                        // When the reference, if any, arrives:
-                        ref => {
-                          if (! globals.isError) {
-                            // Set its global variable.
-                            globals.groupSetRef = shorten('testset', 'testset', ref);
-                            // Serve a report on test-case creation.
-                            serveGroupReport();
-                          }
-                        },
-                        error => err(error, 'getting reference to test set')
-                      );
-                    }
-                  }
-                },
-                error => err(error, 'getting reference to test folder')
-              );
-            }
+            require('./groupTree').groupHandle(op, bodyObject);
           }
           // OP PASSING
           else if (doOp === 'pass') {
-            globals.passBuild = bodyObject.passBuild;
-            if (! globals.passBuild) {
-              err('Build blank', 'passing test cases');
-            }
-            else {
-              globals.passNote = bodyObject.passNote;
-              // Serve a report on passing-result creation.
-              servePassReport();
-            }
+            require('./passTree').passHandle(op, bodyObject);
           }
           // OP PLANIFICATION
           else if (doOp === 'plan') {
-            globals.planHow = bodyObject.planHow;
-            // Planify the tree.
-            servePlanReport();
+            require('./planTree').planHandle(op, bodyObject);
           }
           // OP DOCUMENTATION
           else if (doOp === 'doc') {
-            // Serve a report of the tree documentation.
-            serveDocReport();
+            require('./docTree').docHandle(op);
           }
           else {
             err('Unknown operation', 'RallyTree');

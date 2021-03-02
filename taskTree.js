@@ -1,3 +1,57 @@
+// Serves the add-tasks report page.
+const serveTaskReport = op => {
+  const {
+    err,
+    fs,
+    globals,
+    reportPrep,
+    reportScriptPrep,
+    servePage
+  } = op;
+  fs.readFile('taskReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('report.js', 'utf8')
+      .then(
+        jsContent => {
+          const newJSContent = reportScriptPrep(
+            jsContent, '/tasktally', ['total', 'changes', 'error']
+          );
+          const taskCount = `${globals.taskNames.length} task${
+            globals.taskNames.length > 1 ? 's' : ''
+          }`;
+          const newContent = reportPrep(htmlContent, newJSContent)
+          .replace('__taskCount__', taskCount)
+          .replace('__taskNames__', globals.taskNames.join('\n'));
+          servePage(newContent, true);
+        },
+        error => err(error, 'reading report script')
+      );
+    },
+    error => err(error, 'reading taskReport page')
+  );
+};
+// Handles task-creation requests.
+const taskHandle = (op, bodyObject) => {
+  const {err, globals} = op;
+  const {taskName} = bodyObject;
+  if (taskName.length < 2) {
+    err('Task name(s) missing', 'creating tasks');
+  }
+  else {
+    const delimiter = taskName[0];
+    globals.taskNames.push(...taskName.slice(1).split(delimiter));
+    for (let i = 0; i < globals.taskNames.length; i++) {
+      globals.taskNames[i] = globals.taskNames[i].trim();
+    }
+    if (globals.taskNames.every(taskName => taskName.length)) {
+      serveTaskReport();
+    }
+    else {
+      err('Empty task name(s)', 'creating tasks');
+    }
+  }
+};
 // Sequentially creates tasks for a user story.
 const createTasks = (op, storyRef, owner, names) => {
   const {globals, err} = op;
@@ -79,4 +133,5 @@ const taskTree = (op, storyRefs) => {
     return Promise.resolve('');
   }
 };
+exports.taskHandle = taskHandle;
 exports.taskTree = taskTree;

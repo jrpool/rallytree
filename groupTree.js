@@ -1,3 +1,62 @@
+// Serves the group-test-case report page.
+const serveGroupReport = op => {
+  const {err, fs, reportPrep, reportScriptPrep, servePage} = op;
+  fs.readFile('groupReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('report.js', 'utf8')
+      .then(
+        jsContent => {
+          const newJSContent = reportScriptPrep(
+            jsContent, '/grouptally', ['total', 'changes', 'folderChanges', 'setChanges']
+          );
+          const newContent = reportPrep(htmlContent, newJSContent);
+          servePage(newContent, true);
+        },
+        error => err(error, 'reading report script')
+      );
+    },
+    error => err(error, 'reading groupReport page')
+  );
+};
+// Handles task-creation requests.
+const groupHandle = (op, bodyObject) => {
+  const {err, getRef, globals, shorten} = op;
+  const {groupFolder, groupSet} = bodyObject;
+  if (! groupFolder && ! groupSet) {
+    err('Test folder and test set both missing', 'grouping test cases');
+  }
+  else {
+    // Get a reference to the test folder, if specified.
+    getRef('testfolder', groupFolder, 'test-case grouping')
+    .then(
+      // When the reference, if any, arrives:
+      ref => {
+        if (! globals.isError) {
+          // Set its global variable.
+          globals.groupFolderRef = shorten('testfolder', 'testfolder', ref);
+          if (! globals.isError) {
+            // Get a reference to the test set, if specified.
+            getRef('testset', groupSet, 'test-case grouping')
+            .then(
+              // When the reference, if any, arrives:
+              ref => {
+                if (! globals.isError) {
+                  // Set its global variable.
+                  globals.groupSetRef = shorten('testset', 'testset', ref);
+                  // Serve a report on test-case creation.
+                  serveGroupReport(op);
+                }
+              },
+              error => err(error, 'getting reference to test set')
+            );
+          }
+        }
+      },
+      error => err(error, 'getting reference to test folder')
+    );
+  }
+};
 // Groups test cases.
 const groupCases = (op, cases) => {
   const {globals, err, shorten, report, getCollectionData} = op;
@@ -155,4 +214,5 @@ const groupTree = (op, storyRefs) => {
     return Promise.resolve('');
   }
 };
+exports.groupHandle = groupHandle;
 exports.groupTree = groupTree;

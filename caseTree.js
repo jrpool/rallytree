@@ -1,3 +1,72 @@
+// Serves the add-test-cases report page.
+const serveCaseReport = op => {
+  const {err, fs, reportPrep, reportScriptPrep, servePage} = op;
+  fs.readFile('caseReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('report.js', 'utf8')
+      .then(
+        jsContent => {
+          const newJSContent = reportScriptPrep(
+            jsContent, '/casetally', ['total', 'changes', 'error']
+          );
+          const newContent = reportPrep(htmlContent, newJSContent);
+          servePage(newContent, true);
+        },
+        error => err(error, 'reading report script')
+      );
+    },
+    error => err(error, 'reading caseReport page')
+  );
+};
+// Handles task-creation requests.
+const caseHandle = (op, bodyObject) => {
+  const {err, getGlobalNameRef, getRef, globals, shorten} = op;
+  globals.caseTarget = bodyObject.caseTarget;
+  const {caseFolder, caseSet, caseProject} = bodyObject;
+  // Get a reference to the project, if specified.
+  getGlobalNameRef(caseProject, 'project', 'Name')
+  .then(
+    // When the reference, if any, arrives:
+    ref => {
+      if (! globals.isError) {
+        // Set its global variable.
+        globals.caseProjectRef = shorten('project', 'project', ref);
+        if (! globals.isError) {
+          // Get a reference to the test folder, if specified.
+          getRef('testfolder', caseFolder, 'test-case creation')
+          .then(
+            // When the reference, if any, arrives:
+            ref => {
+              if (! globals.isError) {
+                // Set its global variable.
+                globals.caseFolderRef = shorten('testfolder', 'testfolder', ref);
+                if (! globals.isError) {
+                  // Get a reference to the test set, if specified.
+                  getRef('testset', caseSet, 'test-case creation')
+                  .then(
+                    // When the reference, if any, arrives:
+                    ref => {
+                      if (! globals.isError) {
+                        // Set its global variable.
+                        globals.caseSetRef = shorten('testset', 'testset', ref);
+                        // Serve a report on test-case creation.
+                        serveCaseReport(op);
+                      }
+                    },
+                    error => err(error, 'getting reference to test set')
+                  );
+                }
+              }
+            },
+            error => err(error, 'getting reference to test folder')
+          );
+        }
+      }
+    },
+    error => err(error, 'getting reference to project')
+  );
+};
 // Creates test cases.
 const createCases = (op, names, description, owner, projectRef, storyRef) => {
   const {globals, err, shorten, report} = op;
@@ -116,4 +185,5 @@ const caseTree = (op, storyRefs) => {
     return Promise.resolve('');
   }
 };
+exports.caseHandle = caseHandle;
 exports.caseTree = caseTree;

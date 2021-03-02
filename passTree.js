@@ -1,3 +1,37 @@
+// Serves the pass-test-case report page.
+const servePassReport = op => {
+  const {err, fs, reportPrep, reportScriptPrep, servePage} = op;
+  fs.readFile('passReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('report.js', 'utf8')
+      .then(
+        jsContent => {
+          const newJSContent = reportScriptPrep(
+            jsContent, '/passtally', ['total', 'changes']
+          );
+          const newContent = reportPrep(htmlContent, newJSContent);
+          servePage(newContent, true);
+        },
+        error => err(error, 'reading report script')
+      );
+    },
+    error => err(error, 'reading passReport page')
+  );
+};
+// Handles task-creation requests.
+const passHandle = (op, bodyObject) => {
+  const {err, globals} = op;
+  globals.passBuild = bodyObject.passBuild;
+  if (! globals.passBuild) {
+    err('Build blank', 'passing test cases');
+  }
+  else {
+    globals.passNote = bodyObject.passNote;
+    // Serve a report on passing-result creation.
+    servePassReport(op);
+  }
+};
 // Creates passing results for test cases.
 const passCases = (op, cases) => {
   const {globals, err, shorten, report, getCollectionData} = op;
@@ -118,4 +152,5 @@ const passTree = (op, storyRefs) => {
     return Promise.resolve('');
   }
 };
+exports.passHandle = passHandle;
 exports.passTree = passTree;

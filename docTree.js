@@ -1,5 +1,28 @@
-// ==== DOCUMENTATION OPERATION ====
-/*
+// Serves the documentation report page.
+const serveDocReport = op => {
+  const {err, fs, reportPrep, reportScriptPrep, servePage} = op;
+  fs.readFile('docReport.html', 'utf8')
+  .then(
+    htmlContent => {
+      fs.readFile('report.js', 'utf8')
+      .then(
+        jsContent => {
+          const newJSContent = reportScriptPrep(jsContent, '/doc', ['doc', 'error']);
+          const newContent = reportPrep(htmlContent, newJSContent);
+          servePage(newContent, true);
+        },
+        error => err(error, 'reading report script')
+      );
+    },
+    error => err(error, 'reading docReport page')
+  );
+};
+// Handles task-creation requests.
+const docHandle = op => {
+  // Serve a report of the tree documentation.
+  serveDocReport(op);
+};
+  /*
   Sends the tree documentation as an event if enough time has passed since the last update.
   Otherwise, stops the event from the last update, if any, from being sent.
 */
@@ -110,4 +133,5 @@ const docTree = (op, storyRef, storyArray, index, ancestors) => {
     );
   }
 };
+exports.docHandle = docHandle;
 exports.docTree = docTree;
