@@ -41,7 +41,7 @@ const requestOptions = {
     'X-RallyIntegrationVendor':
     process.env.RALLYINTEGRATIONVENDOR || '',
     'X-RallyIntegrationVersion':
-    process.env.RALLYINTEGRATIONVERSION || '1.8.1'
+    process.env.RALLYINTEGRATIONVERSION || '1.9.1'
   }
 };
 const scorePriorities = ['None', 'Useful', 'Important', 'Critical'];
