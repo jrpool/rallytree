@@ -154,7 +154,7 @@ const copyCases = (op, cases, storyRef) => {
       };
       if (caseProps && caseProps.length) {
         caseProps.forEach(prop => {
-          config.prop = firstCase[lc0Of(prop)];
+          config[prop] = firstCase[lc0Of(prop)];
         });
       }
       // Copy the test case.
