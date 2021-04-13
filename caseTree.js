@@ -133,7 +133,7 @@ const createCases = (op, names, description, owner, projectRef, storyRef) => {
 };
 // Recursively creates test cases for a tree or subtrees of user stories.
 const caseTree = (op, storyRefs) => {
-  const {globals, caseData, err, shorten, report, getItemData, getCollectionData} = op;
+  const {globals, caseNames, err, shorten, report, getItemData, getCollectionData} = op;
   if (storyRefs.length && ! globals.isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! globals.isError) {
@@ -147,7 +147,7 @@ const caseTree = (op, storyRefs) => {
           let names = [];
           let projectRef = '';
           if (globals.caseTarget === 'all' || ! data.children.count) {
-            names = caseData ? caseData[data.name] || [data.name] : [data.name];
+            names = caseNames ? caseNames[data.name] || [data.name] : [data.name];
             projectRef = globals.caseProjectRef || data.project;
           }
           // Create the test cases, if any.

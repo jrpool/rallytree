@@ -11,14 +11,15 @@ const fs = require('fs').promises;
 const open = require('open');
 // Module to keep secrets local.
 require('dotenv').config();
-// Module to specify custom test-case creation.
-let caseData;
+// Module to specify custom data.
+let custom;
 try {
-  caseData = require('./data/caseData').caseData;
+  custom = require('./data/custom.js');
 }
 catch (error) {
-  caseData = {};
+  custom = {};
 }
+const {caseNames, caseProps, storyProps} = custom;
 // Module to create a web server.
 const http = require('http');
 // Module to make HTTPS requests.
@@ -601,7 +602,8 @@ const requestHandler = (request, res) => {
   .on('end', () => {
     const requestURL = request.url;
     const op = {
-      caseData,
+      caseNames,
+      caseProps,
       docWait,
       err,
       fs,
@@ -611,6 +613,7 @@ const requestHandler = (request, res) => {
       getItemData,
       getRef,
       globals,
+      lc0Of,
       report,
       reportPrep,
       reportScriptPrep,
@@ -620,6 +623,7 @@ const requestHandler = (request, res) => {
       servePage,
       setState,
       shorten,
+      storyProps,
       totals
     };
     // METHOD GET: If the request requests a resource:

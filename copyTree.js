@@ -134,53 +134,91 @@ const copyHandle = (op, bodyObject) => {
     error => err(error, 'getting reference to copy parent')
   );
 };
-// Copies an array of items (tasks or test cases).
-const copyItems = (op, itemType, items, storyRef) => {
-  const {globals,  err, shorten, report} = op;
-  if (items.length && ! globals.isError) {
-    const workItemType = ['task', 'testcase'][['task', 'case'].indexOf(itemType)];
-    if (workItemType) {
-      const firstItem = items[0];
-      const firstRef = shorten(workItemType, workItemType, firstItem.ref);
-      if (! globals.isError) {
-        // Specify properties for the copy of the first item.
-        const config = {
-          Name: firstItem.name,
-          Description: firstItem.description,
-          Owner: globals.copyOwnerRef || firstItem.owner,
-          DragAndDropRank: firstItem.dragAndDropRank,
-          WorkProduct: storyRef
-        };
-        // If the item is a task and a state has been specified, apply it.
-        if (itemType === 'task' && globals.state.task) {
-          config.State = globals.state.task;
-        }
-        // If the item is a test case and thus does not inherit a project, specify one.
-        if (itemType === 'case') {
-          config.Project = globals.copyProjectRef;
-        }
-        // Copy the item.
-        return globals.restAPI.create({
-          type: workItemType,
-          fetch: ['_ref'],
-          data: config
-        })
-        .then(
-          // When the item has been copied:
-          () => {
-            report([['total'], [`${itemType}Total`]]);
-            // Copy the remaining items.
-            return copyItems(op, itemType, items.slice(1), storyRef);
-          },
-          error => err(error, `copying ${itemType} ${firstRef}`)
-        );
+// Copies an array of test cases.
+const copyCases = (op, cases, storyRef) => {
+  const {globals, caseProps, err, lc0Of, shorten, report} = op;
+  if (cases.length && ! globals.isError) {
+    const firstCase = cases[0];
+    const firstRef = shorten('testcase', 'testcase', firstCase.ref);
+    if (! globals.isError) {
+      // Specify properties for the copy of the first test case.
+      const config = {
+        Name: firstCase.name,
+        Description: firstCase.description,
+        Owner: globals.copyOwnerRef || firstCase.owner,
+        DragAndDropRank: firstCase.dragAndDropRank,
+        WorkProduct: storyRef,
+        Project: globals.copyProjectRef,
+        Priority: firstCase.priority,
+        Risk: firstCase.risk
+      };
+      if (caseProps && caseProps.length) {
+        caseProps.forEach(prop => {
+          config.prop = firstCase[lc0Of(prop)];
+        });
       }
-      else {
-        return Promise.resolve('');
-      }
+      // Copy the test case.
+      return globals.restAPI.create({
+        type: 'testcase',
+        fetch: ['_ref'],
+        data: config
+      })
+      .then(
+        // When the tust case has been copied:
+        () => {
+          report([['total'], ['caseTotal']]);
+          // Copy the remaining test cases.
+          return copyCases(op, cases.slice(1), storyRef);
+        },
+        error => err(error, `copying test case ${firstRef}`)
+      );
     }
     else {
-      return Promise.resolve(err('invalid item type', `copying ${itemType}`));
+      return Promise.resolve('');
+    }
+  }
+  else {
+    return Promise.resolve('');
+  }
+};
+// Copies an array of tasks.
+const copyTasks = (op, tasks, storyRef) => {
+  const {globals,  err, shorten, report} = op;
+  if (tasks.length && ! globals.isError) {
+    const firstTask = tasks[0];
+    const firstRef = shorten('task', 'task', firstTask.ref);
+    if (! globals.isError) {
+      // Specify properties for the copy of the first task.
+      const config = {
+        Name: firstTask.name,
+        Description: firstTask.description,
+        Owner: globals.copyOwnerRef || firstTask.owner,
+        DragAndDropRank: firstTask.dragAndDropRank,
+        WorkProduct: storyRef
+      };
+      // If a state has been specified, apply it.
+      const state = globals.state.task;
+      if (state) {
+        config.State = state;
+      }
+      // Copy the task.
+      return globals.restAPI.create({
+        type: 'task',
+        fetch: ['_ref'],
+        data: config
+      })
+      .then(
+        // When the task has been copied:
+        () => {
+          report([['total'], ['taskTotal']]);
+          // Copy the remaining items.
+          return copyTasks(op, tasks.slice(1), storyRef);
+        },
+        error => err(error, `copying task ${firstRef}`)
+      );
+    }
+    else {
+      return Promise.resolve('');
     }
   }
   else {
@@ -189,21 +227,23 @@ const copyItems = (op, itemType, items, storyRef) => {
 };
 // Gets data on items (tasks or test cases) and copies them.
 const getAndCopyItems = (op, itemType, itemsType, collectionType, data, copyRef) => {
-  const {globals, err, getCollectionData} = op;
+  const {globals, caseProps, err, getCollectionData} = op;
   // If the original has any specified items and they are to be copied:
   if (
     data[collectionType].count
     && [itemsType, 'both'].includes(globals.copyWhat)
   ) {
     // Get data on the items.
-    return getCollectionData(
-      data[collectionType].ref, ['Name', 'Description', 'Owner', 'DragAndDropRank'], []
-    )
+    const props = ['Name', 'Description', 'Owner', 'DragAndDropRank'];
+    if (collectionType === 'testCases' && caseProps && caseProps.length) {
+      props.push(...caseProps);
+    }
+    return getCollectionData(data[collectionType].ref, props, [])
     .then(
       // When the data arrive:
       items => {
         // Copy the items.
-        return copyItems(op, itemType, items, copyRef);
+        return itemType === 'task' ? copyTasks(op, items, copyRef) : copyCases(op, items, copyRef);
       },
       error => err(error, `getting data on ${collectionType}`)
     );
@@ -214,19 +254,19 @@ const getAndCopyItems = (op, itemType, itemsType, collectionType, data, copyRef)
 };
 // Recursively copies a tree or subtrees.
 const copyTree = (op, storyRefs, parentType, parentRef) => {
-  const {globals, err, shorten, report, getItemData, getCollectionData} = op;
+  const {globals, err, lc0Of, shorten, report, getItemData, getCollectionData, storyProps} = op;
   if (storyRefs.length && ! globals.isError) {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! globals.isError) {
       // Get data on the first user story.
       return getItemData(
         firstRef,
-        ['Name', 'Description', 'Owner', 'DragAndDropRank'],
+        ['Name', 'Description', 'Owner', 'DragAndDropRank', ...storyProps],
         ['Children', 'Tasks', 'TestCases']
       )
       .then(
         // When the data arrive:
-        data => {
+        firstStory => {
           // If the user story is the specified parent of the tree copy:
           if (firstRef === globals.copyParentRef) {
             // Quit and report this.
@@ -237,10 +277,10 @@ const copyTree = (op, storyRefs, parentType, parentRef) => {
           else {
             // Specify the properties of its copy.
             const properties = {
-              Name: data.name,
-              Description: data.description,
-              Owner: globals.copyOwnerRef || data.owner,
-              DragAndDropRank: data.dragAndDropRank,
+              Name: firstStory.name,
+              Description: firstStory.description,
+              Owner: globals.copyOwnerRef || firstStory.owner,
+              DragAndDropRank: firstStory.dragAndDropRank,
               Project: globals.copyProjectRef
             };
             properties[parentType === 'story' ? 'Parent' : 'PortfolioItem'] = parentRef;
@@ -252,6 +292,12 @@ const copyTree = (op, storyRefs, parentType, parentRef) => {
             }
             // The schedule state will be set but may be overridden by task inference.
             if (globals.state.story) {
+              properties.ScheduleState = globals.state.story;
+            }
+            if (storyProps && storyProps.length) {
+              storyProps.forEach(prop => {
+                properties[prop] = firstStory[lc0Of(prop)];
+              });
               properties.ScheduleState = globals.state.story;
             }
             // Copy the user story.
@@ -267,17 +313,17 @@ const copyTree = (op, storyRefs, parentType, parentRef) => {
                 const copyRef = shorten('userstory', 'hierarchicalrequirement', copy.Object._ref);
                 if (! globals.isError) {
                   // Get data on any test cases and copy them, if required.
-                  return getAndCopyItems(op, 'case', 'cases', 'testCases', data, copyRef)
+                  return getAndCopyItems(op, 'case', 'cases', 'testCases', firstStory, copyRef)
                   .then(
                     // When the test cases, if any, have been copied:
                     () => {
                       // Get data on any tasks and copy them, if required.
-                      return getAndCopyItems(op, 'task', 'tasks', 'tasks', data, copyRef)
+                      return getAndCopyItems(op, 'task', 'tasks', 'tasks', firstStory, copyRef)
                       .then(
                         // When the tasks, if any, have been copied:
                         () => {
                           // Get data on the child user stories of the user story.
-                          return getCollectionData(data.children.ref, [], [])
+                          return getCollectionData(firstStory.children.ref, [], [])
                           .then(
                             // When the data arrive:
                             children => {

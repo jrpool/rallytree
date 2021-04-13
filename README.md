@@ -12,7 +12,7 @@ RallyTree can perform these operations on a tree:
 
 ## Tree-copy creation
 
-This operation copies a tree. You designate an existing user story or feature as the parent of the root user story of the new tree. That parent, if a user story, must not have any tasks and must not be in the tree that you are copying. User stories, optionally with their tasks and/or test cases, are copied, but not defects. In a copy of a user story, task, or test case, the name, rank, and description are copied from the original; you can choose whether the owner is copied from the original or is set to a particular user; you can choose whether the project affiliation is copied from the designated parent of the root of the tree copy or is set to a particular project; and you can specify a release, an iteration, and/or a schedule state.
+This operation copies a tree. You designate an existing user story or feature as the parent of the root user story of the new tree. That parent, if a user story, must not have any tasks and must not be in the tree that you are copying. User stories, optionally with their tasks and/or test cases, are copied, but not defects. In a copy of a user story, task, or test case, the name, rank, and description are copied from the original; you can choose whether the owner is copied from the original or is set to a particular user; you can choose whether the project affiliation is copied from the designated parent of the root of the tree copy or is set to a particular project; and you can specify a release, an iteration, and/or a schedule state. Finally, you can specify custom properties of user stories and of test cases to make RallyTree copy those properties from the originals.
 
 ## Scoring
 
@@ -20,11 +20,11 @@ This operation tallies the passing and failing results of the last runs of all t
 
 ## Owner change
 
-This operation ensures that each user story, task, and test case in a tree has the desired owner. You can choose whether to become the new owner or instead to specify another user as the new owner.
+This operation ensures that each user story, each task, and each test case in a tree has the desired owner. You can choose whether to become the new owner or instead to specify another user as the new owner.
 
 ## Project change
 
-This operation ensures that each user story and test case in a tree belongs to the desired project. Changing the project of a user story also makes its tasks and test cases belong to the same project, but the projects of test cases can be changed to differ from those of their user stories. This operation makes test cases belong to the specified project even when their user stories already do. Each project has project-specific sets of releases and iterations. When specifying a project, you may also specify a release and/or an iteration.
+This operation ensures that each user story and each test case in a tree belongs to the desired project. Changing the project of a user story also makes its tasks and test cases belong to the same project, but the projects of test cases can be changed to differ from those of their user stories. This operation makes test cases belong to the specified project even when their user stories already do. Each project has project-specific sets of releases and iterations. When specifying a project, you may also specify a release and/or an iteration.
 
 ## Schedule-state change
 
@@ -44,7 +44,7 @@ This operation makes all test cases in a tree belong to a test folder and/or a t
 
 ## Pass creation
 
-This operation creates passing results for all test cases of user stories in a tree, except for test cases that already have results or that have no owner. If a test case is in any test sets, the result is defined as belonging to the first of those test sets. You must specify a build (asRally requires) and may specify a note, to be applied to all of the new results. Whoever is the owner of the test case is defined as the tester of the result.
+This operation creates passing results for all test cases of user stories in a tree, except for test cases that already have results or that have no owner. If a test case is in any test sets, the result is defined as belonging to the first of those test sets. You must specify a build (as Rally requires) and may specify a note, to be applied to all of the new results. Whoever is the owner of the test case is defined as the tester of the result.
 
 ## Planification
 
@@ -54,11 +54,28 @@ This operation creates a test plan (a tree of test folders and test cases) that 
 
 This operation produces a JSON representation of a tree of user stories.
 
+# Copied properties
+
+Custom properties for user stories and test cases can be specified in a `custom.js` file inside a `data` directory within the application directory. In that file, you can specify custom properties as follows:
+
+```javascript
+exports.storyProps = [
+  'c_CustomPropA',
+  'c_CustomPropB'
+];
+exports.caseProps = [
+  'c_ThisProp',
+  'c_ThatProp'
+];
+```
+
+The value of properties that are specified in this manner will be copied when you copy a tree.
+
 # Parents
 
 In RallyTree, the root of a tree is always a user story. When you copy a tree, you create a new tree, with a user story as its root. You must specify a parent for it, which may be either another user story or a feature.
 
-Technically, when you specify a parent you are actually specifying either the `Parent` property (which must be a user story) or the `PortfolioItem` property (which must be a feature) of the root. If it has one of these properties, it cannot have the other. Confusingly, the Rally UI labels both of these properties as “Parent”.
+Technically, when you specify a parent you are actually specifying either the `Parent` property (which must be a user story) or the `PortfolioItem` property (which must be a feature) of the root. If it has one of these properties, it cannot have the other. Confusingly, the Rally web UI labels both of these properties as “Parent”.
 
 However, a user story can also have a `Feature` property. If you specify a feature as the `PortfolioItem` property of a user story, then that feature also becomes its `Feature` property, and you cannot change that. If instead you specify user story P as the `Parent` property of user story C, then the `Feature` property of C becomes any ancestor feature that C may have.
 
@@ -102,12 +119,12 @@ RallyTree converts your chosen schedule state to a state and gives that state to
 
 After RallyTree gives states to tasks, Rally may perform derivative modifications of the schedule states of the tasks’ user stories.
 
-# Test cases
+# Test-case creation
 
-To customize the test cases that are created by the test-case creation operation, maintain a file named `caseData.js` in a top-level directory named `data` in your local repository. In that file, define a variable named `caseData` as follows:
+To customize the test cases that are created by the test-case creation operation, maintain a file named `custom.js` in a top-level directory named `data` in your local repository. In that file, define a variable named `caseNames` as follows:
 
 ```javascript
-exports.caseData = {
+exports.caseNames = {
   'User story name 0': [
     'Test case name 0',
     'Test case name 1',
@@ -119,7 +136,7 @@ exports.caseData = {
 };
 ```
 
-The `caseData` object can have any user-story names as property keys. For each such key, you may specify 0 or more test-case names. If any eligible user story has a name identical to the specified user-story name, RallyTree will create test cases with the specified test-case names (if any) for that user story. For any eligible user story whose name is **not** in `caseData`, RallyTree will create 1 test case, and it will have the same name as the user story. (When you execute the test-case operation, you decide whether all user stories or only leaf user stories are eligible.)
+The `caseNames` object can have any user-story names as property keys. For each such key, you may specify 0 or more test-case names. If any eligible user story has a name identical to the specified user-story name, RallyTree will create test cases with the specified test-case names (if any) for that user story. For any eligible user story whose name is **not** in `caseNames`, RallyTree will create 1 test case, and it will have the same name as the user story. (When you execute the test-case operation, you decide whether all user stories or only leaf user stories are eligible.)
 
 # Architecture
 
@@ -281,9 +298,11 @@ Please report bugs, comments, feature suggestions, and questions to Jonathan Poo
 
 # Bugs
 
-In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdict-acquisition operation from returning correct results. Rally wrongly reported that test cases with defects had defect counts of 0. RallyTree relies on the correctness of this count. This bug caused reports from the verdict-acquisition operation to omit all defects. Broadcom confirmed this bug and stated that we would be notified of progress in its correction. A temporary code change has been introduced to circumvent this bug.
+In mid-January 2021, a Rally bug was discovered that stopped RallyTree’s verdict-acquisition operation from returning correct results. Rally wrongly reported that test cases with defects had defect counts of 0. RallyTree relied on the correctness of this count. This bug caused reports from the verdict-acquisition operation to omit all defects. Broadcom confirmed this bug and stated that we would be notified of progress in its correction. A temporary code change was introduced to circumvent this bug. On 13 April 2021 Broadcom notified us that the bug had been corrected, and we verified the correction.
 
 # Version notes
+
+Version 1.9.2 copies more properties of user stories and test cases than previous versions did.
 
 Version 1.9.1 increases the modularization of the application by moving two additional operation-specific blocks of code from `index.js` to the operation-specific code files.
 
