@@ -19,7 +19,7 @@ const serveGroupReport = op => {
     error => err(error, 'reading groupReport page')
   );
 };
-// Handles task-creation requests.
+// Handles test-case grouping requests.
 const groupHandle = (op, bodyObject) => {
   const {err, getRef, globals, shorten} = op;
   const {groupFolder, groupSet} = bodyObject;
