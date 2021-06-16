@@ -295,14 +295,15 @@ const getItemData = (ref, facts, collections) => {
 const getCollectionData = (ref, facts, collections) => {
   if (ref) {
     // Get data on the facts and collections of the members of the specified collection.
-    return globals.restAPI.get({
+    return globals.restAPI.query({
       ref,
+      limit: Infinity,
       fetch: facts.concat(collections)
     })
     .then(
       // When the data arrive:
       collection => {
-        const members = collection.Object.Results;
+        const members = collection.Results;
         // Initialize an array of data.
         const data = [];
         // For each member of the collection:
