@@ -29,10 +29,10 @@ const serveProjectReport = (
           const newContent = reportPrep(htmlContent, newJSContent)
           .replace('__projectWhich__', projectWhich)
           .replace('__projectRef__', globals.projectRef)
-          .replace('__projectRelease__', projectRelease)
-          .replace('__projectReleaseRef__', projectReleaseRef)
-          .replace('__projectIteration__', projectIteration)
-          .replace('__projectIterationRef__', projectIterationRef);
+          .replace('__projectRelease__', projectRelease || 'N.A.')
+          .replace('__projectReleaseRef__', projectReleaseRef || 'N.A.')
+          .replace('__projectIteration__', projectIteration || 'N.A.')
+          .replace('__projectIterationRef__', projectIterationRef || 'N.A.');
           servePage(newContent, true);
         },
         error => err(error, 'reading report script')
