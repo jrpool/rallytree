@@ -128,7 +128,11 @@ const projectTree = (op, storyRefs) => {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! globals.isError) {
       // Get data on the first user story.
-      return getItemData(firstRef, ['Project', 'Release', 'Iteration'], ['Children', 'TestCases'])
+      return getItemData(
+        firstRef,
+        ['FormattedID', 'Project', 'Release', 'Iteration'],
+        ['Children', 'TestCases']
+      )
       .then(
         // When the data arrive:
         data => {
@@ -150,6 +154,10 @@ const projectTree = (op, storyRefs) => {
             if (data.iteration !== globals.projectIterationRef && ! data.children.count) {
               config.Iteration = globals.projectIterationRef;
               events.push(['changes'], ['iterationChanges']);
+            }
+            // Report progress in the console if requested.
+            if (globals.debug) {
+              console.log(`Processing ${data.formattedID}`);
             }
             // Update the user story if necessary.
             return (events.length > 1 ? globals.restAPI.update({

@@ -715,6 +715,7 @@ const requestHandler = (request, res) => {
       const bodyObject = parse(Buffer.concat(bodyParts).toString());
       const {cookie, doOp, password, rootID} = bodyObject;
       globals.userName = bodyObject.userName;
+      globals.debug = bodyObject.debug;
       RALLY_USERNAME = globals.userName;
       RALLY_PASSWORD = password;
       // If the user has not deleted the content of the cookie field:
