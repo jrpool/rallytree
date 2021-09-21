@@ -100,6 +100,10 @@ const docTree = (op, storyRef, storyArray, index, ancestors) => {
           ancestor.taskCount += taskCount;
           ancestor.caseCount += caseCount;
         });
+        // Report progress in the console if requested.
+        if (globals.debug) {
+          console.log(`Processing ${data.formattedID}`);
+        }
         // If the user story has child user stories:
         if (childCount) {
           // Get data on them.

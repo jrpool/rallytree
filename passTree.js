@@ -98,7 +98,7 @@ const passTree = (op, storyRefs) => {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! globals.isError) {
       // Get data on the first user story.
-      return getItemData(firstRef, [], ['Children', 'TestCases'])
+      return getItemData(firstRef, ['FormattedID'], ['Children', 'TestCases'])
       .then(
         // When the data arrive:
         data => {
@@ -109,6 +109,10 @@ const passTree = (op, storyRefs) => {
           .then(
             // When the data arrive:
             cases => {
+              // Report progress in the console if requested.
+              if (globals.debug) {
+                console.log(`Processing ${data.formattedID}`);
+              }
               // Process the test cases, if any, sequentially.
               return passCases(op, cases)
               .then(

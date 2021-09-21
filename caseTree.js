@@ -138,7 +138,9 @@ const caseTree = (op, storyRefs) => {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! globals.isError) {
       // Get data on the first user story.
-      return getItemData(firstRef, ['Name', 'Description', 'Owner', 'Project'], ['Children'])
+      return getItemData(
+        firstRef, ['FormattedID', 'Name', 'Description', 'Owner', 'Project'], ['Children']
+      )
       .then(
         // When the data arrive:
         data => {
@@ -149,6 +151,10 @@ const caseTree = (op, storyRefs) => {
           if (globals.caseTarget === 'all' || ! data.children.count) {
             names = caseNames ? caseNames[data.name] || [data.name] : [data.name];
             projectRef = globals.caseProjectRef || data.project;
+          }
+          // Report progress in the console if requested.
+          if (globals.debug) {
+            console.log(`Processing ${data.formattedID}`);
           }
           // Create the test cases, if any.
           return createCases(op, names, data.description, data.owner, projectRef, firstRef)

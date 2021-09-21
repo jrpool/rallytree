@@ -1,5 +1,7 @@
 // Serves the change-project report page.
-const serveProjectReport = (op, projectWhich, projectRelease, projectIteration) => {
+const serveProjectReport = (
+  op, projectWhich, projectRelease, projectReleaseRef, projectIteration, projectIterationRef
+) => {
   const {
     err,
     fs,
@@ -28,7 +30,9 @@ const serveProjectReport = (op, projectWhich, projectRelease, projectIteration) 
           .replace('__projectWhich__', projectWhich)
           .replace('__projectRef__', globals.projectRef)
           .replace('__projectRelease__', projectRelease)
-          .replace('__projectIteration__', projectIteration);
+          .replace('__projectReleaseRef__', projectReleaseRef)
+          .replace('__projectIteration__', projectIteration)
+          .replace('__projectIterationRef__', projectIterationRef);
           servePage(newContent, true);
         },
         error => err(error, 'reading report script')
@@ -73,7 +77,14 @@ const projectHandle = (op, bodyObject) => {
                     // Set its global variable.
                     globals.projectIterationRef = ref || null;
                     // Serve a report identifying the project, release, and iteration.
-                    serveProjectReport(op, projectWhich, projectRelease, projectIteration);
+                    serveProjectReport(
+                      op,
+                      projectWhich,
+                      projectRelease,
+                      globals.projectReleaseRef,
+                      projectIteration,
+                      ref
+                    );
                   }
                 },
                 error => err(error, 'getting reference to iteration')

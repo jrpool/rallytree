@@ -139,7 +139,7 @@ const groupTree = (op, storyRefs) => {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! globals.isError) {
       // Get data on the first user story of the specified array.
-      return getItemData(firstRef, [], ['Children', 'TestCases'])
+      return getItemData(firstRef, ['FormattedID'], ['Children', 'TestCases'])
       .then(
         // When the data arrive:
         data => {
@@ -171,6 +171,10 @@ const groupTree = (op, storyRefs) => {
             }      
           };
           // FUNCTION DEFINITION END
+          // Report progress in the console if requested.
+          if (globals.debug) {
+            console.log(`Processing ${data.formattedID}`);
+          }
           // If the user story has test cases:
           if (data.testCases.count) {
             // Get data on them.

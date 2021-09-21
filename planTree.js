@@ -100,7 +100,7 @@ const planTree = (op, storyRefs, parentRef) => {
     if (! globals.isError) {
       // Get data on the first user story.
       return getItemData(
-        firstRef, ['Name', 'Description', 'Project'], ['Children', 'TestCases']
+        firstRef, ['FormattedID', 'Name', 'Description', 'Project'], ['Children', 'TestCases']
       )
       .then(
         // When the data arrive:
@@ -124,6 +124,10 @@ const planTree = (op, storyRefs, parentRef) => {
           .then(
             // When the test folder has been created:
             folder => {
+              // Report progress in the console if requested.
+              if (globals.debug) {
+                console.log(`Processing ${data.formattedID}`);
+              }
               // If the test folder is the root, report its formatted ID.
               if (! parentRef) {
                 response.write(`event: planRoot\ndata: ${folder.Object.FormattedID}\n\n`);

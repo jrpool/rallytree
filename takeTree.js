@@ -121,13 +121,17 @@ const takeTree = (op, storyRefs) => {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! globals.isError) {
       // Get data on the first user story.
-      return getItemData(firstRef, ['Owner'], ['Children', 'Tasks', 'TestCases'])
+      return getItemData(firstRef, ['FormattedID', 'Owner'], ['Children', 'Tasks', 'TestCases'])
       .then(
         // When the data arrive:
         data => {
           report([['total'], ['storyTotal']]);
           const ownerRef = shorten('user', 'user', data.owner);
           if (! globals.isError) {
+            // Report progress in the console if requested.
+            if (globals.debug) {
+              console.log(`Processing ${data.formattedID}`);
+            }
             // Change the owner of the user story if necessary.
             const ownerWrong = ownerRef && ownerRef !== globals.takeWhoRef || ! ownerRef;
             if (ownerWrong) {

@@ -83,10 +83,14 @@ const taskTree = (op, storyRefs) => {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! globals.isError) {
       // Get data on the first user story.
-      return getItemData(firstRef, ['Owner'], ['Children'])
+      return getItemData(firstRef, ['FormattedID', 'Owner'], ['Children'])
       .then(
         // When the data arrive:
         data => {
+          // Report progress in the console if requested.
+          if (globals.debug) {
+            console.log(`Processing ${data.formattedID}`);
+          }
           // If the user story has any child user stories:
           if (data.children.count) {
             report([['total']]);

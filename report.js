@@ -32,14 +32,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // Request an event stream and listen for messages on it.
   eventSource = new EventSource('__eventSource__');
   listenForMessages(eventSource, __events__);
-  // Stop listening after 20 idle seconds, assuming the job complete.
+  // Stop listening after 40 idle seconds, assuming the job complete.
   const poller = setInterval(
     () => {
-      if (lastEventTime && Date.now() - lastEventTime > 20000) {
+      if (lastEventTime && Date.now() - lastEventTime > 40000) {
         eventSource.close();
         clearInterval(poller);
         // Report the elapsed time in the browser console.
-        console.log(`Elapsed time: ${Math.round((Date.now() - startTime - 20000) / 1000)} sec.`);
+        console.log(`Elapsed time: ${Math.round((Date.now() - startTime - 40000) / 1000)} sec.`);
       }
     },
     1000

@@ -261,7 +261,7 @@ const copyTree = (op, storyRefs, parentType, parentRef) => {
       // Get data on the first user story.
       return getItemData(
         firstRef,
-        ['Name', 'Description', 'Owner', 'DragAndDropRank', ...storyProps],
+        ['FormattedID', 'Name', 'Description', 'Owner', 'DragAndDropRank', ...storyProps],
         ['Children', 'Tasks', 'TestCases']
       )
       .then(
@@ -299,6 +299,10 @@ const copyTree = (op, storyRefs, parentType, parentRef) => {
                 properties[prop] = firstStory[lc0Of(prop)];
               });
               properties.ScheduleState = globals.state.story;
+            }
+            // Report progress in the console if requested.
+            if (globals.debug) {
+              console.log(`Processing ${firstStory.formattedID}`);
             }
             // Copy the user story.
             return globals.restAPI.create({

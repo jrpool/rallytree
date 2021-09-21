@@ -85,11 +85,15 @@ const scheduleTree = (op, storyRefs) => {
     const firstRef = shorten('userstory', 'hierarchicalrequirement', storyRefs[0]);
     if (! globals.isError) {
       // Get data on the first user story.
-      return getItemData(firstRef, ['ScheduleState'], ['Children', 'Tasks'])
+      return getItemData(firstRef, ['FormattedID', 'ScheduleState'], ['Children', 'Tasks'])
       .then(
         // When the data arrive:
         data => {
           report([['total'], ['storyTotal']]);
+          // Report progress in the console if requested.
+          if (globals.debug) {
+            console.log(`Processing ${data.formattedID}`);
+          }
           // Change the schedule state of the user story if necessary.
           const changeNeeded = ! data.children.count
             && ! data.tasks.count

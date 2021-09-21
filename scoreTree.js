@@ -94,11 +94,15 @@ const scoreHandle = (op, bodyObject) => {
 const scoreTree = (op, storyRef) => {
   const {globals, totals, err, shorten, report, getItemData, getCollectionData} = op;
   // Get data on the user story.
-  getItemData(storyRef, [], ['Children', 'TestCases'])
+  getItemData(storyRef, ['FormattedID'], ['Children', 'TestCases'])
   .then(
     // When the data arrive:
     data => {
       if (! globals.isError) {
+        // Report progress in the console if requested.
+        if (globals.debug) {
+          console.log(`Processing ${data.formattedID}`);
+        }
         // Get data on the test cases of the user story, if any.
         getCollectionData(
           data.testCases.count ? data.testCases.ref : '',
