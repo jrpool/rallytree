@@ -1,6 +1,6 @@
 {
   "name": "rallytree",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "description": "Automation of Rally tree management",
   "main": "index.html",
   "scripts": {
@@ -24,7 +24,7 @@
   "homepage": "https://github.com/jrpool/rallytree#readme",
   "dependencies": {
     "dotenv": "*",
-    "open": "*",
+    "open": "8.4.2",
     "rally": "*"
   },
   "devDependencies": {
